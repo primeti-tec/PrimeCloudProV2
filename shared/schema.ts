@@ -1,18 +1,107 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, primaryKey, varchar } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { users } from "./models/auth";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export * from "./models/auth";
+
+// === PRODUCTS (PLANS) ===
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  price: integer("price").notNull(), // in cents
+  storageLimit: integer("storage_limit_gb").notNull(),
+  transferLimit: integer("transfer_limit_gb"),
+  isPublic: boolean("is_public").default(true),
+  features: jsonb("features").default([]),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+// === ACCOUNTS (TENANTS) ===
+export const accounts = pgTable("accounts", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").unique(), // For potentially identifying tenant
+  ownerId: varchar("owner_id").references(() => users.id), // Initial owner
+  status: text("status").default("active"), // active, suspended, pending_approval
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+// === ACCOUNT MEMBERS ===
+export const accountMembers = pgTable("account_members", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  userId: varchar("user_id").references(() => users.id),
+  role: text("role").notNull().default("developer"), // owner, admin, developer
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+// === SUBSCRIPTIONS ===
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  productId: integer("product_id").references(() => products.id),
+  status: text("status").default("active"), // active, past_due, canceled
+  currentPeriodStart: timestamp("current_period_start").defaultNow(),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+});
+
+// === RELATIONS ===
+export const productsRelations = relations(products, ({ many }) => ({
+  subscriptions: many(subscriptions),
+}));
+
+export const accountsRelations = relations(accounts, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [accounts.ownerId],
+    references: [users.id],
+  }),
+  members: many(accountMembers),
+  subscriptions: many(subscriptions),
+}));
+
+export const accountMembersRelations = relations(accountMembers, ({ one }) => ({
+  account: one(accounts, {
+    fields: [accountMembers.accountId],
+    references: [accounts.id],
+  }),
+  user: one(users, {
+    fields: [accountMembers.userId],
+    references: [users.id],
+  }),
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  account: one(accounts, {
+    fields: [subscriptions.accountId],
+    references: [accounts.id],
+  }),
+  product: one(products, {
+    fields: [subscriptions.productId],
+    references: [products.id],
+  }),
+}));
+
+// === ZOD SCHEMAS ===
+export const insertProductSchema = createInsertSchema(products);
+export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true, status: true });
+export const insertMemberSchema = createInsertSchema(accountMembers).omit({ id: true, joinedAt: true });
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true });
+
+// === TYPES ===
+export type Product = typeof products.$inferSelect;
+export type Account = typeof accounts.$inferSelect;
+export type AccountMember = typeof accountMembers.$inferSelect;
+export type Subscription = typeof subscriptions.$inferSelect;
+
+export type CreateAccountRequest = z.infer<typeof insertAccountSchema>;
+export type UpdateAccountRequest = Partial<CreateAccountRequest>;
+export type CreateMemberRequest = z.infer<typeof insertMemberSchema>;
+
+// Detailed types for frontend
+export interface AccountWithDetails extends Account {
+  subscription?: Subscription & { product: Product };
+  role?: string; // Role of the current user in this account
+}
