@@ -83,7 +83,7 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes (January 2026)
 
 ### Complete Feature Set (MVP)
-All 13 feature phases implemented and tested:
+All 16 feature phases implemented and tested:
 
 1. **Notifications System**: Real-time notifications with bell icon, read/unread status, and dropdown menu
 2. **Audit Logs**: Comprehensive logging of all user actions with filterable history view
@@ -98,6 +98,9 @@ All 13 feature phases implemented and tested:
 11. **Dashboard Enhancements**: Cost estimates, quota alerts (80%, 95%), quick actions
 12. **Invoice System**: Usage tracking, invoice generation, PDF download
 13. **Quota Request Workflow**: Request, approve/reject quota increases
+14. **Admin Products Management**: Full CRUD for products with isSuperAdmin security check
+15. **Orders/Sales Tracking**: Complete order management with status tracking, payment methods, create/edit/cancel flows
+16. **Settings Page**: User profile display, organization settings update (name, phone, document), notification preferences, security section
 
 ### Bug Fixes
 1. **Member Role Update Fix**: Changed `updateMemberRole` and `removeMember` in storage.ts to use `memberId` (numeric ID from accountMembers table) instead of `userId` string for more reliable updates.
