@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertAccountSchema, type CreateAccountRequest } from "@shared/schema";
 import { useCreateAccount } from "@/hooks/use-accounts";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui-custom";
-import { Loader2, Rocket, Building2, Phone, FileText } from "lucide-react";
+import { Loader2, Rocket, Building2, Phone, FileText, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { formatDocument, validateDocument } from "@/lib/document-validation";
 
 export default function CreateAccount() {
   const { mutateAsync, isPending } = useCreateAccount();
@@ -25,30 +26,24 @@ export default function CreateAccount() {
     },
   });
 
+  const documentValue = form.watch('document') || '';
+  
+  const documentValidation = useMemo(() => {
+    if (!documentValue || documentValue.replace(/\D/g, '').length === 0) {
+      return { valid: true };
+    }
+    return validateDocument(documentValue, documentType);
+  }, [documentValue, documentType]);
+
   const onSubmit = async (data: CreateAccountRequest) => {
+    if (!documentValidation.valid) {
+      return;
+    }
     try {
       await mutateAsync({ ...data, documentType });
       setLocation("/dashboard");
     } catch (error) {
       console.error(error);
-    }
-  };
-
-  const formatDocument = (value: string) => {
-    const digits = value.replace(/\D/g, '');
-    if (documentType === 'cpf') {
-      return digits
-        .slice(0, 11)
-        .replace(/(\d{3})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-    } else {
-      return digits
-        .slice(0, 14)
-        .replace(/(\d{2})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d)/, '$1/$2')
-        .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
     }
   };
 
@@ -108,14 +103,24 @@ export default function CreateAccount() {
                   <option value="cnpj">CNPJ</option>
                   <option value="cpf">CPF</option>
                 </select>
-                <Input
-                  placeholder={documentType === 'cpf' ? '000.000.000-00' : '00.000.000/0000-00'}
-                  value={form.watch('document') || ''}
-                  onChange={(e) => form.setValue('document', formatDocument(e.target.value))}
-                  className="h-12 flex-1 font-mono"
-                  data-testid="input-document"
-                />
+                <div className="relative flex-1">
+                  <Input
+                    placeholder={documentType === 'cpf' ? '000.000.000-00' : '00.000.000/0000-00'}
+                    value={documentValue}
+                    onChange={(e) => form.setValue('document', formatDocument(e.target.value, documentType))}
+                    className={`h-12 font-mono pr-10 ${!documentValidation.valid ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                    data-testid="input-document"
+                  />
+                  {!documentValidation.valid && (
+                    <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-red-500" data-testid="icon-document-error" />
+                  )}
+                </div>
               </div>
+              {!documentValidation.valid && documentValidation.error && (
+                <p className="text-red-500 text-sm flex items-center gap-1" data-testid="text-document-error">
+                  {documentValidation.error}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -143,7 +148,7 @@ export default function CreateAccount() {
               <p className="text-xs text-muted-foreground">Unique identifier for your organization URL.</p>
             </div>
 
-            <Button type="submit" className="w-full h-12 text-base" disabled={isPending} data-testid="button-create">
+            <Button type="submit" className="w-full h-12 text-base" disabled={isPending || !documentValidation.valid} data-testid="button-create">
               {isPending ? <Loader2 className="animate-spin mr-2" /> : null}
               Create Workspace
             </Button>

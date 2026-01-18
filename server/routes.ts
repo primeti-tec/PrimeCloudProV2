@@ -259,6 +259,64 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // --- Notifications Routes ---
+  app.get('/api/accounts/:accountId/notifications', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const notificationList = await storage.getNotifications(accountId, 50);
+    res.json(notificationList);
+  });
+
+  app.get('/api/accounts/:accountId/notifications/unread-count', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const count = await storage.getUnreadCount(accountId);
+    res.json({ count });
+  });
+
+  app.patch('/api/accounts/:accountId/notifications/:notificationId/read', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const notificationId = parseInt(req.params.notificationId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const notification = await storage.markNotificationRead(notificationId);
+    res.json(notification);
+  });
+
+  app.post('/api/accounts/:accountId/notifications/mark-all-read', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    await storage.markAllNotificationsRead(accountId);
+    res.json({ success: true });
+  });
+
+  // --- Audit Logs Routes ---
+  app.get('/api/accounts/:accountId/audit-logs', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const logs = await storage.getAuditLogs(accountId, 100);
+    res.json(logs);
+  });
+
   // Seed Data
   await seedDatabase();
 

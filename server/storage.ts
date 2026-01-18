@@ -1,10 +1,12 @@
 import { db } from "./db";
 import {
-  users, accounts, products, accountMembers, subscriptions, buckets, accessKeys,
+  users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs,
   type Account, type Product, type Subscription, type AccountMember, type Bucket, type AccessKey,
-  type CreateAccountRequest, type CreateMemberRequest, type CreateBucketRequest, type CreateAccessKeyRequest
+  type Notification, type AuditLog,
+  type CreateAccountRequest, type CreateMemberRequest, type CreateBucketRequest, type CreateAccessKeyRequest,
+  type CreateNotificationRequest, type CreateAuditLogRequest
 } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface IStorage {
@@ -42,6 +44,17 @@ export interface IStorage {
   createAccessKey(data: CreateAccessKeyRequest): Promise<AccessKey & { rawSecret: string }>;
   getAccessKeys(accountId: number): Promise<AccessKey[]>;
   revokeAccessKey(id: number): Promise<void>;
+
+  // Notifications
+  createNotification(data: CreateNotificationRequest): Promise<Notification>;
+  getNotifications(accountId: number, limit?: number): Promise<Notification[]>;
+  markNotificationRead(id: number): Promise<Notification>;
+  markAllNotificationsRead(accountId: number): Promise<void>;
+  getUnreadCount(accountId: number): Promise<number>;
+
+  // Audit Logs
+  createAuditLog(data: CreateAuditLogRequest): Promise<AuditLog>;
+  getAuditLogs(accountId: number, limit?: number): Promise<AuditLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -200,6 +213,61 @@ export class DatabaseStorage implements IStorage {
 
   async revokeAccessKey(id: number): Promise<void> {
     await db.update(accessKeys).set({ isActive: false }).where(eq(accessKeys.id, id));
+  }
+
+  // Notifications
+  async createNotification(data: CreateNotificationRequest): Promise<Notification> {
+    const [notification] = await db.insert(notifications).values(data).returning();
+    return notification;
+  }
+
+  async getNotifications(accountId: number, limit?: number): Promise<Notification[]> {
+    const query = db.select().from(notifications)
+      .where(eq(notifications.accountId, accountId))
+      .orderBy(desc(notifications.createdAt));
+    
+    if (limit) {
+      return await query.limit(limit);
+    }
+    return await query;
+  }
+
+  async markNotificationRead(id: number): Promise<Notification> {
+    const [notification] = await db.update(notifications)
+      .set({ isRead: true, readAt: new Date() })
+      .where(eq(notifications.id, id))
+      .returning();
+    return notification;
+  }
+
+  async markAllNotificationsRead(accountId: number): Promise<void> {
+    await db.update(notifications)
+      .set({ isRead: true, readAt: new Date() })
+      .where(and(eq(notifications.accountId, accountId), eq(notifications.isRead, false)));
+  }
+
+  async getUnreadCount(accountId: number): Promise<number> {
+    const [result] = await db.select({ count: count() })
+      .from(notifications)
+      .where(and(eq(notifications.accountId, accountId), eq(notifications.isRead, false)));
+    return result?.count ?? 0;
+  }
+
+  // Audit Logs
+  async createAuditLog(data: CreateAuditLogRequest): Promise<AuditLog> {
+    const [log] = await db.insert(auditLogs).values(data).returning();
+    return log;
+  }
+
+  async getAuditLogs(accountId: number, limit?: number): Promise<AuditLog[]> {
+    const query = db.select().from(auditLogs)
+      .where(eq(auditLogs.accountId, accountId))
+      .orderBy(desc(auditLogs.createdAt));
+    
+    if (limit) {
+      return await query.limit(limit);
+    }
+    return await query;
   }
 }
 

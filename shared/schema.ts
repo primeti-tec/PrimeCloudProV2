@@ -56,7 +56,106 @@ export const accessKeys = pgTable("access_keys", {
   secretAccessKey: text("secret_access_key").notNull(), // Hashed in production
   permissions: text("permissions").default("read-write"), // read, write, read-write
   isActive: boolean("is_active").default(true),
+  expiresAt: timestamp("expires_at"),
   lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === NOTIFICATIONS ===
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  type: text("type").notNull(), // quota_warning, quota_critical, invoice_generated, payment_overdue, welcome, etc.
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false),
+  readAt: timestamp("read_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === AUDIT LOGS ===
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  userId: varchar("user_id").references(() => users.id),
+  action: text("action").notNull(), // BUCKET_CREATED, KEY_REVOKED, MEMBER_ADDED, etc.
+  resource: text("resource"),
+  details: jsonb("details"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === USER INVITATIONS ===
+export const invitations = pgTable("invitations", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("developer"),
+  token: text("token").notNull().unique(),
+  invitedBy: varchar("invited_by").references(() => users.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === INVOICES ===
+export const invoices = pgTable("invoices", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  storageGB: integer("storage_gb").default(0),
+  storageCost: integer("storage_cost").default(0), // cents
+  bandwidthGB: integer("bandwidth_gb").default(0),
+  bandwidthCost: integer("bandwidth_cost").default(0), // cents
+  subtotal: integer("subtotal").default(0), // cents
+  taxAmount: integer("tax_amount").default(0), // cents
+  totalAmount: integer("total_amount").default(0), // cents
+  status: text("status").default("pending"), // pending, paid, overdue, canceled
+  dueDate: timestamp("due_date").notNull(),
+  paidAt: timestamp("paid_at"),
+  paymentMethod: text("payment_method"),
+  pdfUrl: text("pdf_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === USAGE RECORDS ===
+export const usageRecords = pgTable("usage_records", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  storageBytes: bigint("storage_bytes", { mode: "number" }).default(0),
+  bandwidthIngress: bigint("bandwidth_ingress", { mode: "number" }).default(0),
+  bandwidthEgress: bigint("bandwidth_egress", { mode: "number" }).default(0),
+  requestsCount: integer("requests_count").default(0),
+  recordedAt: timestamp("recorded_at").defaultNow(),
+});
+
+// === QUOTA CHANGE REQUESTS ===
+export const quotaRequests = pgTable("quota_requests", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  currentQuotaGB: integer("current_quota_gb").notNull(),
+  requestedQuotaGB: integer("requested_quota_gb").notNull(),
+  reason: text("reason"),
+  status: text("status").default("pending"), // pending, approved, rejected
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  rejectedReason: text("rejected_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === SFTP CREDENTIALS ===
+export const sftpCredentials = pgTable("sftp_credentials", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id).unique(),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  status: text("status").default("active"), // active, revoked
+  lastLoginAt: timestamp("last_login_at"),
+  lastLoginIp: text("last_login_ip"),
+  loginCount: integer("login_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -94,6 +193,77 @@ export const accountsRelations = relations(accounts, ({ one, many }) => ({
   subscriptions: many(subscriptions),
   buckets: many(buckets),
   accessKeys: many(accessKeys),
+  notifications: many(notifications),
+  auditLogs: many(auditLogs),
+  invitations: many(invitations),
+  invoices: many(invoices),
+  usageRecords: many(usageRecords),
+  quotaRequests: many(quotaRequests),
+  sftpCredential: one(sftpCredentials, {
+    fields: [accounts.id],
+    references: [sftpCredentials.accountId],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  account: one(accounts, {
+    fields: [notifications.accountId],
+    references: [accounts.id],
+  }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  account: one(accounts, {
+    fields: [auditLogs.accountId],
+    references: [accounts.id],
+  }),
+  user: one(users, {
+    fields: [auditLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  account: one(accounts, {
+    fields: [invitations.accountId],
+    references: [accounts.id],
+  }),
+  inviter: one(users, {
+    fields: [invitations.invitedBy],
+    references: [users.id],
+  }),
+}));
+
+export const invoicesRelations = relations(invoices, ({ one }) => ({
+  account: one(accounts, {
+    fields: [invoices.accountId],
+    references: [accounts.id],
+  }),
+}));
+
+export const usageRecordsRelations = relations(usageRecords, ({ one }) => ({
+  account: one(accounts, {
+    fields: [usageRecords.accountId],
+    references: [accounts.id],
+  }),
+}));
+
+export const quotaRequestsRelations = relations(quotaRequests, ({ one }) => ({
+  account: one(accounts, {
+    fields: [quotaRequests.accountId],
+    references: [accounts.id],
+  }),
+  approver: one(users, {
+    fields: [quotaRequests.approvedBy],
+    references: [users.id],
+  }),
+}));
+
+export const sftpCredentialsRelations = relations(sftpCredentials, ({ one }) => ({
+  account: one(accounts, {
+    fields: [sftpCredentials.accountId],
+    references: [accounts.id],
+  }),
 }));
 
 export const bucketsRelations = relations(buckets, ({ one }) => ({
@@ -138,7 +308,14 @@ export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true,
 export const insertMemberSchema = createInsertSchema(accountMembers).omit({ id: true, joinedAt: true });
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true });
 export const insertBucketSchema = createInsertSchema(buckets).omit({ id: true, createdAt: true, objectCount: true, sizeBytes: true });
-export const insertAccessKeySchema = createInsertSchema(accessKeys).omit({ id: true, createdAt: true, lastUsedAt: true, accessKeyId: true, secretAccessKey: true });
+export const insertAccessKeySchema = createInsertSchema(accessKeys).omit({ id: true, createdAt: true, lastUsedAt: true, accessKeyId: true, secretAccessKey: true, expiresAt: true });
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, isRead: true, readAt: true });
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+export const insertInvitationSchema = createInsertSchema(invitations).omit({ id: true, createdAt: true, acceptedAt: true, token: true });
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, paidAt: true });
+export const insertUsageRecordSchema = createInsertSchema(usageRecords).omit({ id: true, recordedAt: true });
+export const insertQuotaRequestSchema = createInsertSchema(quotaRequests).omit({ id: true, createdAt: true, status: true, approvedBy: true, approvedAt: true, rejectedReason: true });
+export const insertSftpCredentialSchema = createInsertSchema(sftpCredentials).omit({ id: true, createdAt: true, lastLoginAt: true, lastLoginIp: true, loginCount: true });
 
 // === TYPES ===
 export type Product = typeof products.$inferSelect;
@@ -147,12 +324,25 @@ export type AccountMember = typeof accountMembers.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type Bucket = typeof buckets.$inferSelect;
 export type AccessKey = typeof accessKeys.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type Invitation = typeof invitations.$inferSelect;
+export type Invoice = typeof invoices.$inferSelect;
+export type UsageRecord = typeof usageRecords.$inferSelect;
+export type QuotaRequest = typeof quotaRequests.$inferSelect;
+export type SftpCredential = typeof sftpCredentials.$inferSelect;
 
 export type CreateAccountRequest = z.infer<typeof insertAccountSchema>;
 export type UpdateAccountRequest = Partial<CreateAccountRequest>;
 export type CreateMemberRequest = z.infer<typeof insertMemberSchema>;
 export type CreateBucketRequest = z.infer<typeof insertBucketSchema>;
 export type CreateAccessKeyRequest = z.infer<typeof insertAccessKeySchema>;
+export type CreateNotificationRequest = z.infer<typeof insertNotificationSchema>;
+export type CreateAuditLogRequest = z.infer<typeof insertAuditLogSchema>;
+export type CreateInvitationRequest = z.infer<typeof insertInvitationSchema>;
+export type CreateInvoiceRequest = z.infer<typeof insertInvoiceSchema>;
+export type CreateUsageRecordRequest = z.infer<typeof insertUsageRecordSchema>;
+export type CreateQuotaRequestRequest = z.infer<typeof insertQuotaRequestSchema>;
 
 // Detailed types for frontend
 export interface AccountWithDetails extends Account {

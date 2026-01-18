@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { useAccount, useMyAccounts } from "@/hooks/use-accounts";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui-custom";
@@ -5,6 +6,7 @@ import { useLocation } from "wouter";
 import { Loader2, HardDrive, ArrowUpRight, Activity, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
+import { NotificationsBell } from "@/components/NotificationsBell";
 
 // Mock Data for Charts
 const data = [
@@ -20,18 +22,21 @@ const data = [
 export default function Dashboard() {
   const { data: accounts, isLoading: accountsLoading } = useMyAccounts();
   const [, setLocation] = useLocation();
-
-  // Redirect to setup if no accounts
-  if (!accountsLoading && accounts && accounts.length === 0) {
-    setLocation("/create-account");
-    return null;
-  }
-
-  // Select the first account for MVP
   const currentAccount = accounts?.[0];
   const { data: accountDetails, isLoading: detailsLoading } = useAccount(currentAccount?.id);
 
+  // Redirect to setup if no accounts
+  useEffect(() => {
+    if (!accountsLoading && accounts && accounts.length === 0) {
+      setLocation("/create-account");
+    }
+  }, [accountsLoading, accounts, setLocation]);
+
   if (accountsLoading || detailsLoading) {
+    return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
+  }
+
+  if (!currentAccount) {
     return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
 
@@ -44,7 +49,8 @@ export default function Dashboard() {
             <h1 className="text-3xl font-display font-bold text-slate-900">Dashboard</h1>
             <p className="text-muted-foreground">Overview for <span className="font-semibold text-slate-900">{currentAccount?.name}</span></p>
           </div>
-          <div className="flex gap-4">
+          <div className="flex items-center gap-4">
+             {currentAccount && <NotificationsBell accountId={currentAccount.id} />}
              <Button variant="outline">View Documentation</Button>
              <Button>Create Bucket</Button>
           </div>
