@@ -1,10 +1,10 @@
 import { db } from "./db";
 import {
-  users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs, invitations, sftpCredentials, invoices, usageRecords, quotaRequests,
+  users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs, invitations, sftpCredentials, invoices, usageRecords, quotaRequests, orders,
   type Account, type Product, type Subscription, type AccountMember, type Bucket, type AccessKey,
-  type Notification, type AuditLog, type Invitation, type SftpCredential, type Invoice, type QuotaRequest,
+  type Notification, type AuditLog, type Invitation, type SftpCredential, type Invoice, type QuotaRequest, type Order, type OrderWithDetails,
   type CreateAccountRequest, type CreateMemberRequest, type CreateBucketRequest, type CreateAccessKeyRequest,
-  type CreateNotificationRequest, type CreateAuditLogRequest, type CreateQuotaRequestRequest
+  type CreateNotificationRequest, type CreateAuditLogRequest, type CreateQuotaRequestRequest, type CreateOrderRequest, type UpdateOrderRequest
 } from "@shared/schema";
 import { eq, and, desc, count, isNull, gt } from "drizzle-orm";
 import crypto from "crypto";
@@ -92,6 +92,14 @@ export interface IStorage {
   getQuotaRequest(id: number): Promise<QuotaRequest | undefined>;
   approveQuotaRequest(id: number, reviewerId: string, note?: string): Promise<QuotaRequest>;
   rejectQuotaRequest(id: number, reviewerId: string, note?: string): Promise<QuotaRequest>;
+
+  // Orders
+  createOrder(data: CreateOrderRequest): Promise<Order>;
+  getOrders(accountId: number): Promise<OrderWithDetails[]>;
+  getAllOrders(): Promise<OrderWithDetails[]>;
+  getOrder(id: number): Promise<OrderWithDetails | undefined>;
+  updateOrder(id: number, data: UpdateOrderRequest): Promise<Order>;
+  cancelOrder(id: number, reason?: string): Promise<Order>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -611,6 +619,101 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return updated;
+  }
+
+  // Orders
+  private generateOrderNumber(): string {
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = crypto.randomBytes(3).toString('hex').toUpperCase();
+    return `ORD-${timestamp}-${random}`;
+  }
+
+  async createOrder(data: CreateOrderRequest): Promise<Order> {
+    const orderNumber = this.generateOrderNumber();
+    const [order] = await db.insert(orders).values({ 
+      ...data, 
+      orderNumber 
+    }).returning();
+    return order;
+  }
+
+  async getOrders(accountId: number): Promise<OrderWithDetails[]> {
+    const results = await db.select({
+      order: orders,
+      account: accounts,
+      product: products
+    })
+    .from(orders)
+    .leftJoin(accounts, eq(orders.accountId, accounts.id))
+    .leftJoin(products, eq(orders.productId, products.id))
+    .where(eq(orders.accountId, accountId))
+    .orderBy(desc(orders.createdAt));
+
+    return results.map(r => ({ 
+      ...r.order, 
+      account: r.account || undefined, 
+      product: r.product || undefined 
+    }));
+  }
+
+  async getAllOrders(): Promise<OrderWithDetails[]> {
+    const results = await db.select({
+      order: orders,
+      account: accounts,
+      product: products
+    })
+    .from(orders)
+    .leftJoin(accounts, eq(orders.accountId, accounts.id))
+    .leftJoin(products, eq(orders.productId, products.id))
+    .orderBy(desc(orders.createdAt));
+
+    return results.map(r => ({ 
+      ...r.order, 
+      account: r.account || undefined, 
+      product: r.product || undefined 
+    }));
+  }
+
+  async getOrder(id: number): Promise<OrderWithDetails | undefined> {
+    const results = await db.select({
+      order: orders,
+      account: accounts,
+      product: products
+    })
+    .from(orders)
+    .leftJoin(accounts, eq(orders.accountId, accounts.id))
+    .leftJoin(products, eq(orders.productId, products.id))
+    .where(eq(orders.id, id));
+
+    if (results.length === 0) return undefined;
+    
+    const r = results[0];
+    return { 
+      ...r.order, 
+      account: r.account || undefined, 
+      product: r.product || undefined 
+    };
+  }
+
+  async updateOrder(id: number, data: UpdateOrderRequest): Promise<Order> {
+    const [order] = await db.update(orders)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(orders.id, id))
+      .returning();
+    return order;
+  }
+
+  async cancelOrder(id: number, reason?: string): Promise<Order> {
+    const [order] = await db.update(orders)
+      .set({ 
+        status: 'canceled', 
+        canceledAt: new Date(), 
+        cancelReason: reason || null,
+        updatedAt: new Date()
+      })
+      .where(eq(orders.id, id))
+      .returning();
+    return order;
   }
 }
 

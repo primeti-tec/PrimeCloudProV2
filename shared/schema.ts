@@ -182,9 +182,42 @@ export const subscriptions = pgTable("subscriptions", {
   cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
 });
 
+// === ORDERS (SALES) ===
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  productId: integer("product_id").references(() => products.id),
+  orderNumber: text("order_number").notNull().unique(),
+  status: text("status").default("pending"), // pending, processing, completed, canceled, refunded
+  quantity: integer("quantity").default(1),
+  unitPrice: integer("unit_price").notNull(), // cents
+  totalAmount: integer("total_amount").notNull(), // cents
+  discount: integer("discount").default(0), // cents
+  notes: text("notes"),
+  paymentMethod: text("payment_method"), // credit_card, pix, boleto, bank_transfer
+  paymentStatus: text("payment_status").default("pending"), // pending, paid, failed, refunded
+  paidAt: timestamp("paid_at"),
+  canceledAt: timestamp("canceled_at"),
+  cancelReason: text("cancel_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // === RELATIONS ===
 export const productsRelations = relations(products, ({ many }) => ({
   subscriptions: many(subscriptions),
+  orders: many(orders),
+}));
+
+export const ordersRelations = relations(orders, ({ one }) => ({
+  account: one(accounts, {
+    fields: [orders.accountId],
+    references: [accounts.id],
+  }),
+  product: one(products, {
+    fields: [orders.productId],
+    references: [products.id],
+  }),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -330,9 +363,11 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true,
 export const insertUsageRecordSchema = createInsertSchema(usageRecords).omit({ id: true, recordedAt: true });
 export const insertQuotaRequestSchema = createInsertSchema(quotaRequests).omit({ id: true, createdAt: true, status: true, reviewedById: true, reviewNote: true, reviewedAt: true });
 export const insertSftpCredentialSchema = createInsertSchema(sftpCredentials).omit({ id: true, createdAt: true, lastLoginAt: true, lastLoginIp: true, loginCount: true });
+export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true, orderNumber: true, paidAt: true, canceledAt: true });
 
 // === TYPES ===
 export type Product = typeof products.$inferSelect;
+export type Order = typeof orders.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type AccountMember = typeof accountMembers.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
@@ -357,6 +392,14 @@ export type CreateInvitationRequest = z.infer<typeof insertInvitationSchema>;
 export type CreateInvoiceRequest = z.infer<typeof insertInvoiceSchema>;
 export type CreateUsageRecordRequest = z.infer<typeof insertUsageRecordSchema>;
 export type CreateQuotaRequestRequest = z.infer<typeof insertQuotaRequestSchema>;
+export type CreateOrderRequest = z.infer<typeof insertOrderSchema>;
+export type UpdateOrderRequest = Partial<Omit<CreateOrderRequest, 'accountId' | 'productId'>>;
+
+// Order with related data
+export interface OrderWithDetails extends Order {
+  account?: Account;
+  product?: Product;
+}
 
 // Detailed types for frontend
 export interface AccountWithDetails extends Account {
