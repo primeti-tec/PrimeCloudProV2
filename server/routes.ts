@@ -148,6 +148,117 @@ export async function registerRoutes(
     res.json(account);
   });
 
+  // Remove Member
+  app.delete(api.members.remove.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const memberId = parseInt(req.params.memberId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    await storage.removeMember(accountId, memberId);
+    res.json({ success: true });
+  });
+
+  // Update Member Role
+  app.patch('/api/accounts/:accountId/members/:memberId', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const memberId = parseInt(req.params.memberId);
+    const { role } = req.body;
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const member = await storage.updateMemberRole(memberId, role);
+    res.json(member);
+  });
+
+  // --- Buckets Routes ---
+  app.get(api.buckets.list.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const bucketList = await storage.getBuckets(accountId);
+    res.json(bucketList);
+  });
+
+  app.post(api.buckets.create.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const { name, region, isPublic } = req.body;
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const bucket = await storage.createBucket({ accountId, name, region, isPublic });
+    res.status(201).json(bucket);
+  });
+
+  app.delete(api.buckets.delete.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    await storage.deleteBucket(bucketId);
+    res.json({ success: true });
+  });
+
+  // --- Access Keys Routes ---
+  app.get(api.accessKeys.list.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const keys = await storage.getAccessKeys(accountId);
+    res.json(keys);
+  });
+
+  app.post(api.accessKeys.create.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const { name, permissions } = req.body;
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const key = await storage.createAccessKey({ accountId, name, permissions });
+    res.status(201).json(key);
+  });
+
+  app.delete(api.accessKeys.revoke.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const keyId = parseInt(req.params.keyId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    await storage.revokeAccessKey(keyId);
+    res.json({ success: true });
+  });
+
   // Seed Data
   await seedDatabase();
 

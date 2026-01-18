@@ -1,10 +1,11 @@
 import { Sidebar } from "@/components/Sidebar";
-import { useMembers, useAddMember, useRemoveMember } from "@/hooks/use-members";
+import { useMembers, useAddMember, useRemoveMember, useUpdateMemberRole } from "@/hooks/use-members";
 import { useMyAccounts } from "@/hooks/use-accounts";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui-custom";
-import { Loader2, Trash2, UserPlus, Shield, User } from "lucide-react";
+import { Loader2, Trash2, UserPlus, Shield, User, Crown, Code } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Team() {
   const { data: accounts } = useMyAccounts();
@@ -12,6 +13,8 @@ export default function Team() {
   const { data: members, isLoading } = useMembers(currentAccount?.id);
   const { mutateAsync: addMember, isPending: isAdding } = useAddMember();
   const { mutateAsync: removeMember } = useRemoveMember();
+  const { mutate: updateRole } = useUpdateMemberRole();
+  const { toast } = useToast();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { register, handleSubmit, reset } = useForm<{ email: string; role: 'admin' | 'developer' }>();
@@ -22,14 +25,31 @@ export default function Team() {
       await addMember({ accountId: currentAccount.id, ...data });
       setIsDialogOpen(false);
       reset();
+      toast({ title: "Member added", description: `${data.email} has been invited.` });
     } catch (e) {
-      console.error(e);
+      toast({ title: "Error", description: "User not found. They must log in at least once.", variant: "destructive" });
     }
   };
 
   const onRemove = async (memberId: number) => {
-    if (!currentAccount || !confirm("Are you sure?")) return;
+    if (!currentAccount || !confirm("Are you sure you want to remove this member?")) return;
     await removeMember({ accountId: currentAccount.id, memberId });
+    toast({ title: "Member removed" });
+  };
+
+  const onChangeRole = (memberId: number, newRole: string) => {
+    if (!currentAccount) return;
+    updateRole({ accountId: currentAccount.id, memberId, role: newRole }, {
+      onSuccess: () => toast({ title: "Role updated" }),
+    });
+  };
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'owner': return <Crown className="w-3 h-3 mr-1" />;
+      case 'admin': return <Shield className="w-3 h-3 mr-1" />;
+      default: return <Code className="w-3 h-3 mr-1" />;
+    }
   };
 
   return (
@@ -99,14 +119,22 @@ export default function Team() {
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          member.role === 'owner' ? 'bg-purple-100 text-purple-800' : 
-                          member.role === 'admin' ? 'bg-blue-100 text-blue-800' : 
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {member.role === 'owner' && <Shield className="w-3 h-3 mr-1" />}
-                          {member.role}
-                        </span>
+                        {member.role === 'owner' ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            {getRoleIcon(member.role)}
+                            Owner
+                          </span>
+                        ) : (
+                          <select
+                            value={member.role}
+                            onChange={(e) => onChangeRole(member.id, e.target.value)}
+                            className="h-8 px-2 rounded-md border border-input bg-background text-xs font-medium cursor-pointer hover:bg-accent"
+                            data-testid={`select-role-${member.id}`}
+                          >
+                            <option value="admin">Admin</option>
+                            <option value="developer">Developer</option>
+                          </select>
+                        )}
                       </td>
                       <td className="p-4 text-sm text-muted-foreground">
                         {new Date(member.joinedAt!).toLocaleDateString()}

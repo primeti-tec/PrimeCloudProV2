@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertAccountSchema, insertProductSchema, accounts, products, accountMembers, subscriptions } from './schema';
+import { insertAccountSchema, insertProductSchema, insertBucketSchema, insertAccessKeySchema, accounts, products, accountMembers, subscriptions, buckets, accessKeys } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -118,6 +118,62 @@ export const api = {
       path: '/api/admin/accounts/:id/approve',
       responses: {
         200: z.custom<typeof accounts.$inferSelect>(),
+      },
+    },
+  },
+  // Buckets
+  buckets: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/buckets',
+      responses: {
+        200: z.array(z.custom<typeof buckets.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/buckets',
+      input: insertBucketSchema.pick({ name: true, region: true, isPublic: true }),
+      responses: {
+        201: z.custom<typeof buckets.$inferSelect>(),
+        400: errorSchemas.validation,
+        403: errorSchemas.forbidden,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId',
+      responses: {
+        200: z.void(),
+        403: errorSchemas.forbidden,
+      },
+    },
+  },
+  // Access Keys
+  accessKeys: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/access-keys',
+      responses: {
+        200: z.array(z.custom<typeof accessKeys.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/access-keys',
+      input: insertAccessKeySchema.pick({ name: true, permissions: true }),
+      responses: {
+        201: z.custom<typeof accessKeys.$inferSelect & { rawSecret: string }>(),
+        400: errorSchemas.validation,
+        403: errorSchemas.forbidden,
+      },
+    },
+    revoke: {
+      method: 'DELETE' as const,
+      path: '/api/accounts/:accountId/access-keys/:keyId',
+      responses: {
+        200: z.void(),
+        403: errorSchemas.forbidden,
       },
     },
   },

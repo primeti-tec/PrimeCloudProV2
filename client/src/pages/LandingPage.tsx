@@ -22,11 +22,15 @@ export default function LandingPage() {
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Features</a>
               <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Pricing</a>
-              <Link href={user ? "/dashboard" : "/api/login"}>
-                <Button size="md" className="rounded-full px-6">
-                  {user ? "Go to Dashboard" : "Get Started"}
-                </Button>
-              </Link>
+              {user ? (
+                <Link href="/dashboard">
+                  <Button size="md" className="rounded-full px-6">Go to Dashboard</Button>
+                </Link>
+              ) : (
+                <a href="/api/login">
+                  <Button size="md" className="rounded-full px-6" data-testid="button-get-started">Get Started</Button>
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -54,11 +58,19 @@ export default function LandingPage() {
               Enterprise-grade S3-compatible object storage with simple pricing, infinite scalability, and developer-first APIs.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href={user ? "/dashboard" : "/api/login"}>
-                <Button size="lg" className="rounded-full text-lg px-8 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30">
-                  Start for Free <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
+              {user ? (
+                <Link href="/dashboard">
+                  <Button size="lg" className="rounded-full text-lg px-8 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30">
+                    Go to Dashboard <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              ) : (
+                <a href="/api/login">
+                  <Button size="lg" className="rounded-full text-lg px-8 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30" data-testid="button-start-free">
+                    Start for Free <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </a>
+              )}
               <Button variant="outline" size="lg" className="rounded-full text-lg px-8 border-2">
                 View Documentation
               </Button>
@@ -157,11 +169,19 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link href={user ? "/dashboard" : "/api/login"}>
-                  <Button variant={plan.featured ? "primary" : "outline"} className="w-full rounded-xl">
-                    Choose {plan.name}
-                  </Button>
-                </Link>
+                {user ? (
+                  <Link href="/dashboard">
+                    <Button variant={plan.featured ? "primary" : "outline"} className="w-full rounded-xl">
+                      Choose {plan.name}
+                    </Button>
+                  </Link>
+                ) : (
+                  <a href="/api/login">
+                    <Button variant={plan.featured ? "primary" : "outline"} className="w-full rounded-xl" data-testid={`button-choose-${plan.name.toLowerCase()}`}>
+                      Choose {plan.name}
+                    </Button>
+                  </a>
+                )}
               </div>
             ))}
           </div>

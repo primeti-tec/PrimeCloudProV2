@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertAccountSchema, type CreateAccountRequest } from "@shared/schema";
 import { useCreateAccount } from "@/hooks/use-accounts";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui-custom";
-import { Loader2, Rocket } from "lucide-react";
+import { Loader2, Rocket, Building2, Phone, FileText } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -12,22 +12,52 @@ export default function CreateAccount() {
   const { mutateAsync, isPending } = useCreateAccount();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const [documentType, setDocumentType] = useState<'cpf' | 'cnpj'>('cnpj');
   
   const form = useForm<CreateAccountRequest>({
     resolver: zodResolver(insertAccountSchema),
     defaultValues: {
       name: "",
-      slug: "", // optional, usually auto-generated if empty but good to ask
+      slug: "",
+      document: "",
+      documentType: "cnpj",
+      phone: "",
     },
   });
 
   const onSubmit = async (data: CreateAccountRequest) => {
     try {
-      await mutateAsync(data);
+      await mutateAsync({ ...data, documentType });
       setLocation("/dashboard");
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const formatDocument = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (documentType === 'cpf') {
+      return digits
+        .slice(0, 11)
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    } else {
+      return digits
+        .slice(0, 14)
+        .replace(/(\d{2})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1/$2')
+        .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+    }
+  };
+
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    return digits
+      .slice(0, 11)
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{5})(\d)/, '$1-$2');
   };
 
   return (
@@ -39,21 +69,67 @@ export default function CreateAccount() {
           </div>
           <CardTitle className="text-2xl">Create Organization</CardTitle>
           <p className="text-muted-foreground mt-2">
-            Welcome, {user?.firstName}! To get started, set up your organization workspace.
+            Welcome, {user?.firstName || 'there'}! Set up your organization workspace to get started.
           </p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Organization Name</label>
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                Organization Name
+              </label>
               <Input
                 placeholder="Acme Corp"
                 {...form.register("name")}
                 className="h-12"
+                data-testid="input-org-name"
               />
               {form.formState.errors.name && (
                 <p className="text-red-500 text-sm">{form.formState.errors.name.message}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Document (CPF/CNPJ)
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={documentType}
+                  onChange={(e) => {
+                    setDocumentType(e.target.value as 'cpf' | 'cnpj');
+                    form.setValue('document', '');
+                  }}
+                  className="h-12 px-3 rounded-lg border border-input bg-background text-sm"
+                  data-testid="select-document-type"
+                >
+                  <option value="cnpj">CNPJ</option>
+                  <option value="cpf">CPF</option>
+                </select>
+                <Input
+                  placeholder={documentType === 'cpf' ? '000.000.000-00' : '00.000.000/0000-00'}
+                  value={form.watch('document') || ''}
+                  onChange={(e) => form.setValue('document', formatDocument(e.target.value))}
+                  className="h-12 flex-1 font-mono"
+                  data-testid="input-document"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                Phone Number
+              </label>
+              <Input
+                placeholder="(11) 99999-9999"
+                value={form.watch('phone') || ''}
+                onChange={(e) => form.setValue('phone', formatPhone(e.target.value))}
+                className="h-12 font-mono"
+                data-testid="input-phone"
+              />
             </div>
 
             <div className="space-y-2">
@@ -62,14 +138,19 @@ export default function CreateAccount() {
                 placeholder="acme-corp"
                 {...form.register("slug")}
                 className="h-12"
+                data-testid="input-slug"
               />
               <p className="text-xs text-muted-foreground">Unique identifier for your organization URL.</p>
             </div>
 
-            <Button type="submit" className="w-full h-12 text-base" disabled={isPending}>
+            <Button type="submit" className="w-full h-12 text-base" disabled={isPending} data-testid="button-create">
               {isPending ? <Loader2 className="animate-spin mr-2" /> : null}
               Create Workspace
             </Button>
+
+            <p className="text-xs text-center text-muted-foreground">
+              Your workspace will be created and ready to use immediately.
+            </p>
           </form>
         </CardContent>
       </Card>

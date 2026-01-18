@@ -9,6 +9,7 @@ import CreateAccount from "@/pages/CreateAccount";
 import Storage from "@/pages/Storage";
 import Team from "@/pages/Team";
 import Billing from "@/pages/Billing";
+import ApiKeys from "@/pages/ApiKeys";
 import AdminDashboard from "@/pages/AdminDashboard";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
@@ -52,6 +53,9 @@ function Router() {
       </Route>
       <Route path="/dashboard/billing">
         <PrivateRoute component={Billing} />
+      </Route>
+      <Route path="/dashboard/api-keys">
+        <PrivateRoute component={ApiKeys} />
       </Route>
 
       {/* Admin Route */}

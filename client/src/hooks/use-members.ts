@@ -52,3 +52,22 @@ export function useRemoveMember() {
     },
   });
 }
+
+export function useUpdateMemberRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ accountId, memberId, role }: { accountId: number; memberId: number; role: string }) => {
+      const res = await fetch(`/api/accounts/${accountId}/members/${memberId}`, {
+        method: 'PATCH',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update role");
+      return res.json();
+    },
+    onSuccess: (_, { accountId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.members.list.path, accountId] });
+    },
+  });
+}
