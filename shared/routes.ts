@@ -151,6 +151,36 @@ export const api = {
         200: z.custom<typeof accounts.$inferSelect>(),
       },
     },
+    listProducts: {
+      method: 'GET' as const,
+      path: '/api/admin/products',
+      responses: {
+        200: z.array(z.custom<typeof products.$inferSelect>()),
+      },
+    },
+    createProduct: {
+      method: 'POST' as const,
+      path: '/api/admin/products',
+      input: insertProductSchema,
+      responses: {
+        201: z.custom<typeof products.$inferSelect>(),
+      },
+    },
+    updateProduct: {
+      method: 'PATCH' as const,
+      path: '/api/admin/products/:id',
+      input: insertProductSchema.partial(),
+      responses: {
+        200: z.custom<typeof products.$inferSelect>(),
+      },
+    },
+    deleteProduct: {
+      method: 'DELETE' as const,
+      path: '/api/admin/products/:id',
+      responses: {
+        200: z.void(),
+      },
+    },
   },
   // Buckets
   buckets: {

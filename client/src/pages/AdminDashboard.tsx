@@ -2,16 +2,17 @@ import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { useAdminAccounts, useApproveAccount, useRejectAccount, useSuspendAccount, useReactivateAccount, useAdjustQuota } from "@/hooks/use-admin";
 import { usePendingQuotaRequests, useApproveQuotaRequest, useRejectQuotaRequest } from "@/hooks/use-quota-requests";
-import { useProducts } from "@/hooks/use-products";
+import { useAdminProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "@/hooks/use-products";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui-custom";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle, Clock, Users, DollarSign, Building2, AlertCircle, XCircle, Pause, Play, Settings2, HardDrive, TrendingDown, Target, UserPlus, Wallet, FileUp } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, CheckCircle, Clock, Users, DollarSign, Building2, AlertCircle, XCircle, Pause, Play, Settings2, HardDrive, TrendingDown, Target, UserPlus, Wallet, FileUp, Package, Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import type { Account, QuotaRequest } from "@shared/schema";
+import type { Account, QuotaRequest, Product } from "@shared/schema";
 
 const mrrHistoryData = [
   { name: 'Aug', mrr: 4200 },
@@ -33,12 +34,15 @@ const signupsData = [
 
 export default function AdminDashboard() {
   const { data: accounts, isLoading } = useAdminAccounts();
-  const { data: products } = useProducts();
+  const { data: products, isLoading: productsLoading } = useAdminProducts();
   const { mutate: approve, isPending: isApproving } = useApproveAccount();
   const { mutate: reject, isPending: isRejecting } = useRejectAccount();
   const { mutate: suspend, isPending: isSuspending } = useSuspendAccount();
   const { mutate: reactivate, isPending: isReactivating } = useReactivateAccount();
   const { mutate: adjustQuota, isPending: isAdjustingQuota } = useAdjustQuota();
+  const { mutate: createProduct, isPending: isCreatingProduct } = useCreateProduct();
+  const { mutate: updateProduct, isPending: isUpdatingProduct } = useUpdateProduct();
+  const { mutate: deleteProduct, isPending: isDeletingProduct } = useDeleteProduct();
   const { toast } = useToast();
 
   const [quotaDialogOpen, setQuotaDialogOpen] = useState(false);
@@ -54,6 +58,18 @@ export default function AdminDashboard() {
   const [selectedQuotaRequest, setSelectedQuotaRequest] = useState<(QuotaRequest & { account: Account }) | null>(null);
   const [quotaReviewNote, setQuotaReviewNote] = useState("");
   const [quotaReviewAction, setQuotaReviewAction] = useState<'approve' | 'reject'>('approve');
+
+  // Products management
+  const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productForm, setProductForm] = useState({
+    name: "",
+    description: "",
+    price: 0,
+    storageLimit: 100,
+    transferLimit: 0,
+    isPublic: true,
+  });
 
   const pendingAccounts = accounts?.filter(a => a.status === 'pending') || [];
   const activeAccounts = accounts?.filter(a => a.status === 'active') || [];
@@ -126,6 +142,81 @@ export default function AdminDashboard() {
     if (!bytes) return "0 GB";
     const gb = bytes / (1024 * 1024 * 1024);
     return `${gb.toFixed(2)} GB`;
+  };
+
+  const formatCurrency = (cents: number) => {
+    return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  };
+
+  const openProductDialog = (product?: Product) => {
+    if (product) {
+      setEditingProduct(product);
+      setProductForm({
+        name: product.name,
+        description: product.description || "",
+        price: product.price,
+        storageLimit: product.storageLimit,
+        transferLimit: product.transferLimit || 0,
+        isPublic: product.isPublic ?? true,
+      });
+    } else {
+      setEditingProduct(null);
+      setProductForm({
+        name: "",
+        description: "",
+        price: 0,
+        storageLimit: 100,
+        transferLimit: 0,
+        isPublic: true,
+      });
+    }
+    setProductDialogOpen(true);
+  };
+
+  const handleSaveProduct = () => {
+    if (!productForm.name.trim()) {
+      toast({ title: "Error", description: "Product name is required.", variant: "destructive" });
+      return;
+    }
+    if (productForm.storageLimit < 1) {
+      toast({ title: "Error", description: "Storage limit must be at least 1 GB.", variant: "destructive" });
+      return;
+    }
+
+    const productData = {
+      name: productForm.name.trim(),
+      description: productForm.description.trim() || undefined,
+      price: productForm.price,
+      storageLimit: productForm.storageLimit,
+      transferLimit: productForm.transferLimit || undefined,
+      isPublic: productForm.isPublic,
+    };
+
+    if (editingProduct) {
+      updateProduct({ id: editingProduct.id, data: productData }, {
+        onSuccess: () => {
+          toast({ title: "Product Updated", description: `${productForm.name} has been updated.` });
+          setProductDialogOpen(false);
+        },
+      });
+    } else {
+      createProduct(productData, {
+        onSuccess: () => {
+          toast({ title: "Product Created", description: `${productForm.name} has been created.` });
+          setProductDialogOpen(false);
+        },
+      });
+    }
+  };
+
+  const handleDeleteProduct = (product: Product) => {
+    if (confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`)) {
+      deleteProduct(product.id, {
+        onSuccess: () => {
+          toast({ title: "Product Deleted", description: `${product.name} has been deleted.`, variant: "destructive" });
+        },
+      });
+    }
   };
 
   const openQuotaReviewDialog = (request: (QuotaRequest & { account: Account }), action: 'approve' | 'reject') => {
@@ -597,6 +688,87 @@ export default function AdminDashboard() {
           </Card>
         )}
 
+        <Card className="mb-8">
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              Products/Plans
+            </CardTitle>
+            <Button onClick={() => openProductDialog()} data-testid="button-create-product">
+              <Plus className="mr-1 h-4 w-4" /> Create Product
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            {productsLoading ? (
+              <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
+            ) : !products || products.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                <p>No products yet. Create your first product to get started.</p>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-slate-50 dark:bg-muted/50 border-b">
+                  <tr>
+                    <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Name</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Price</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Storage Limit</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Transfer Limit</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
+                    <th className="text-right p-4 pr-6 text-sm font-medium text-muted-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {products.map((product) => (
+                    <tr key={product.id} className="hover:bg-slate-50/50 dark:hover:bg-muted/30 transition-colors" data-testid={`row-product-${product.id}`}>
+                      <td className="p-4 pl-6">
+                        <div>
+                          <span className="font-medium text-slate-900 dark:text-foreground">{product.name}</span>
+                          {product.description && (
+                            <p className="text-sm text-muted-foreground truncate max-w-xs">{product.description}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-sm font-medium">{formatCurrency(product.price)}/mo</td>
+                      <td className="p-4 text-sm">{product.storageLimit} GB</td>
+                      <td className="p-4 text-sm">{product.transferLimit ? `${product.transferLimit} GB` : 'Unlimited'}</td>
+                      <td className="p-4">
+                        {product.isPublic ? (
+                          <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Public</Badge>
+                        ) : (
+                          <Badge variant="secondary">Private</Badge>
+                        )}
+                      </td>
+                      <td className="p-4 pr-6 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => openProductDialog(product)}
+                            data-testid={`button-edit-product-${product.id}`}
+                          >
+                            <Pencil className="mr-1 h-4 w-4" /> Edit
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="text-destructive border-destructive/30"
+                            onClick={() => handleDeleteProduct(product)}
+                            disabled={isDeletingProduct}
+                            data-testid={`button-delete-product-${product.id}`}
+                          >
+                            <Trash2 className="mr-1 h-4 w-4" /> Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">All Accounts</CardTitle>
@@ -751,11 +923,109 @@ export default function AdminDashboard() {
             <Button 
               onClick={handleQuotaReview} 
               disabled={isApprovingQuota || isRejectingQuota}
-              variant={quotaReviewAction === 'approve' ? 'default' : 'destructive'}
+              variant={quotaReviewAction === 'approve' ? 'primary' : 'destructive'}
               data-testid="button-quota-review-confirm"
             >
               {(isApprovingQuota || isRejectingQuota) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {quotaReviewAction === 'approve' ? 'Approve' : 'Reject'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Create/Edit Dialog */}
+      <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingProduct ? 'Edit Product' : 'Create Product'}</DialogTitle>
+            <DialogDescription>
+              {editingProduct ? `Update the details for ${editingProduct.name}.` : 'Create a new product/plan for your customers.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="product-name">Name *</Label>
+              <Input
+                id="product-name"
+                value={productForm.name}
+                onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Pro Plan"
+                data-testid="input-product-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="product-description">Description</Label>
+              <Textarea
+                id="product-description"
+                value={productForm.description}
+                onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Brief description of this product..."
+                className="resize-none"
+                data-testid="input-product-description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="product-price">Price (cents) - ${(productForm.price / 100).toFixed(2)}/mo</Label>
+              <Input
+                id="product-price"
+                type="number"
+                min="0"
+                value={productForm.price}
+                onChange={(e) => setProductForm(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
+                placeholder="e.g. 999 for $9.99"
+                data-testid="input-product-price"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="product-storage">Storage Limit (GB) *</Label>
+                <Input
+                  id="product-storage"
+                  type="number"
+                  min="1"
+                  value={productForm.storageLimit}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, storageLimit: parseInt(e.target.value) || 0 }))}
+                  placeholder="e.g. 100"
+                  data-testid="input-product-storage"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="product-transfer">Transfer Limit (GB)</Label>
+                <Input
+                  id="product-transfer"
+                  type="number"
+                  min="0"
+                  value={productForm.transferLimit}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, transferLimit: parseInt(e.target.value) || 0 }))}
+                  placeholder="0 = Unlimited"
+                  data-testid="input-product-transfer"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="product-public">Public</Label>
+                <p className="text-sm text-muted-foreground">Make this product visible to customers</p>
+              </div>
+              <Switch
+                id="product-public"
+                checked={productForm.isPublic}
+                onCheckedChange={(checked) => setProductForm(prev => ({ ...prev, isPublic: checked }))}
+                data-testid="switch-product-public"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProductDialogOpen(false)} data-testid="button-product-cancel">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveProduct} 
+              disabled={isCreatingProduct || isUpdatingProduct}
+              data-testid="button-product-save"
+            >
+              {(isCreatingProduct || isUpdatingProduct) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingProduct ? 'Save Changes' : 'Create Product'}
             </Button>
           </DialogFooter>
         </DialogContent>

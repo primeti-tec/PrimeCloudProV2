@@ -14,6 +14,8 @@ export interface IStorage {
   getProducts(): Promise<Product[]>;
   getProduct(id: number): Promise<Product | undefined>;
   createProduct(product: any): Promise<Product>;
+  updateProduct(id: number, data: Partial<Product>): Promise<Product>;
+  deleteProduct(id: number): Promise<void>;
 
   // Accounts
   createAccount(data: CreateAccountRequest, ownerId: string): Promise<Account>;
@@ -105,6 +107,15 @@ export class DatabaseStorage implements IStorage {
   async createProduct(product: any): Promise<Product> {
     const [newProduct] = await db.insert(products).values(product).returning();
     return newProduct;
+  }
+
+  async updateProduct(id: number, data: Partial<Product>): Promise<Product> {
+    const [product] = await db.update(products).set(data).where(eq(products.id, id)).returning();
+    return product;
+  }
+
+  async deleteProduct(id: number): Promise<void> {
+    await db.delete(products).where(eq(products.id, id));
   }
 
   async createAccount(data: CreateAccountRequest, ownerId: string): Promise<Account> {

@@ -240,6 +240,74 @@ export async function registerRoutes(
     }
   });
 
+  // Admin Products CRUD (protected by isSuperAdmin check)
+  app.get(api.admin.listProducts.path, isAuthenticated, async (req: any, res) => {
+    // Listing products is public for now (needed for billing page)
+    const products = await storage.getProducts();
+    res.json(products);
+  });
+
+  app.post(api.admin.createProduct.path, isAuthenticated, async (req: any, res) => {
+    if (!isSuperAdmin(req.user.claims.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const input = api.admin.createProduct.input.parse(req.body);
+      const product = await storage.createProduct(input);
+      await storage.createAuditLog({
+        userId: req.user.claims.sub,
+        action: 'PRODUCT_CREATED',
+        resource: 'product',
+        details: { productId: product.id, productName: product.name },
+      });
+      res.status(201).json(product);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.patch(api.admin.updateProduct.path, isAuthenticated, async (req: any, res) => {
+    if (!isSuperAdmin(req.user.claims.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const productId = parseInt(req.params.id);
+      const input = api.admin.updateProduct.input.parse(req.body);
+      const product = await storage.updateProduct(productId, input);
+      await storage.createAuditLog({
+        userId: req.user.claims.sub,
+        action: 'PRODUCT_UPDATED',
+        resource: 'product',
+        details: { productId: product.id, productName: product.name, changes: input },
+      });
+      res.json(product);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.delete(api.admin.deleteProduct.path, isAuthenticated, async (req: any, res) => {
+    if (!isSuperAdmin(req.user.claims.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    const productId = parseInt(req.params.id);
+    const product = await storage.getProduct(productId);
+    await storage.deleteProduct(productId);
+    await storage.createAuditLog({
+      userId: req.user.claims.sub,
+      action: 'PRODUCT_DELETED',
+      resource: 'product',
+      details: { productId, productName: product?.name },
+    });
+    res.json({ success: true });
+  });
+
   // Remove Member
   app.delete(api.members.remove.path, isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
