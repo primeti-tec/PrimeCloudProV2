@@ -6,6 +6,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { authStorage } from "./replit_integrations/auth"; // To find users by email
+import { validateDocument } from "./lib/document-validation";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -38,6 +39,15 @@ export async function registerRoutes(
     try {
       const input = api.accounts.create.input.parse(req.body);
       const userId = req.user.claims.sub;
+      
+      // Validate document if provided
+      if (input.document && input.documentType) {
+        const validation = validateDocument(input.document, input.documentType as 'cpf' | 'cnpj');
+        if (!validation.valid) {
+          return res.status(400).json({ message: validation.error });
+        }
+      }
+      
       const account = await storage.createAccount(input, userId);
       res.status(201).json(account);
     } catch (err) {
@@ -144,8 +154,90 @@ export async function registerRoutes(
 
   app.post(api.admin.approveAccount.path, isAuthenticated, async (req: any, res) => {
     const accountId = parseInt(req.params.id);
+    const userId = req.user.claims.sub;
     const account = await storage.updateAccount(accountId, { status: 'active' });
+    await storage.createAuditLog({
+      accountId,
+      userId,
+      action: 'ACCOUNT_APPROVED',
+      resource: 'account',
+      details: { accountId, accountName: account.name },
+    });
     res.json(account);
+  });
+
+  app.post(api.admin.rejectAccount.path, isAuthenticated, async (req: any, res) => {
+    const accountId = parseInt(req.params.id);
+    const userId = req.user.claims.sub;
+    const { reason } = req.body || {};
+    const account = await storage.updateAccount(accountId, { status: 'rejected' });
+    await storage.createAuditLog({
+      accountId,
+      userId,
+      action: 'ACCOUNT_REJECTED',
+      resource: 'account',
+      details: { accountId, accountName: account.name, reason },
+    });
+    res.json(account);
+  });
+
+  app.post(api.admin.suspendAccount.path, isAuthenticated, async (req: any, res) => {
+    const accountId = parseInt(req.params.id);
+    const userId = req.user.claims.sub;
+    const { reason } = req.body || {};
+    const account = await storage.updateAccount(accountId, { status: 'suspended' });
+    await storage.createAuditLog({
+      accountId,
+      userId,
+      action: 'ACCOUNT_SUSPENDED',
+      resource: 'account',
+      details: { accountId, accountName: account.name, reason },
+    });
+    res.json(account);
+  });
+
+  app.post(api.admin.reactivateAccount.path, isAuthenticated, async (req: any, res) => {
+    const accountId = parseInt(req.params.id);
+    const userId = req.user.claims.sub;
+    const account = await storage.updateAccount(accountId, { status: 'active' });
+    await storage.createAuditLog({
+      accountId,
+      userId,
+      action: 'ACCOUNT_REACTIVATED',
+      resource: 'account',
+      details: { accountId, accountName: account.name },
+    });
+    res.json(account);
+  });
+
+  app.post(api.admin.adjustQuota.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const accountId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const input = api.admin.adjustQuota.input.parse(req.body);
+      const previousAccount = await storage.getAccount(accountId);
+      const previousQuota = previousAccount?.storageQuotaGB || 100;
+      const account = await storage.updateAccount(accountId, { storageQuotaGB: input.quotaGB });
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'QUOTA_ADJUSTED',
+        resource: 'account',
+        details: { 
+          accountId, 
+          accountName: account.name, 
+          previousQuotaGB: previousQuota, 
+          newQuotaGB: input.quotaGB, 
+          reason: input.reason 
+        },
+      });
+      res.json(account);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   });
 
   // Remove Member
@@ -219,6 +311,65 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Bucket Versioning
+  app.put('/api/accounts/:accountId/buckets/:bucketId/versioning', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const { enabled } = req.body;
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const bucket = await storage.updateBucketVersioning(bucketId, enabled);
+    res.json(bucket);
+  });
+
+  // Bucket Lifecycle Rules
+  app.get('/api/accounts/:accountId/buckets/:bucketId/lifecycle', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const rules = await storage.getBucketLifecycle(bucketId);
+    res.json(rules);
+  });
+
+  app.post('/api/accounts/:accountId/buckets/:bucketId/lifecycle', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const rule = req.body;
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const bucket = await storage.addLifecycleRule(bucketId, rule);
+    res.json(bucket);
+  });
+
+  app.delete('/api/accounts/:accountId/buckets/:bucketId/lifecycle/:ruleId', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const ruleId = req.params.ruleId;
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const bucket = await storage.deleteLifecycleRule(bucketId, ruleId);
+    res.json(bucket);
+  });
+
   // --- Access Keys Routes ---
   app.get(api.accessKeys.list.path, isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
@@ -259,6 +410,58 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  app.post(api.accessKeys.rotate.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const keyId = parseInt(req.params.keyId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const existingKey = await storage.getAccessKey(keyId);
+    if (!existingKey || existingKey.accountId !== accountId) {
+      return res.status(404).json({ message: "Access key not found" });
+    }
+
+    const key = await storage.rotateAccessKey(keyId);
+    await storage.createAuditLog({
+      accountId,
+      userId,
+      action: 'ACCESS_KEY_ROTATED',
+      resource: 'access_key',
+      details: { keyId, keyName: existingKey.name },
+    });
+    res.json(key);
+  });
+
+  app.post(api.accessKeys.toggleActive.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const keyId = parseInt(req.params.keyId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const existingKey = await storage.getAccessKey(keyId);
+    if (!existingKey || existingKey.accountId !== accountId) {
+      return res.status(404).json({ message: "Access key not found" });
+    }
+
+    const key = await storage.toggleAccessKeyActive(keyId);
+    await storage.createAuditLog({
+      accountId,
+      userId,
+      action: key.isActive ? 'ACCESS_KEY_ACTIVATED' : 'ACCESS_KEY_DEACTIVATED',
+      resource: 'access_key',
+      details: { keyId, keyName: existingKey.name, isActive: key.isActive },
+    });
+    res.json(key);
+  });
+
   // --- Notifications Routes ---
   app.get('/api/accounts/:accountId/notifications', isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
@@ -294,7 +497,7 @@ export async function registerRoutes(
     res.json(notification);
   });
 
-  app.post('/api/accounts/:accountId/notifications/mark-all-read', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/accounts/:accountId/notifications/read-all', isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const accountId = parseInt(req.params.accountId);
 
@@ -302,6 +505,18 @@ export async function registerRoutes(
     if (!membership) return res.status(403).json({ message: "Forbidden" });
 
     await storage.markAllNotificationsRead(accountId);
+    res.json({ success: true });
+  });
+
+  app.delete('/api/accounts/:accountId/notifications/:id', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const notificationId = parseInt(req.params.id);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    await storage.deleteNotification(notificationId);
     res.json({ success: true });
   });
 
@@ -315,6 +530,296 @@ export async function registerRoutes(
 
     const logs = await storage.getAuditLogs(accountId, 100);
     res.json(logs);
+  });
+
+  // --- Invitations Routes ---
+  app.post('/api/accounts/:accountId/invitations', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const { email, role } = req.body;
+
+    if (!email || !role) {
+      return res.status(400).json({ message: "Email and role are required" });
+    }
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const invitation = await storage.createInvitation(accountId, email, role, userId);
+      res.status(201).json(invitation);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to create invitation" });
+    }
+  });
+
+  app.get('/api/accounts/:accountId/invitations', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const invitationsList = await storage.getInvitationsByAccount(accountId);
+    res.json(invitationsList);
+  });
+
+  app.delete('/api/accounts/:accountId/invitations/:id', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const invitationId = parseInt(req.params.id);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    await storage.deleteInvitation(invitationId);
+    res.json({ success: true });
+  });
+
+  app.get('/api/invitations/:token', async (req: any, res) => {
+    const { token } = req.params;
+    const invitation = await storage.getInvitationByToken(token);
+    
+    if (!invitation) {
+      return res.status(404).json({ message: "Invitation not found" });
+    }
+    
+    if (invitation.acceptedAt) {
+      return res.status(400).json({ message: "Invitation already accepted" });
+    }
+    
+    if (new Date() > invitation.expiresAt) {
+      return res.status(400).json({ message: "Invitation has expired" });
+    }
+    
+    const account = await storage.getAccount(invitation.accountId!);
+    const { users } = await import("@shared/models/auth");
+    const { eq } = await import("drizzle-orm");
+    const { db } = await import("./db");
+    
+    let inviter = null;
+    if (invitation.invitedBy) {
+      const [user] = await db.select().from(users).where(eq(users.id, invitation.invitedBy));
+      inviter = user ? { firstName: user.firstName, email: user.email } : null;
+    }
+    
+    res.json({
+      ...invitation,
+      account: account ? { id: account.id, name: account.name } : null,
+      inviter,
+    });
+  });
+
+  app.post('/api/invitations/:token/accept', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { token } = req.params;
+
+    try {
+      const member = await storage.acceptInvitation(token, userId);
+      res.status(201).json(member);
+    } catch (err: any) {
+      if (err.message === "Invitation not found") {
+        return res.status(404).json({ message: err.message });
+      }
+      if (err.message === "Invitation already accepted" || err.message === "Invitation has expired") {
+        return res.status(400).json({ message: err.message });
+      }
+      res.status(500).json({ message: err.message || "Failed to accept invitation" });
+    }
+  });
+
+  // --- SFTP Credentials Routes ---
+  app.get('/api/accounts/:accountId/sftp', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const credential = await storage.getSftpCredentials(accountId);
+    res.json(credential || null);
+  });
+
+  app.post('/api/accounts/:accountId/sftp', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const existing = await storage.getSftpCredentials(accountId);
+    if (existing) {
+      return res.status(400).json({ message: "SFTP credentials already exist. Use reset-password to generate a new password." });
+    }
+
+    const credential = await storage.createSftpCredentials(accountId);
+    await storage.createAuditLog({
+      accountId,
+      userId,
+      action: 'SFTP_CREDENTIALS_CREATED',
+      resource: 'sftp_credentials',
+      details: { username: credential.username },
+    });
+    res.status(201).json(credential);
+  });
+
+  app.post('/api/accounts/:accountId/sftp/reset-password', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const existing = await storage.getSftpCredentials(accountId);
+    if (!existing) {
+      return res.status(404).json({ message: "No SFTP credentials found. Create them first." });
+    }
+
+    const credential = await storage.resetSftpPassword(accountId);
+    await storage.createAuditLog({
+      accountId,
+      userId,
+      action: 'SFTP_PASSWORD_RESET',
+      resource: 'sftp_credentials',
+      details: { username: credential.username },
+    });
+    res.json(credential);
+  });
+
+  // --- Invoices Routes ---
+  app.get(api.invoices.list.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const invoiceList = await storage.getInvoices(accountId);
+    res.json(invoiceList);
+  });
+
+  // --- Usage Routes ---
+  app.get(api.usage.get.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const usage = await storage.getUsageSummary(accountId);
+    res.json(usage);
+  });
+
+  // --- Quota Requests Routes ---
+  // Create a quota request
+  app.post(api.quotaRequests.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const accountId = parseInt(req.params.accountId);
+      const { requestedQuotaGB, reason } = req.body;
+
+      const membership = await storage.getMembership(userId, accountId);
+      if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+      const account = await storage.getAccount(accountId);
+      if (!account) return res.status(404).json({ message: "Account not found" });
+
+      const currentQuotaGB = account.storageQuotaGB || 100;
+      
+      const request = await storage.createQuotaRequest({
+        accountId,
+        currentQuotaGB,
+        requestedQuotaGB,
+        reason: reason || null,
+      });
+
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'QUOTA_REQUEST_CREATED',
+        resource: 'quota_request',
+        details: { requestId: request.id, currentQuotaGB, requestedQuotaGB, reason },
+      });
+
+      res.status(201).json(request);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // List quota requests for an account
+  app.get(api.quotaRequests.list.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const requests = await storage.getQuotaRequests(accountId);
+    res.json(requests);
+  });
+
+  // List all pending quota requests (admin)
+  app.get(api.quotaRequests.listPending.path, isAuthenticated, async (req: any, res) => {
+    const requests = await storage.getAllPendingQuotaRequests();
+    res.json(requests);
+  });
+
+  // Approve quota request
+  app.post(api.quotaRequests.approve.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requestId = parseInt(req.params.id);
+      const { note } = req.body || {};
+
+      const request = await storage.approveQuotaRequest(requestId, userId, note);
+
+      await storage.createAuditLog({
+        accountId: request.accountId!,
+        userId,
+        action: 'QUOTA_REQUEST_APPROVED',
+        resource: 'quota_request',
+        details: { requestId, newQuotaGB: request.requestedQuotaGB, note },
+      });
+
+      res.json(request);
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ message: err.message || "Internal Server Error" });
+    }
+  });
+
+  // Reject quota request
+  app.post(api.quotaRequests.reject.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requestId = parseInt(req.params.id);
+      const { note } = req.body || {};
+
+      const request = await storage.rejectQuotaRequest(requestId, userId, note);
+
+      await storage.createAuditLog({
+        accountId: request.accountId!,
+        userId,
+        action: 'QUOTA_REQUEST_REJECTED',
+        resource: 'quota_request',
+        details: { requestId, note },
+      });
+
+      res.json(request);
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ message: err.message || "Internal Server Error" });
+    }
   });
 
   // Seed Data

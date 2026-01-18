@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertAccountSchema, insertProductSchema, insertBucketSchema, insertAccessKeySchema, accounts, products, accountMembers, subscriptions, buckets, accessKeys } from './schema';
+import { insertAccountSchema, insertProductSchema, insertBucketSchema, insertAccessKeySchema, accounts, products, accountMembers, subscriptions, buckets, accessKeys, invoices, usageRecords } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -120,6 +120,37 @@ export const api = {
         200: z.custom<typeof accounts.$inferSelect>(),
       },
     },
+    rejectAccount: {
+      method: 'POST' as const,
+      path: '/api/admin/accounts/:id/reject',
+      input: z.object({ reason: z.string().optional() }),
+      responses: {
+        200: z.custom<typeof accounts.$inferSelect>(),
+      },
+    },
+    suspendAccount: {
+      method: 'POST' as const,
+      path: '/api/admin/accounts/:id/suspend',
+      input: z.object({ reason: z.string().optional() }),
+      responses: {
+        200: z.custom<typeof accounts.$inferSelect>(),
+      },
+    },
+    reactivateAccount: {
+      method: 'POST' as const,
+      path: '/api/admin/accounts/:id/reactivate',
+      responses: {
+        200: z.custom<typeof accounts.$inferSelect>(),
+      },
+    },
+    adjustQuota: {
+      method: 'POST' as const,
+      path: '/api/admin/accounts/:id/adjust-quota',
+      input: z.object({ quotaGB: z.number().min(1), reason: z.string().min(1) }),
+      responses: {
+        200: z.custom<typeof accounts.$inferSelect>(),
+      },
+    },
   },
   // Buckets
   buckets: {
@@ -174,6 +205,97 @@ export const api = {
       responses: {
         200: z.void(),
         403: errorSchemas.forbidden,
+      },
+    },
+    rotate: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/access-keys/:keyId/rotate',
+      responses: {
+        200: z.custom<typeof accessKeys.$inferSelect & { rawSecret: string }>(),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
+      },
+    },
+    toggleActive: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/access-keys/:keyId/toggle-active',
+      responses: {
+        200: z.custom<typeof accessKeys.$inferSelect>(),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  // Invoices
+  invoices: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/invoices',
+      responses: {
+        200: z.array(z.custom<typeof invoices.$inferSelect>()),
+        403: errorSchemas.forbidden,
+      },
+    },
+  },
+  // Usage
+  usage: {
+    get: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/usage',
+      responses: {
+        200: z.object({
+          storageUsedGB: z.number(),
+          bandwidthUsedGB: z.number(),
+          apiRequestsCount: z.number(),
+          projectedCost: z.number(),
+        }),
+        403: errorSchemas.forbidden,
+      },
+    },
+  },
+  // Quota Requests
+  quotaRequests: {
+    create: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/quota-requests',
+      input: z.object({
+        requestedQuotaGB: z.number().min(1),
+        reason: z.string().optional(),
+      }),
+      responses: {
+        201: z.any(),
+        403: errorSchemas.forbidden,
+      },
+    },
+    list: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/quota-requests',
+      responses: {
+        200: z.array(z.any()),
+        403: errorSchemas.forbidden,
+      },
+    },
+    listPending: {
+      method: 'GET' as const,
+      path: '/api/admin/quota-requests',
+      responses: {
+        200: z.array(z.any()),
+      },
+    },
+    approve: {
+      method: 'POST' as const,
+      path: '/api/admin/quota-requests/:id/approve',
+      input: z.object({ note: z.string().optional() }),
+      responses: {
+        200: z.any(),
+      },
+    },
+    reject: {
+      method: 'POST' as const,
+      path: '/api/admin/quota-requests/:id/reject',
+      input: z.object({ note: z.string().optional() }),
+      responses: {
+        200: z.any(),
       },
     },
   },

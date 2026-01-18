@@ -24,7 +24,7 @@ export const accounts = pgTable("accounts", {
   name: text("name").notNull(),
   slug: text("slug").unique(), // For potentially identifying tenant
   ownerId: varchar("owner_id").references(() => users.id), // Initial owner
-  status: text("status").default("active"), // active, suspended, pending
+  status: text("status").default("active"), // active, suspended, pending, rejected
   // Business Information
   document: text("document"), // CPF or CNPJ
   documentType: text("document_type"), // cpf or cnpj
@@ -32,6 +32,7 @@ export const accounts = pgTable("accounts", {
   // Usage Quotas (in bytes for precision)
   storageUsed: bigint("storage_used", { mode: "number" }).default(0),
   bandwidthUsed: bigint("bandwidth_used", { mode: "number" }).default(0),
+  storageQuotaGB: integer("storage_quota_gb").default(100), // Manual quota override
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -44,6 +45,8 @@ export const buckets = pgTable("buckets", {
   isPublic: boolean("is_public").default(false),
   objectCount: integer("object_count").default(0),
   sizeBytes: bigint("size_bytes", { mode: "number" }).default(0),
+  versioningEnabled: boolean("versioning_enabled").default(false),
+  lifecycleRules: jsonb("lifecycle_rules").default([]),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -140,9 +143,9 @@ export const quotaRequests = pgTable("quota_requests", {
   requestedQuotaGB: integer("requested_quota_gb").notNull(),
   reason: text("reason"),
   status: text("status").default("pending"), // pending, approved, rejected
-  approvedBy: varchar("approved_by").references(() => users.id),
-  approvedAt: timestamp("approved_at"),
-  rejectedReason: text("rejected_reason"),
+  reviewedById: varchar("reviewed_by_id").references(() => users.id),
+  reviewNote: text("review_note"),
+  reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -253,8 +256,8 @@ export const quotaRequestsRelations = relations(quotaRequests, ({ one }) => ({
     fields: [quotaRequests.accountId],
     references: [accounts.id],
   }),
-  approver: one(users, {
-    fields: [quotaRequests.approvedBy],
+  reviewer: one(users, {
+    fields: [quotaRequests.reviewedById],
     references: [users.id],
   }),
 }));
@@ -307,14 +310,25 @@ export const insertProductSchema = createInsertSchema(products);
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true, status: true, storageUsed: true, bandwidthUsed: true });
 export const insertMemberSchema = createInsertSchema(accountMembers).omit({ id: true, joinedAt: true });
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true });
-export const insertBucketSchema = createInsertSchema(buckets).omit({ id: true, createdAt: true, objectCount: true, sizeBytes: true });
+export const insertBucketSchema = createInsertSchema(buckets).omit({ id: true, createdAt: true, objectCount: true, sizeBytes: true, versioningEnabled: true, lifecycleRules: true });
+
+export const lifecycleRuleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(["expiration", "transition"]),
+  days: z.number().min(1),
+  storageClass: z.string().optional(),
+  enabled: z.boolean().default(true),
+});
+
+export type LifecycleRule = z.infer<typeof lifecycleRuleSchema>;
 export const insertAccessKeySchema = createInsertSchema(accessKeys).omit({ id: true, createdAt: true, lastUsedAt: true, accessKeyId: true, secretAccessKey: true, expiresAt: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, isRead: true, readAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
 export const insertInvitationSchema = createInsertSchema(invitations).omit({ id: true, createdAt: true, acceptedAt: true, token: true });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, paidAt: true });
 export const insertUsageRecordSchema = createInsertSchema(usageRecords).omit({ id: true, recordedAt: true });
-export const insertQuotaRequestSchema = createInsertSchema(quotaRequests).omit({ id: true, createdAt: true, status: true, approvedBy: true, approvedAt: true, rejectedReason: true });
+export const insertQuotaRequestSchema = createInsertSchema(quotaRequests).omit({ id: true, createdAt: true, status: true, reviewedById: true, reviewNote: true, reviewedAt: true });
 export const insertSftpCredentialSchema = createInsertSchema(sftpCredentials).omit({ id: true, createdAt: true, lastLoginAt: true, lastLoginIp: true, loginCount: true });
 
 // === TYPES ===

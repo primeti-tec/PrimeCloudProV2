@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
+import { apiRequest } from "@/lib/queryClient";
 
 export function useAdminAccounts() {
   return useQuery({
@@ -23,6 +24,73 @@ export function useApproveAccount() {
       });
       if (!res.ok) throw new Error("Failed to approve account");
       return api.admin.approveAccount.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });
+    },
+  });
+}
+
+export function useRejectAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: number; reason?: string }) => {
+      const url = buildUrl(api.admin.rejectAccount.path, { id });
+      const res = await apiRequest(url, {
+        method: api.admin.rejectAccount.method,
+        body: JSON.stringify({ reason }),
+      });
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });
+    },
+  });
+}
+
+export function useSuspendAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: number; reason?: string }) => {
+      const url = buildUrl(api.admin.suspendAccount.path, { id });
+      const res = await apiRequest(url, {
+        method: api.admin.suspendAccount.method,
+        body: JSON.stringify({ reason }),
+      });
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });
+    },
+  });
+}
+
+export function useReactivateAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.admin.reactivateAccount.path, { id });
+      const res = await apiRequest(url, {
+        method: api.admin.reactivateAccount.method,
+      });
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });
+    },
+  });
+}
+
+export function useAdjustQuota() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, quotaGB, reason }: { id: number; quotaGB: number; reason: string }) => {
+      const url = buildUrl(api.admin.adjustQuota.path, { id });
+      const res = await apiRequest(url, {
+        method: api.admin.adjustQuota.method,
+        body: JSON.stringify({ quotaGB, reason }),
+      });
+      return res;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });

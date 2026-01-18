@@ -40,3 +40,29 @@ export function useRevokeAccessKey(accountId: number | undefined) {
     },
   });
 }
+
+export function useRotateAccessKey(accountId: number | undefined) {
+  return useMutation({
+    mutationFn: async (keyId: number) => {
+      if (!accountId) throw new Error('No account');
+      const res = await apiRequest('POST', buildUrl(api.accessKeys.rotate.path, { accountId, keyId }));
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'access-keys'] });
+    },
+  });
+}
+
+export function useToggleAccessKeyActive(accountId: number | undefined) {
+  return useMutation({
+    mutationFn: async (keyId: number) => {
+      if (!accountId) throw new Error('No account');
+      const res = await apiRequest('POST', buildUrl(api.accessKeys.toggleActive.path, { accountId, keyId }));
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'access-keys'] });
+    },
+  });
+}

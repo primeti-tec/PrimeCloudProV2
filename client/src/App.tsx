@@ -11,7 +11,9 @@ import Team from "@/pages/Team";
 import Billing from "@/pages/Billing";
 import ApiKeys from "@/pages/ApiKeys";
 import AuditLogs from "@/pages/AuditLogs";
+import SftpAccess from "@/pages/SftpAccess";
 import AdminDashboard from "@/pages/AdminDashboard";
+import AcceptInvite from "@/pages/AcceptInvite";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
@@ -61,11 +63,17 @@ function Router() {
       <Route path="/dashboard/audit-logs">
         <PrivateRoute component={AuditLogs} />
       </Route>
+      <Route path="/dashboard/sftp">
+        <PrivateRoute component={SftpAccess} />
+      </Route>
 
       {/* Admin Route */}
       <Route path="/admin">
         <PrivateRoute component={AdminDashboard} adminOnly />
       </Route>
+
+      {/* Public Invitation Route */}
+      <Route path="/invite/:token" component={AcceptInvite} />
 
       <Route component={NotFound} />
     </Switch>

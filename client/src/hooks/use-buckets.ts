@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { buildUrl, api } from "@shared/routes";
-import type { Bucket } from "@shared/schema";
+import type { Bucket, LifecycleRule } from "@shared/schema";
 
 export function useBuckets(accountId: number | undefined) {
   return useQuery<Bucket[]>({
@@ -37,6 +37,60 @@ export function useDeleteBucket(accountId: number | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets'] });
+    },
+  });
+}
+
+export function useUpdateBucketVersioning(accountId: number | undefined) {
+  return useMutation({
+    mutationFn: async ({ bucketId, enabled }: { bucketId: number; enabled: boolean }) => {
+      if (!accountId) throw new Error('No account');
+      const res = await apiRequest('PUT', `/api/accounts/${accountId}/buckets/${bucketId}/versioning`, { enabled });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets'] });
+    },
+  });
+}
+
+export function useBucketLifecycle(accountId: number | undefined, bucketId: number | undefined) {
+  return useQuery<LifecycleRule[]>({
+    queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'lifecycle'],
+    queryFn: async () => {
+      if (!accountId || !bucketId) return [];
+      const res = await fetch(`/api/accounts/${accountId}/buckets/${bucketId}/lifecycle`);
+      if (!res.ok) throw new Error('Failed to fetch lifecycle rules');
+      return res.json();
+    },
+    enabled: !!accountId && !!bucketId,
+  });
+}
+
+export function useAddLifecycleRule(accountId: number | undefined) {
+  return useMutation({
+    mutationFn: async ({ bucketId, rule }: { bucketId: number; rule: Omit<LifecycleRule, 'id'> & { id: string } }) => {
+      if (!accountId) throw new Error('No account');
+      const res = await apiRequest('POST', `/api/accounts/${accountId}/buckets/${bucketId}/lifecycle`, rule);
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', variables.bucketId, 'lifecycle'] });
+    },
+  });
+}
+
+export function useDeleteLifecycleRule(accountId: number | undefined) {
+  return useMutation({
+    mutationFn: async ({ bucketId, ruleId }: { bucketId: number; ruleId: string }) => {
+      if (!accountId) throw new Error('No account');
+      const res = await apiRequest('DELETE', `/api/accounts/${accountId}/buckets/${bucketId}/lifecycle/${ruleId}`);
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', variables.bucketId, 'lifecycle'] });
     },
   });
 }
