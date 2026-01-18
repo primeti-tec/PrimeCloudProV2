@@ -1,0 +1,1426 @@
+{
+  "version": "1.0.0",
+  "generated": "2026-01-18T14:57:49.647Z",
+  "stack": {
+    "primaryLanguage": "typescript",
+    "languages": [
+      "javascript",
+      "typescript"
+    ],
+    "frameworks": [],
+    "buildTools": [
+      "vite"
+    ],
+    "testFrameworks": [],
+    "packageManager": "npm",
+    "isMonorepo": false,
+    "hasDocker": false,
+    "hasCI": false
+  },
+  "structure": {
+    "totalFiles": 122,
+    "topDirectories": [
+      {
+        "name": "AGENTS.md",
+        "fileCount": 1
+      },
+      {
+        "name": "attached_assets",
+        "fileCount": 5
+      },
+      {
+        "name": "client",
+        "fileCount": 90
+      },
+      {
+        "name": "components.json",
+        "fileCount": 1
+      },
+      {
+        "name": "drizzle.config.ts",
+        "fileCount": 1
+      },
+      {
+        "name": "package-lock.json",
+        "fileCount": 1
+      },
+      {
+        "name": "package.json",
+        "fileCount": 1
+      },
+      {
+        "name": "postcss.config.js",
+        "fileCount": 1
+      },
+      {
+        "name": "README.md",
+        "fileCount": 1
+      },
+      {
+        "name": "replit.md",
+        "fileCount": 1
+      },
+      {
+        "name": "script",
+        "fileCount": 1
+      },
+      {
+        "name": "server",
+        "fileCount": 12
+      },
+      {
+        "name": "shared",
+        "fileCount": 3
+      },
+      {
+        "name": "tailwind.config.ts",
+        "fileCount": 1
+      },
+      {
+        "name": "tsconfig.json",
+        "fileCount": 1
+      },
+      {
+        "name": "vite.config.ts",
+        "fileCount": 1
+      }
+    ],
+    "languageDistribution": [
+      {
+        "extension": ".tsx",
+        "count": 67
+      },
+      {
+        "extension": ".ts",
+        "count": 38
+      },
+      {
+        "extension": ".md",
+        "count": 7
+      },
+      {
+        "extension": ".json",
+        "count": 4
+      },
+      {
+        "extension": ".png",
+        "count": 3
+      },
+      {
+        "extension": ".js",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      }
+    ]
+  },
+  "architecture": {
+    "layers": [
+      {
+        "name": "Models",
+        "description": "Data structures and domain objects",
+        "directories": [
+          "shared",
+          "shared\\models"
+        ],
+        "symbolCount": 32,
+        "dependsOn": [
+          "Controllers"
+        ]
+      },
+      {
+        "name": "Controllers",
+        "description": "Request handling and routing",
+        "directories": [
+          "shared",
+          "server",
+          "server\\replit_integrations\\auth",
+          "client\\src\\pages"
+        ],
+        "symbolCount": 2,
+        "dependsOn": []
+      },
+      {
+        "name": "Services",
+        "description": "Business logic and orchestration",
+        "directories": [
+          "server\\services"
+        ],
+        "symbolCount": 6,
+        "dependsOn": []
+      },
+      {
+        "name": "Utils",
+        "description": "Shared utilities and helpers",
+        "directories": [
+          "server\\lib",
+          "client\\src\\lib"
+        ],
+        "symbolCount": 15,
+        "dependsOn": []
+      },
+      {
+        "name": "Components",
+        "description": "UI components and views",
+        "directories": [
+          "client\\src\\pages",
+          "client\\src\\components",
+          "client\\src\\components\\ui"
+        ],
+        "symbolCount": 33,
+        "dependsOn": []
+      }
+    ],
+    "patterns": [],
+    "entryPoints": [
+      "server\\index.ts",
+      "server\\replit_integrations\\auth\\index.ts",
+      "client\\src\\main.tsx"
+    ]
+  },
+  "symbols": {
+    "classes": [
+      {
+        "name": "DatabaseStorage",
+        "kind": "class",
+        "file": "server\\storage.ts",
+        "line": 105,
+        "exported": true
+      },
+      {
+        "name": "AuthStorage",
+        "kind": "class",
+        "file": "server\\replit_integrations\\auth\\storage.ts",
+        "line": 12,
+        "exported": false
+      }
+    ],
+    "interfaces": [
+      {
+        "name": "AccountWithDetails",
+        "kind": "interface",
+        "file": "shared\\schema.ts",
+        "line": 405,
+        "exported": true
+      },
+      {
+        "name": "AuditLog",
+        "kind": "interface",
+        "file": "client\\src\\hooks\\use-audit-logs.ts",
+        "line": 3,
+        "exported": true
+      },
+      {
+        "name": "BadgeProps",
+        "kind": "interface",
+        "file": "client\\src\\components\\ui\\badge.tsx",
+        "line": 28,
+        "exported": true
+      },
+      {
+        "name": "ButtonProps",
+        "kind": "interface",
+        "file": "client\\src\\components\\ui-custom.tsx",
+        "line": 10,
+        "exported": true
+      },
+      {
+        "name": "ButtonProps",
+        "kind": "interface",
+        "file": "client\\src\\components\\ui\\button.tsx",
+        "line": 42,
+        "exported": true
+      },
+      {
+        "name": "EmailOptions",
+        "kind": "interface",
+        "file": "server\\services\\email.ts",
+        "line": 25,
+        "exported": true
+      },
+      {
+        "name": "IAuthStorage",
+        "kind": "interface",
+        "file": "server\\replit_integrations\\auth\\storage.ts",
+        "line": 7,
+        "exported": true
+      },
+      {
+        "name": "IStorage",
+        "kind": "interface",
+        "file": "server\\storage.ts",
+        "line": 12,
+        "exported": true
+      },
+      {
+        "name": "OrderWithDetails",
+        "kind": "interface",
+        "file": "shared\\schema.ts",
+        "line": 399,
+        "exported": true
+      },
+      {
+        "name": "IncomingMessage",
+        "kind": "interface",
+        "file": "server\\index.ts",
+        "line": 10,
+        "exported": false
+      },
+      {
+        "name": "InvitationWithDetails",
+        "kind": "interface",
+        "file": "client\\src\\hooks\\use-invitations.ts",
+        "line": 4,
+        "exported": false
+      },
+      {
+        "name": "Invoice",
+        "kind": "interface",
+        "file": "client\\src\\hooks\\use-billing.ts",
+        "line": 3,
+        "exported": false
+      },
+      {
+        "name": "Invoice",
+        "kind": "interface",
+        "file": "client\\src\\pages\\Billing.tsx",
+        "line": 16,
+        "exported": false
+      },
+      {
+        "name": "NotificationsBellProps",
+        "kind": "interface",
+        "file": "client\\src\\components\\NotificationsBell.tsx",
+        "line": 15,
+        "exported": false
+      },
+      {
+        "name": "State",
+        "kind": "interface",
+        "file": "client\\src\\hooks\\use-toast.ts",
+        "line": 52,
+        "exported": false
+      },
+      {
+        "name": "UsageSummary",
+        "kind": "interface",
+        "file": "client\\src\\hooks\\use-billing.ts",
+        "line": 13,
+        "exported": false
+      }
+    ],
+    "functions": [
+      {
+        "name": "apiRequest",
+        "kind": "function",
+        "file": "client\\src\\lib\\queryClient.ts",
+        "line": 10,
+        "exported": true
+      },
+      {
+        "name": "buildUrl",
+        "kind": "function",
+        "file": "shared\\routes.ts",
+        "line": 401,
+        "exported": true
+      },
+      {
+        "name": "cn",
+        "kind": "function",
+        "file": "client\\src\\lib\\utils.ts",
+        "line": 4,
+        "exported": true
+      },
+      {
+        "name": "Dashboard",
+        "kind": "function",
+        "file": "client\\src\\pages\\Dashboard.tsx",
+        "line": 32,
+        "exported": true
+      },
+      {
+        "name": "formatCNPJ",
+        "kind": "function",
+        "file": "client\\src\\lib\\document-validation.ts",
+        "line": 63,
+        "exported": true
+      },
+      {
+        "name": "formatCPF",
+        "kind": "function",
+        "file": "client\\src\\lib\\document-validation.ts",
+        "line": 55,
+        "exported": true
+      },
+      {
+        "name": "formatDocument",
+        "kind": "function",
+        "file": "client\\src\\lib\\document-validation.ts",
+        "line": 72,
+        "exported": true
+      },
+      {
+        "name": "getSession",
+        "kind": "function",
+        "file": "server\\replit_integrations\\auth\\replitAuth.ts",
+        "line": 21,
+        "exported": true
+      },
+      {
+        "name": "isUnauthorizedError",
+        "kind": "function",
+        "file": "client\\src\\lib\\auth-utils.ts",
+        "line": 1,
+        "exported": true
+      },
+      {
+        "name": "isValidCNPJ",
+        "kind": "function",
+        "file": "server\\lib\\document-validation.ts",
+        "line": 27,
+        "exported": true
+      },
+      {
+        "name": "isValidCNPJ",
+        "kind": "function",
+        "file": "client\\src\\lib\\document-validation.ts",
+        "line": 27,
+        "exported": true
+      },
+      {
+        "name": "isValidCPF",
+        "kind": "function",
+        "file": "server\\lib\\document-validation.ts",
+        "line": 1,
+        "exported": true
+      },
+      {
+        "name": "isValidCPF",
+        "kind": "function",
+        "file": "client\\src\\lib\\document-validation.ts",
+        "line": 1,
+        "exported": true
+      },
+      {
+        "name": "log",
+        "kind": "function",
+        "file": "server\\index.ts",
+        "line": 25,
+        "exported": true
+      },
+      {
+        "name": "NotFound",
+        "kind": "function",
+        "file": "client\\src\\pages\\not-found.tsx",
+        "line": 4,
+        "exported": true
+      },
+      {
+        "name": "redirectToLogin",
+        "kind": "function",
+        "file": "client\\src\\lib\\auth-utils.ts",
+        "line": 6,
+        "exported": true
+      },
+      {
+        "name": "registerAuthRoutes",
+        "kind": "function",
+        "file": "server\\replit_integrations\\auth\\routes.ts",
+        "line": 6,
+        "exported": true
+      },
+      {
+        "name": "sendEmail",
+        "kind": "function",
+        "file": "server\\services\\email.ts",
+        "line": 38,
+        "exported": true
+      },
+      {
+        "name": "sendInvitationEmail",
+        "kind": "function",
+        "file": "server\\services\\email.ts",
+        "line": 70,
+        "exported": true
+      },
+      {
+        "name": "sendPasswordResetEmail",
+        "kind": "function",
+        "file": "server\\services\\email.ts",
+        "line": 245,
+        "exported": true
+      },
+      {
+        "name": "sendVerificationEmail",
+        "kind": "function",
+        "file": "server\\services\\email.ts",
+        "line": 131,
+        "exported": true
+      },
+      {
+        "name": "sendWelcomeEmail",
+        "kind": "function",
+        "file": "server\\services\\email.ts",
+        "line": 184,
+        "exported": true
+      },
+      {
+        "name": "serveStatic",
+        "kind": "function",
+        "file": "server\\static.ts",
+        "line": 5,
+        "exported": true
+      },
+      {
+        "name": "setupAuth",
+        "kind": "function",
+        "file": "server\\replit_integrations\\auth\\replitAuth.ts",
+        "line": 63,
+        "exported": true
+      },
+      {
+        "name": "setupVite",
+        "kind": "function",
+        "file": "server\\vite.ts",
+        "line": 11,
+        "exported": true
+      },
+      {
+        "name": "useAcceptInvitation",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-invitations.ts",
+        "line": 77,
+        "exported": true
+      },
+      {
+        "name": "useAccessKeys",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-access-keys.ts",
+        "line": 6,
+        "exported": true
+      },
+      {
+        "name": "useAccount",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-accounts.ts",
+        "line": 16,
+        "exported": true
+      },
+      {
+        "name": "useAddLifecycleRule",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-buckets.ts",
+        "line": 70,
+        "exported": true
+      },
+      {
+        "name": "useAddMember",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-members.ts",
+        "line": 19,
+        "exported": true
+      },
+      {
+        "name": "useAdjustQuota",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-admin.ts",
+        "line": 84,
+        "exported": true
+      },
+      {
+        "name": "useAdminAccounts",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-admin.ts",
+        "line": 5,
+        "exported": true
+      },
+      {
+        "name": "useAdminOrders",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-orders.ts",
+        "line": 66,
+        "exported": true
+      },
+      {
+        "name": "useAdminProducts",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-products.ts",
+        "line": 17,
+        "exported": true
+      },
+      {
+        "name": "useApproveAccount",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-admin.ts",
+        "line": 16,
+        "exported": true
+      },
+      {
+        "name": "useApproveQuotaRequest",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-quota-requests.ts",
+        "line": 48,
+        "exported": true
+      },
+      {
+        "name": "useAuditLogs",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-audit-logs.ts",
+        "line": 16,
+        "exported": true
+      },
+      {
+        "name": "useAuth",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-auth.ts",
+        "line": 24,
+        "exported": true
+      },
+      {
+        "name": "useBucketLifecycle",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-buckets.ts",
+        "line": 57,
+        "exported": true
+      },
+      {
+        "name": "useBuckets",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-buckets.ts",
+        "line": 6,
+        "exported": true
+      },
+      {
+        "name": "useCancelInvitation",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-invitations.ts",
+        "line": 44,
+        "exported": true
+      },
+      {
+        "name": "useCancelOrder",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-orders.ts",
+        "line": 54,
+        "exported": true
+      },
+      {
+        "name": "useCreateAccessKey",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-access-keys.ts",
+        "line": 19,
+        "exported": true
+      },
+      {
+        "name": "useCreateAccount",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-accounts.ts",
+        "line": 30,
+        "exported": true
+      },
+      {
+        "name": "useCreateBucket",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-buckets.ts",
+        "line": 19,
+        "exported": true
+      },
+      {
+        "name": "useCreateInvitation",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-invitations.ts",
+        "line": 22,
+        "exported": true
+      },
+      {
+        "name": "useCreateOrder",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-orders.ts",
+        "line": 19,
+        "exported": true
+      },
+      {
+        "name": "useCreateProduct",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-products.ts",
+        "line": 28,
+        "exported": true
+      },
+      {
+        "name": "useCreateQuotaRequest",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-quota-requests.ts",
+        "line": 31,
+        "exported": true
+      },
+      {
+        "name": "useDeleteBucket",
+        "kind": "function",
+        "file": "client\\src\\hooks\\use-buckets.ts",
+        "line": 32,
+        "exported": true
+      }
+    ],
+    "types": [
+      {
+        "name": "AccessKey",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 375,
+        "exported": true
+      },
+      {
+        "name": "Account",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 371,
+        "exported": true
+      },
+      {
+        "name": "AccountMember",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 372,
+        "exported": true
+      },
+      {
+        "name": "AuditLog",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 377,
+        "exported": true
+      },
+      {
+        "name": "Bucket",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 374,
+        "exported": true
+      },
+      {
+        "name": "CalendarProps",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\calendar.tsx",
+        "line": 8,
+        "exported": true
+      },
+      {
+        "name": "ChartConfig",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\chart.tsx",
+        "line": 11,
+        "exported": true
+      },
+      {
+        "name": "CreateAccessKeyRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 388,
+        "exported": true
+      },
+      {
+        "name": "CreateAccountRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 384,
+        "exported": true
+      },
+      {
+        "name": "CreateAuditLogRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 390,
+        "exported": true
+      },
+      {
+        "name": "CreateBucketRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 387,
+        "exported": true
+      },
+      {
+        "name": "CreateInvitationRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 391,
+        "exported": true
+      },
+      {
+        "name": "CreateInvoiceRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 392,
+        "exported": true
+      },
+      {
+        "name": "CreateMemberRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 386,
+        "exported": true
+      },
+      {
+        "name": "CreateNotificationRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 389,
+        "exported": true
+      },
+      {
+        "name": "CreateOrderRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 395,
+        "exported": true
+      },
+      {
+        "name": "CreateQuotaRequestRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 394,
+        "exported": true
+      },
+      {
+        "name": "CreateUsageRecordRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 393,
+        "exported": true
+      },
+      {
+        "name": "Invitation",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 378,
+        "exported": true
+      },
+      {
+        "name": "Invoice",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 379,
+        "exported": true
+      },
+      {
+        "name": "LifecycleRule",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 357,
+        "exported": true
+      },
+      {
+        "name": "Notification",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 376,
+        "exported": true
+      },
+      {
+        "name": "Order",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 370,
+        "exported": true
+      },
+      {
+        "name": "Product",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 369,
+        "exported": true
+      },
+      {
+        "name": "QuotaRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 381,
+        "exported": true
+      },
+      {
+        "name": "SftpCredential",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 382,
+        "exported": true
+      },
+      {
+        "name": "Subscription",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 373,
+        "exported": true
+      },
+      {
+        "name": "UpdateAccountRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 385,
+        "exported": true
+      },
+      {
+        "name": "UpdateOrderRequest",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 396,
+        "exported": true
+      },
+      {
+        "name": "UpsertUser",
+        "kind": "type",
+        "file": "shared\\models\\auth.ts",
+        "line": 28,
+        "exported": true
+      },
+      {
+        "name": "UsageRecord",
+        "kind": "type",
+        "file": "shared\\schema.ts",
+        "line": 380,
+        "exported": true
+      },
+      {
+        "name": "User",
+        "kind": "type",
+        "file": "shared\\models\\auth.ts",
+        "line": 29,
+        "exported": true
+      },
+      {
+        "name": "AccountUpdateForm",
+        "kind": "type",
+        "file": "client\\src\\pages\\Settings.tsx",
+        "line": 29,
+        "exported": false
+      },
+      {
+        "name": "Action",
+        "kind": "type",
+        "file": "client\\src\\hooks\\use-toast.ts",
+        "line": 34,
+        "exported": false
+      },
+      {
+        "name": "ActionType",
+        "kind": "type",
+        "file": "client\\src\\hooks\\use-toast.ts",
+        "line": 32,
+        "exported": false
+      },
+      {
+        "name": "CarouselApi",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\carousel.tsx",
+        "line": 10,
+        "exported": false
+      },
+      {
+        "name": "CarouselContextProps",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\carousel.tsx",
+        "line": 22,
+        "exported": false
+      },
+      {
+        "name": "CarouselOptions",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\carousel.tsx",
+        "line": 12,
+        "exported": false
+      },
+      {
+        "name": "CarouselPlugin",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\carousel.tsx",
+        "line": 13,
+        "exported": false
+      },
+      {
+        "name": "CarouselProps",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\carousel.tsx",
+        "line": 15,
+        "exported": false
+      },
+      {
+        "name": "ChartContextProps",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\chart.tsx",
+        "line": 21,
+        "exported": false
+      },
+      {
+        "name": "FormFieldContextValue",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\form.tsx",
+        "line": 20,
+        "exported": false
+      },
+      {
+        "name": "FormItemContextValue",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\form.tsx",
+        "line": 67,
+        "exported": false
+      },
+      {
+        "name": "PaginationLinkProps",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\pagination.tsx",
+        "line": 37,
+        "exported": false
+      },
+      {
+        "name": "SidebarContextProps",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\sidebar.tsx",
+        "line": 35,
+        "exported": false
+      },
+      {
+        "name": "Toast",
+        "kind": "type",
+        "file": "client\\src\\hooks\\use-toast.ts",
+        "line": 140,
+        "exported": false
+      },
+      {
+        "name": "ToasterToast",
+        "kind": "type",
+        "file": "client\\src\\hooks\\use-toast.ts",
+        "line": 11,
+        "exported": false
+      },
+      {
+        "name": "UnauthorizedBehavior",
+        "kind": "type",
+        "file": "client\\src\\lib\\queryClient.ts",
+        "line": 26,
+        "exported": false
+      },
+      {
+        "name": "UseCarouselParameters",
+        "kind": "type",
+        "file": "client\\src\\components\\ui\\carousel.tsx",
+        "line": 11,
+        "exported": false
+      }
+    ],
+    "enums": []
+  },
+  "publicAPI": [
+    {
+      "name": "AccessKey",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 375,
+      "exported": true
+    },
+    {
+      "name": "Account",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 371,
+      "exported": true
+    },
+    {
+      "name": "AccountMember",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 372,
+      "exported": true
+    },
+    {
+      "name": "AccountWithDetails",
+      "kind": "interface",
+      "file": "shared\\schema.ts",
+      "line": 405,
+      "exported": true
+    },
+    {
+      "name": "apiRequest",
+      "kind": "function",
+      "file": "client\\src\\lib\\queryClient.ts",
+      "line": 10,
+      "exported": true
+    },
+    {
+      "name": "AuditLog",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 377,
+      "exported": true
+    },
+    {
+      "name": "AuditLog",
+      "kind": "interface",
+      "file": "client\\src\\hooks\\use-audit-logs.ts",
+      "line": 3,
+      "exported": true
+    },
+    {
+      "name": "BadgeProps",
+      "kind": "interface",
+      "file": "client\\src\\components\\ui\\badge.tsx",
+      "line": 28,
+      "exported": true
+    },
+    {
+      "name": "Bucket",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 374,
+      "exported": true
+    },
+    {
+      "name": "buildUrl",
+      "kind": "function",
+      "file": "shared\\routes.ts",
+      "line": 401,
+      "exported": true
+    },
+    {
+      "name": "ButtonProps",
+      "kind": "interface",
+      "file": "client\\src\\components\\ui-custom.tsx",
+      "line": 10,
+      "exported": true
+    },
+    {
+      "name": "ButtonProps",
+      "kind": "interface",
+      "file": "client\\src\\components\\ui\\button.tsx",
+      "line": 42,
+      "exported": true
+    },
+    {
+      "name": "CalendarProps",
+      "kind": "type",
+      "file": "client\\src\\components\\ui\\calendar.tsx",
+      "line": 8,
+      "exported": true
+    },
+    {
+      "name": "ChartConfig",
+      "kind": "type",
+      "file": "client\\src\\components\\ui\\chart.tsx",
+      "line": 11,
+      "exported": true
+    },
+    {
+      "name": "cn",
+      "kind": "function",
+      "file": "client\\src\\lib\\utils.ts",
+      "line": 4,
+      "exported": true
+    },
+    {
+      "name": "CreateAccessKeyRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 388,
+      "exported": true
+    },
+    {
+      "name": "CreateAccountRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 384,
+      "exported": true
+    },
+    {
+      "name": "CreateAuditLogRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 390,
+      "exported": true
+    },
+    {
+      "name": "CreateBucketRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 387,
+      "exported": true
+    },
+    {
+      "name": "CreateInvitationRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 391,
+      "exported": true
+    },
+    {
+      "name": "CreateInvoiceRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 392,
+      "exported": true
+    },
+    {
+      "name": "CreateMemberRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 386,
+      "exported": true
+    },
+    {
+      "name": "CreateNotificationRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 389,
+      "exported": true
+    },
+    {
+      "name": "CreateOrderRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 395,
+      "exported": true
+    },
+    {
+      "name": "CreateQuotaRequestRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 394,
+      "exported": true
+    },
+    {
+      "name": "CreateUsageRecordRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 393,
+      "exported": true
+    },
+    {
+      "name": "Dashboard",
+      "kind": "function",
+      "file": "client\\src\\pages\\Dashboard.tsx",
+      "line": 32,
+      "exported": true
+    },
+    {
+      "name": "DatabaseStorage",
+      "kind": "class",
+      "file": "server\\storage.ts",
+      "line": 105,
+      "exported": true
+    },
+    {
+      "name": "EmailOptions",
+      "kind": "interface",
+      "file": "server\\services\\email.ts",
+      "line": 25,
+      "exported": true
+    },
+    {
+      "name": "formatCNPJ",
+      "kind": "function",
+      "file": "client\\src\\lib\\document-validation.ts",
+      "line": 63,
+      "exported": true
+    },
+    {
+      "name": "formatCPF",
+      "kind": "function",
+      "file": "client\\src\\lib\\document-validation.ts",
+      "line": 55,
+      "exported": true
+    },
+    {
+      "name": "formatDocument",
+      "kind": "function",
+      "file": "client\\src\\lib\\document-validation.ts",
+      "line": 72,
+      "exported": true
+    },
+    {
+      "name": "getSession",
+      "kind": "function",
+      "file": "server\\replit_integrations\\auth\\replitAuth.ts",
+      "line": 21,
+      "exported": true
+    },
+    {
+      "name": "IAuthStorage",
+      "kind": "interface",
+      "file": "server\\replit_integrations\\auth\\storage.ts",
+      "line": 7,
+      "exported": true
+    },
+    {
+      "name": "Invitation",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 378,
+      "exported": true
+    },
+    {
+      "name": "Invoice",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 379,
+      "exported": true
+    },
+    {
+      "name": "IStorage",
+      "kind": "interface",
+      "file": "server\\storage.ts",
+      "line": 12,
+      "exported": true
+    },
+    {
+      "name": "isUnauthorizedError",
+      "kind": "function",
+      "file": "client\\src\\lib\\auth-utils.ts",
+      "line": 1,
+      "exported": true
+    },
+    {
+      "name": "isValidCNPJ",
+      "kind": "function",
+      "file": "server\\lib\\document-validation.ts",
+      "line": 27,
+      "exported": true
+    },
+    {
+      "name": "isValidCNPJ",
+      "kind": "function",
+      "file": "client\\src\\lib\\document-validation.ts",
+      "line": 27,
+      "exported": true
+    },
+    {
+      "name": "isValidCPF",
+      "kind": "function",
+      "file": "server\\lib\\document-validation.ts",
+      "line": 1,
+      "exported": true
+    },
+    {
+      "name": "isValidCPF",
+      "kind": "function",
+      "file": "client\\src\\lib\\document-validation.ts",
+      "line": 1,
+      "exported": true
+    },
+    {
+      "name": "LifecycleRule",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 357,
+      "exported": true
+    },
+    {
+      "name": "log",
+      "kind": "function",
+      "file": "server\\index.ts",
+      "line": 25,
+      "exported": true
+    },
+    {
+      "name": "NotFound",
+      "kind": "function",
+      "file": "client\\src\\pages\\not-found.tsx",
+      "line": 4,
+      "exported": true
+    },
+    {
+      "name": "Notification",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 376,
+      "exported": true
+    },
+    {
+      "name": "Order",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 370,
+      "exported": true
+    },
+    {
+      "name": "OrderWithDetails",
+      "kind": "interface",
+      "file": "shared\\schema.ts",
+      "line": 399,
+      "exported": true
+    },
+    {
+      "name": "Product",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 369,
+      "exported": true
+    },
+    {
+      "name": "QuotaRequest",
+      "kind": "type",
+      "file": "shared\\schema.ts",
+      "line": 381,
+      "exported": true
+    }
+  ],
+  "dependencies": {
+    "mostImported": [
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\server\\db.ts",
+        "importedBy": 2
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\server\\replit_integrations\\auth\\storage.ts",
+        "importedBy": 2
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\shared\\models\\auth.ts",
+        "importedBy": 1
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\shared\\schema.ts",
+        "importedBy": 1
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\vite.config.ts",
+        "importedBy": 1
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\server\\routes.ts",
+        "importedBy": 1
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\server\\static.ts",
+        "importedBy": 1
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\server\\replit_integrations\\auth\\replitAuth.ts",
+        "importedBy": 1
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\client\\src\\App.tsx",
+        "importedBy": 1
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\client\\src\\index.css",
+        "importedBy": 1
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\client\\src\\lib\\queryClient.ts",
+        "importedBy": 1
+      },
+      {
+        "file": "D:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2\\client\\src\\components\\ui-custom.tsx",
+        "importedBy": 1
+      }
+    ]
+  },
+  "stats": {
+    "totalSymbols": 172,
+    "exportedSymbols": 125,
+    "analysisTimeMs": 737
+  }
+}

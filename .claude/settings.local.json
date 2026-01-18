@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx @ai-coders/context)",
+      "Bash(npx @ai-coders/context:*)",
+      "mcp__ai-context__checkScaffolding",
+      "mcp__ai-context__listFilesToFill",
+      "mcp__ai-context__fillSingleFile",
+      "mcp__ai-context__getCodebaseMap",
+      "mcp__ai-context__workflowStatus",
+      "Bash(claude mcp add:*)",
+      "Bash(dir:*)"
+    ]
+  }
+}
