@@ -12,6 +12,7 @@ import Billing from "@/pages/Billing";
 import ApiKeys from "@/pages/ApiKeys";
 import AuditLogs from "@/pages/AuditLogs";
 import SftpAccess from "@/pages/SftpAccess";
+import Orders from "@/pages/Orders";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AcceptInvite from "@/pages/AcceptInvite";
 import NotFound from "@/pages/not-found";
@@ -65,6 +66,9 @@ function Router() {
       </Route>
       <Route path="/dashboard/sftp">
         <PrivateRoute component={SftpAccess} />
+      </Route>
+      <Route path="/dashboard/orders">
+        <PrivateRoute component={Orders} />
       </Route>
 
       {/* Admin Route */}

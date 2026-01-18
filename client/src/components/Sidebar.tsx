@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, FileText, HardDrive } from "lucide-react";
+import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, FileText, HardDrive, ShoppingCart } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "./ui-custom";
 
@@ -14,6 +14,7 @@ export function Sidebar() {
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Storage", href: "/dashboard/storage", icon: Database },
     { name: "SFTP Access", href: "/dashboard/sftp", icon: HardDrive },
+    { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
     { name: "Team", href: "/dashboard/team", icon: Users },
     { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
     { name: "API Keys", href: "/dashboard/api-keys", icon: Key },

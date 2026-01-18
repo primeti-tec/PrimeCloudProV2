@@ -890,6 +890,182 @@ export async function registerRoutes(
     }
   });
 
+  // === ORDERS ROUTES ===
+  
+  // List orders for an account
+  app.get(api.orders.list.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const accountOrders = await storage.getOrders(accountId);
+    res.json(accountOrders);
+  });
+
+  // Create order
+  app.post(api.orders.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const accountId = parseInt(req.params.accountId);
+
+      const membership = await storage.getMembership(userId, accountId);
+      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const input = api.orders.create.input.parse(req.body);
+      const product = await storage.getProduct(input.productId);
+      if (!product) {
+        return res.status(400).json({ message: "Product not found" });
+      }
+
+      const quantity = input.quantity || 1;
+      const unitPrice = product.price;
+      const discount = input.discount || 0;
+      const totalAmount = (unitPrice * quantity) - discount;
+
+      const order = await storage.createOrder({
+        accountId,
+        productId: input.productId,
+        quantity,
+        unitPrice,
+        totalAmount,
+        discount,
+        notes: input.notes,
+        paymentMethod: input.paymentMethod,
+      });
+
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'ORDER_CREATED',
+        resource: 'order',
+        details: { orderId: order.id, orderNumber: order.orderNumber, productName: product.name, totalAmount },
+      });
+
+      res.status(201).json(order);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // Get single order
+  app.get(api.orders.get.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.accountId);
+    const orderId = parseInt(req.params.orderId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const order = await storage.getOrder(orderId);
+    if (!order || order.accountId !== accountId) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    res.json(order);
+  });
+
+  // Update order
+  app.patch(api.orders.update.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const accountId = parseInt(req.params.accountId);
+      const orderId = parseInt(req.params.orderId);
+
+      const membership = await storage.getMembership(userId, accountId);
+      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const existingOrder = await storage.getOrder(orderId);
+      if (!existingOrder || existingOrder.accountId !== accountId) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const input = api.orders.update.input.parse(req.body);
+      const order = await storage.updateOrder(orderId, {
+        status: input.status,
+        paymentStatus: input.paymentStatus,
+        notes: input.notes,
+        paidAt: input.paymentStatus === 'paid' ? new Date() : undefined,
+      });
+
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'ORDER_UPDATED',
+        resource: 'order',
+        details: { orderId, changes: input },
+      });
+
+      res.json(order);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // Cancel order
+  app.post(api.orders.cancel.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const accountId = parseInt(req.params.accountId);
+      const orderId = parseInt(req.params.orderId);
+
+      const membership = await storage.getMembership(userId, accountId);
+      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const existingOrder = await storage.getOrder(orderId);
+      if (!existingOrder || existingOrder.accountId !== accountId) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const input = api.orders.cancel.input.parse(req.body || {});
+      const order = await storage.cancelOrder(orderId, input.reason);
+
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'ORDER_CANCELED',
+        resource: 'order',
+        details: { orderId, orderNumber: order.orderNumber, reason: input.reason },
+      });
+
+      res.json(order);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // Admin: List all orders (protected by isSuperAdmin)
+  app.get(api.orders.listAll.path, isAuthenticated, async (req: any, res) => {
+    if (!isSuperAdmin(req.user.claims.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    const allOrders = await storage.getAllOrders();
+    res.json(allOrders);
+  });
+
   // Seed Data
   await seedDatabase();
 

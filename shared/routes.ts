@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertAccountSchema, insertProductSchema, insertBucketSchema, insertAccessKeySchema, accounts, products, accountMembers, subscriptions, buckets, accessKeys, invoices, usageRecords } from './schema';
+import { insertAccountSchema, insertProductSchema, insertBucketSchema, insertAccessKeySchema, insertOrderSchema, accounts, products, accountMembers, subscriptions, buckets, accessKeys, invoices, usageRecords, orders } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -326,6 +326,73 @@ export const api = {
       input: z.object({ note: z.string().optional() }),
       responses: {
         200: z.any(),
+      },
+    },
+  },
+  // Orders
+  orders: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/orders',
+      responses: {
+        200: z.array(z.custom<typeof orders.$inferSelect>()),
+        403: errorSchemas.forbidden,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/orders',
+      input: z.object({
+        productId: z.number(),
+        quantity: z.number().min(1).optional().default(1),
+        discount: z.number().min(0).optional().default(0),
+        notes: z.string().optional(),
+        paymentMethod: z.enum(['credit_card', 'pix', 'boleto', 'bank_transfer']).optional(),
+      }),
+      responses: {
+        201: z.custom<typeof orders.$inferSelect>(),
+        400: errorSchemas.validation,
+        403: errorSchemas.forbidden,
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/orders/:orderId',
+      responses: {
+        200: z.custom<typeof orders.$inferSelect>(),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/accounts/:accountId/orders/:orderId',
+      input: z.object({
+        status: z.enum(['pending', 'processing', 'completed', 'canceled', 'refunded']).optional(),
+        paymentStatus: z.enum(['pending', 'paid', 'failed', 'refunded']).optional(),
+        notes: z.string().optional(),
+      }),
+      responses: {
+        200: z.custom<typeof orders.$inferSelect>(),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
+      },
+    },
+    cancel: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/orders/:orderId/cancel',
+      input: z.object({ reason: z.string().optional() }),
+      responses: {
+        200: z.custom<typeof orders.$inferSelect>(),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
+      },
+    },
+    listAll: {
+      method: 'GET' as const,
+      path: '/api/admin/orders',
+      responses: {
+        200: z.array(z.custom<typeof orders.$inferSelect>()),
       },
     },
   },
