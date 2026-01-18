@@ -491,7 +491,7 @@ export default function Billing() {
                   <HardDrive className="h-8 w-8 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">Current Storage Used</p>
-                    <p className="text-xl font-bold">{usage.storageUsedGB} GB / {currentAccount?.storageQuotaGB || 100} GB</p>
+                    <p className="text-xl font-bold">{usageData.storageUsedGB} GB / {currentAccount?.storageQuotaGB || 100} GB</p>
                   </div>
                 </div>
               </div>
