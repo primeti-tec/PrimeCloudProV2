@@ -82,6 +82,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (January 2026)
 
+### Complete Feature Set (MVP)
+All 13 feature phases implemented and tested:
+
+1. **Notifications System**: Real-time notifications with bell icon, read/unread status, and dropdown menu
+2. **Audit Logs**: Comprehensive logging of all user actions with filterable history view
+3. **CPF/CNPJ Validation**: Full Brazilian document validation (client and server-side)
+4. **Email Service (Mocked)**: Template-based email system ready for Resend/SendGrid integration
+5. **Team Invitations**: Invite workflow with email notifications and public acceptance page
+6. **Admin Features**: Account approval/rejection, suspend/reactivate, manual quota adjustment
+7. **Advanced Metrics**: Dashboard with Churn/CAC/LTV/ARPU cards and MRR chart
+8. **Bucket Lifecycle**: Versioning, lifecycle policies, object count, copy URL functionality
+9. **Access Key Enhancements**: Download formats (.env, JSON, AWS), rotation, deactivation
+10. **SFTP Credentials**: Mock SFTP access management with password reset
+11. **Dashboard Enhancements**: Cost estimates, quota alerts (80%, 95%), quick actions
+12. **Invoice System**: Usage tracking, invoice generation, PDF download
+13. **Quota Request Workflow**: Request, approve/reject quota increases
+
 ### Bug Fixes
 1. **Member Role Update Fix**: Changed `updateMemberRole` and `removeMember` in storage.ts to use `memberId` (numeric ID from accountMembers table) instead of `userId` string for more reliable updates.
 
@@ -89,8 +106,12 @@ Preferred communication style: Simple, everyday language.
 
 3. **Account Status Default**: Changed default account status from "pending" to "active" so new accounts can immediately access the dashboard without approval (MVP behavior).
 
+4. **Billing Page Usage Fix**: Changed `usage.storageUsedGB` to `usageData.storageUsedGB` to prevent undefined errors when usage data is loading.
+
 ### Design Decisions
 - Access key secrets are hashed with SHA-256 and only shown once on creation
 - Storage buckets and access keys are mocked (not connected to real S3/MinIO)
 - Role-based access control enforced in backend routes (owner/admin for mutations)
 - Primary color palette: #6300FF (primary), #2F0089 (dark), #8140FF (secondary), #EEF0F7 (light)
+- Email service uses mocked implementation with console logging (ready for Resend/SendGrid)
+- SFTP features are mocked for MVP (no actual server provisioning)
