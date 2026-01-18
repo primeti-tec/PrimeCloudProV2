@@ -73,6 +73,48 @@ export async function registerRoutes(
     res.json({ ...account, subscription });
   });
 
+  // Update Account
+  app.patch(api.accounts.update.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const accountId = parseInt(req.params.id);
+    
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const input = api.accounts.update.input.parse(req.body);
+      
+      // Validate document if provided
+      if (input.document && input.documentType) {
+        const validation = validateDocument(input.document, input.documentType as 'cpf' | 'cnpj');
+        if (!validation.valid) {
+          return res.status(400).json({ message: validation.error });
+        }
+      }
+      
+      const account = await storage.updateAccount(accountId, input);
+      
+      // Audit log
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'account.updated',
+        resource: 'account',
+        resourceId: accountId.toString(),
+        details: { updatedFields: Object.keys(input) },
+      });
+      
+      res.json(account);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // List Members
   app.get(api.members.list.path, isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;

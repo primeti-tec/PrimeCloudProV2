@@ -63,7 +63,10 @@ export function useUpdateAccount() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to update account");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to update account");
+      }
       return api.accounts.update.responses[200].parse(await res.json());
     },
     onSuccess: (_, { id }) => {
