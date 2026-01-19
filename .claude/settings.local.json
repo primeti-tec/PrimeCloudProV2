@@ -14,7 +14,8 @@
       "Bash(npm test:*)",
       "Bash(node --loader tsx --test:*)",
       "Bash(npx tsx:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "mcp__ai-context__listFiles"
     ]
   }
 }

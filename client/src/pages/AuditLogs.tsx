@@ -170,10 +170,22 @@ export default function AuditLogs() {
                       <td className="p-4 pl-6">
                         <div className="flex flex-col">
                           <span className="text-sm font-medium text-slate-900">
-                            {format(new Date(log.timestamp), "d 'de' MMM, yyyy", { locale: ptBR })}
+                            {(() => {
+                              const date = new Date(log.timestamp);
+                              if (isNaN(date.getTime())) return "Data Inválida";
+                              return format(date, "d 'de' MMM, yyyy", { locale: ptBR });
+                            })()}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {format(new Date(log.timestamp), "HH:mm", { locale: ptBR })} ({formatDistanceToNow(new Date(log.timestamp), { addSuffix: true, locale: ptBR })})
+                            {(() => {
+                              const date = new Date(log.timestamp);
+                              if (isNaN(date.getTime())) return "-";
+                              return (
+                                <>
+                                  {format(date, "HH:mm", { locale: ptBR })} ({formatDistanceToNow(date, { addSuffix: true, locale: ptBR })})
+                                </>
+                              );
+                            })()}
                           </span>
                         </div>
                       </td>
@@ -220,6 +232,6 @@ export default function AuditLogs() {
           </CardContent>
         </Card>
       </main>
-    </div>
+    </div >
   );
 }
