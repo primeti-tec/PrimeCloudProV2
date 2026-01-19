@@ -131,7 +131,7 @@ export class NotificationService {
       <p>${payload.message}</p>
     </div>
     <div class="footer">
-      <p>CloudStorage Pro - Sua solução de armazenamento em nuvem</p>
+      <p>Prime Cloud Pro - Sua solução de armazenamento em nuvem</p>
     </div>
   </div>
 </body>
@@ -197,7 +197,7 @@ export class NotificationService {
         await this.create({
             accountId,
             type: "welcome",
-            title: "🎉 Bem-vindo ao CloudStorage Pro!",
+            title: "🎉 Bem-vindo ao Prime Cloud Pro!",
             message: `Olá ${ownerName}! Seu cadastro foi recebido e está em análise. Você receberá uma notificação assim que for aprovado.`,
             sendEmail: true,
             emailTo: ownerEmail,
@@ -216,7 +216,7 @@ export class NotificationService {
             accountId,
             type: "approval_approved",
             title: "✅ Conta Aprovada!",
-            message: `Sua conta foi aprovada! Você já pode começar a usar o CloudStorage Pro. Suas credenciais S3 foram enviadas para seu email.`,
+            message: `Sua conta foi aprovada! Você já pode começar a usar o Prime Cloud Pro. Suas credenciais S3 foram enviadas para seu email.`,
             metadata: { accessKeyId: credentials.accessKeyId },
             sendEmail: true,
             emailTo: ownerEmail,

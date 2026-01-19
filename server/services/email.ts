@@ -29,16 +29,46 @@ export interface EmailOptions {
   text?: string;
 }
 
+export interface AccountSmtpConfig {
+  smtpEnabled?: boolean;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
+  smtpUser?: string | null;
+  smtpPass?: string | null;
+  smtpFromEmail?: string | null;
+  smtpFromName?: string | null;
+  smtpEncryption?: string | null;
+}
+
 /**
  * Send an email with the provided options.
  * Currently logs to console in development mode.
  * 
  * @param options - Email options containing recipient, subject, and content
  */
-export async function sendEmail(options: EmailOptions): Promise<void> {
+import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
+
+// Initialize SendGrid if API key is present
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
+
+/**
+ * Send an email with the provided options.
+ * Uses account's custom SMTP if configured, otherwise falls back to SendGrid or console log.
+ * 
+ * @param options - Email options containing recipient, subject, and content
+ * @param accountSmtpConfig - Optional SMTP configuration for the account
+ */
+export async function sendEmail(
+  options: EmailOptions,
+  accountSmtpConfig?: AccountSmtpConfig
+): Promise<void> {
   const { to, subject, html, text } = options;
 
-  // Log email in a nice, readable format
+  // Log email to console for debugging/dev
   console.log(`
 ╔════════════════════════════════════════════════════════════════╗
 ║                        [EMAIL] Novo Email                      ║
@@ -53,15 +83,73 @@ VERSÃO TEXTO:
 ${text || '(Nenhuma versão em texto disponível)'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`);
 
-VERSÃO HTML:
-${html}
+  // Try custom SMTP first if configured
+  if (accountSmtpConfig?.smtpEnabled && accountSmtpConfig.smtpHost) {
+    try {
+      const transporter = createSmtpTransporter(accountSmtpConfig);
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  `);
+      await transporter.sendMail({
+        from: {
+          address: accountSmtpConfig.smtpFromEmail || 'noreply@primecloudpro.com.br',
+          name: accountSmtpConfig.smtpFromName || 'Prime Cloud Pro',
+        },
+        to,
+        subject,
+        html,
+        text,
+      });
 
-  // TODO: Implement actual email sending with Resend or SendGrid
-  // For now, we're just logging to the console for development
+      console.log(`✅ [EmailService] Email enviado via SMTP customizado para ${to}`);
+      return;
+    } catch (error) {
+      console.error(`❌ [EmailService] Falha ao enviar pelo SMTP customizado:`, error);
+      console.log(`⚠️  [EmailService] Tentando fallback para SendGrid...`);
+      // Fall through to SendGrid
+    }
+  }
+
+  // Fallback to SendGrid if configured
+  if (process.env.SENDGRID_API_KEY) {
+    try {
+      const fromEmail = process.env.EMAIL_FROM || 'noreply@cloudstoragepro.com.br';
+      await sgMail.send({
+        to,
+        from: fromEmail,
+        subject,
+        html,
+        text
+      });
+      console.log(`✅ [EmailService] Email enviado via SendGrid para ${to}`);
+    } catch (error) {
+      console.error(`❌ [EmailService] Falha ao enviar pelo SendGrid:`, error);
+      // Don't throw, just log usage of mock
+    }
+  } else {
+    console.warn("⚠️ [EmailService] SENDGRID_API_KEY ausente. Email não enviado (apenas logado).");
+  }
+}
+
+/**
+ * Create a nodemailer transporter from SMTP config
+ */
+function createSmtpTransporter(config: AccountSmtpConfig) {
+  const secure = config.smtpEncryption === 'ssl';
+
+  const options: SMTPTransport.Options = {
+    host: config.smtpHost!,
+    port: config.smtpPort || 587,
+    secure,
+    auth: {
+      user: config.smtpUser!,
+      pass: config.smtpPass!,
+    },
+    // Use STARTTLS for 'tls' encryption
+    requireTLS: config.smtpEncryption === 'tls',
+  };
+
+  return nodemailer.createTransport(options);
 }
 
 /**
@@ -95,7 +183,7 @@ export async function sendInvitationEmail(
     <div class="content">
       <p>Olá,</p>
       
-      <p><strong>${inviterName}</strong> convidou você para participar da organização <strong>${accountName}</strong> no CloudStorage Pro.</p>
+      <p><strong>${inviterName}</strong> convidou você para participar da organização <strong>${accountName}</strong> no Prime Cloud Pro.</p>
       
       <p>Clique no botão abaixo para aceitar o convite e começar:</p>
       
@@ -106,11 +194,11 @@ export async function sendInvitationEmail(
       
       <p>Este convite expira em 7 dias.</p>
       
-      <p>Att,<br>Equipe CloudStorage Pro</p>
+      <p>Att,<br>Equipe Prime Cloud Pro</p>
     </div>
     <div class="footer">
       <p>Se você não esperava este convite, pode ignorar este email com segurança.</p>
-      <p>CloudStorage Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -119,7 +207,7 @@ export async function sendInvitationEmail(
 
   const text = `Você Foi Convidado!
 
-${inviterName} convidou você para participar da organização ${accountName} no CloudStorage Pro.
+${inviterName} convidou você para participar da organização ${accountName} no Prime Cloud Pro.
 
 Aceite o convite: ${inviteUrl}
 
@@ -169,11 +257,11 @@ export async function sendVerificationEmail(email: string, code: string): Promis
       
       <p>Se você não solicitou esta verificação, pode ignorar este email.</p>
       
-      <p>Att,<br>Equipe CloudStorage Pro</p>
+      <p>Att,<br>Equipe Prime Cloud Pro</p>
     </div>
     <div class="footer">
       <p>Nunca compartilhe este código com ninguém. Nós nunca pediremos isso.</p>
-      <p>CloudStorage Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -190,7 +278,7 @@ Se você não solicitou esta verificação, pode ignorar este email.`;
 
   await sendEmail({
     to: email,
-    subject: "Verifique seu endereço de email - CloudStorage Pro",
+    subject: "Verifique seu endereço de email - Prime Cloud Pro",
     html,
     text,
   });
@@ -245,11 +333,11 @@ export async function sendWelcomeEmail(email: string, userName: string): Promise
       
       <p>Dúvidas? Responda este email ou acesse nosso suporte.</p>
       
-      <p>Att,<br>Equipe CloudStorage Pro</p>
+      <p>Att,<br>Equipe Prime Cloud Pro</p>
     </div>
     <div class="footer">
       <p>Esta é uma mensagem automática. Por favor, não responda diretamente.</p>
-      <p>CloudStorage Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -273,11 +361,11 @@ O que você poderá fazer:
 Dúvidas? Responda este email ou acesse nosso suporte.
 
 Att,
-Equipe CloudStorage Pro`;
+Equipe Prime Cloud Pro`;
 
   await sendEmail({
     to: email,
-    subject: `Bem-vindo ao CloudStorage Pro, ${userName}!`,
+    subject: `Bem-vindo ao Prime Cloud Pro, ${userName}!`,
     html,
     text,
   });
@@ -321,11 +409,11 @@ export async function sendPasswordResetEmail(email: string, resetUrl: string): P
         <strong>⚠️ Aviso de Segurança:</strong> Este link expira em 1 hora. Se você não solicitou a redefinição de senha, ignore este email ou entre em contato com nosso suporte imediatamente.
       </div>
       
-      <p>Att,<br>Equipe CloudStorage Pro</p>
+      <p>Att,<br>Equipe Prime Cloud Pro</p>
     </div>
     <div class="footer">
       <p>Por segurança, nunca compartilhe este link com ninguém. Nós nunca pediremos sua senha por email.</p>
-      <p>CloudStorage Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -341,11 +429,11 @@ Este link expira em 1 hora.
 Se você não solicitou esta redefinição, ignore este email.
 
 Att,
-Equipe CloudStorage Pro`;
+Equipe Prime Cloud Pro`;
 
   await sendEmail({
     to: email,
-    subject: "Redefinir sua senha - CloudStorage Pro",
+    subject: "Redefinir sua senha - Prime Cloud Pro",
     html,
     text,
   });
@@ -384,7 +472,7 @@ export async function sendAccountApprovalEmail(
     <div class="content">
       <p>Olá <strong>${userName}</strong>,</p>
       
-      <p>Sua conta foi aprovada! Você já pode começar a usar o CloudStorage Pro.</p>
+      <p>Sua conta foi aprovada! Você já pode começar a usar o Prime Cloud Pro.</p>
       
       <h3>Suas Credenciais S3:</h3>
       <div class="credentials-box">
@@ -410,7 +498,7 @@ export async function sendAccountApprovalEmail(
       <p>Dúvidas? Responda este email ou acesse nossa documentação.</p>
     </div>
     <div class="footer">
-      <p>CloudStorage Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -421,7 +509,7 @@ export async function sendAccountApprovalEmail(
 
 Olá ${userName},
 
-Sua conta foi aprovada! Você já pode começar a usar o CloudStorage Pro.
+Sua conta foi aprovada! Você já pode começar a usar o Prime Cloud Pro.
 
 CREDENCIAIS S3:
 Endpoint: ${credentials.endpoint}
@@ -435,7 +523,7 @@ Acesse: https://app.cloudstoragepro.com.br/dashboard`;
 
   await sendEmail({
     to: email,
-    subject: "✅ Conta Aprovada - CloudStorage Pro",
+    subject: "✅ Conta Aprovada - Prime Cloud Pro",
     html,
     text,
   });
@@ -481,10 +569,10 @@ export async function sendAccountRejectionEmail(
       
       <p>Se você acredita que houve um erro ou gostaria de mais informações, responda este email.</p>
       
-      <p>Att,<br>Equipe CloudStorage Pro</p>
+      <p>Att,<br>Equipe Prime Cloud Pro</p>
     </div>
     <div class="footer">
-      <p>CloudStorage Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -501,11 +589,11 @@ ${reason ? `Motivo: ${reason}` : ''}
 Se você acredita que houve um erro, responda este email.
 
 Att,
-Equipe CloudStorage Pro`;
+Equipe Prime Cloud Pro`;
 
   await sendEmail({
     to: email,
-    subject: "Cadastro não aprovado - CloudStorage Pro",
+    subject: "Cadastro não aprovado - Prime Cloud Pro",
     html,
     text,
   });
@@ -560,10 +648,10 @@ export async function sendInvoiceEmail(
       <a href="https://app.cloudstoragepro.com.br/billing" class="button">Ver Fatura</a>
       ${pdfUrl ? `<a href="${pdfUrl}" class="button" style="background-color: #64748b;">Baixar PDF</a>` : ''}
       
-      <p>Att,<br>Equipe CloudStorage Pro</p>
+      <p>Att,<br>Equipe Prime Cloud Pro</p>
     </div>
     <div class="footer">
-      <p>CloudStorage Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -580,7 +668,7 @@ Vencimento: ${formattedDate}
 Acesse: https://app.cloudstoragepro.com.br/billing
 
 Att,
-Equipe CloudStorage Pro`;
+Equipe Prime Cloud Pro`;
 
   await sendEmail({
     to: email,
@@ -644,10 +732,10 @@ export async function sendQuotaWarningEmail(
       
       <a href="https://app.cloudstoragepro.com.br/billing" class="button">Fazer Upgrade</a>
       
-      <p>Att,<br>Equipe CloudStorage Pro</p>
+      <p>Att,<br>Equipe Prime Cloud Pro</p>
     </div>
     <div class="footer">
-      <p>CloudStorage Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -668,7 +756,7 @@ Uso Atual: ${usedGB.toFixed(2)} GB de ${quotaGB} GB (${usagePercent.toFixed(1)}%
 Faça upgrade: https://app.cloudstoragepro.com.br/billing
 
 Att,
-Equipe CloudStorage Pro`;
+Equipe Prime Cloud Pro`;
 
   await sendEmail({
     to: email,
@@ -733,10 +821,10 @@ export async function sendPaymentConfirmationEmail(
       
       <a href="https://app.cloudstoragepro.com.br/billing" class="button">Ver Histórico de Pagamentos</a>
       
-      <p>Att,<br>Equipe CloudStorage Pro</p>
+      <p>Att,<br>Equipe Prime Cloud Pro</p>
     </div>
     <div class="footer">
-      <p>CloudStorage Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -757,7 +845,7 @@ Data: ${new Date().toLocaleDateString('pt-BR')}
 Obrigado!
 
 Att,
-Equipe CloudStorage Pro`;
+Equipe Prime Cloud Pro`;
 
   await sendEmail({
     to: email,

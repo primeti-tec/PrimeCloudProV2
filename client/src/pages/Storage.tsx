@@ -90,7 +90,7 @@ function LifecyclePolicyDialog({ bucket, accountId }: { bucket: Bucket; accountI
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
-          <div className="border rounded-lg p-4 bg-slate-50">
+          <div className="border rounded-lg p-4 bg-muted/50">
             <h4 className="font-medium mb-3">Adicionar Nova Regra</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -344,12 +344,12 @@ export default function Storage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 ml-72 p-8">
         <header className="flex justify-between items-center mb-8 gap-4 flex-wrap">
           <div>
-            <h1 className="text-3xl font-display font-bold text-slate-900" data-testid="text-page-title">
+            <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-page-title">
               Buckets de Armazenamento
             </h1>
             <p className="text-muted-foreground">Gerencie seus buckets de armazenamento S3-compatible.</p>
@@ -430,7 +430,7 @@ export default function Storage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 border-b">
+                  <thead className="bg-muted/50 border-b">
                     <tr>
                       <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Nome</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Região</th>
@@ -443,7 +443,7 @@ export default function Storage() {
                   </thead>
                   <tbody className="divide-y">
                     {buckets?.map((bucket) => (
-                      <tr key={bucket.id} className="hover:bg-slate-50/50 transition-colors" data-testid={`row-bucket-${bucket.id}`}>
+                      <tr key={bucket.id} className="hover:bg-muted/50 transition-colors" data-testid={`row-bucket-${bucket.id}`}>
                         <td className="p-4 pl-6">
                           <div className="flex items-center gap-3">
                             <Database className="h-5 w-5 text-blue-500" />

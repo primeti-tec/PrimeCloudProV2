@@ -17,7 +17,7 @@ export default function LandingPage() {
               <div className="h-9 w-9 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
                 <Cloud className="text-white h-5 w-5" />
               </div>
-              <span className="font-display font-bold text-2xl tracking-tight text-slate-900">CloudStorage Pro</span>
+              <span className="font-display font-bold text-2xl tracking-tight text-slate-900">Prime Cloud Pro</span>
             </div>
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Recursos</a>
@@ -98,7 +98,7 @@ export default function LandingPage() {
       <section id="features" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">Por que escolher o CloudStorage Pro?</h2>
+            <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">Por que escolher o Prime Cloud Pro?</h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Recursos poderosos para gerenciar seus dados com confiança e facilidade.
             </p>
@@ -237,7 +237,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-100 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground">
-          <div className="mb-4 md:mb-0 font-semibold text-slate-900">© 2025 CloudStorage Pro - PrimeTI Tecnologia</div>
+          <div className="mb-4 md:mb-0 font-semibold text-slate-900">© 2025 Prime Cloud Pro - PrimeTI Tecnologia</div>
           <div className="flex space-x-6">
             <a href="#" className="hover:text-primary">Política de Privacidade</a>
             <a href="#" className="hover:text-primary">Termos de Uso</a>

@@ -1,7 +1,7 @@
 ```markdown
 # Índice de Documentação
 
-Bem-vindo à base de conhecimento do PrimeCloudProV2. Esta documentação fornece orientações abrangentes para desenvolvedores que trabalham na plataforma de gerenciamento de armazenamento em nuvem.
+Bem-vindo à base de conhecimento do Prime Cloud Pro. Esta documentação fornece orientações abrangentes para desenvolvedores que trabalham na plataforma de gerenciamento de armazenamento em nuvem.
 
 ## Início Rápido
 
@@ -32,7 +32,7 @@ Bem-vindo à base de conhecimento do PrimeCloudProV2. Esta documentação fornec
 ## Estrutura do Projeto
 
 ```
-PrimeCloudProV2/
+Prime Cloud Pro/
 ├── client/           # Frontend React
 │   └── src/
 │       ├── pages/    # Componentes de rota

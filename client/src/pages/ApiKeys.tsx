@@ -140,12 +140,12 @@ export default function ApiKeys() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 ml-72 p-8">
         <header className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold text-slate-900" data-testid="text-page-title">Chaves de API</h1>
+            <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-page-title">Chaves de API</h1>
             <p className="text-muted-foreground">Gerencie suas credenciais de acesso S3.</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -254,7 +254,7 @@ export default function ApiKeys() {
               </div>
             ) : (
               <table className="w-full">
-                <thead className="bg-slate-50 border-b">
+                <thead className="bg-muted/50 border-b">
                   <tr>
                     <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Nome</th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Access Key ID</th>
@@ -266,7 +266,7 @@ export default function ApiKeys() {
                 </thead>
                 <tbody className="divide-y">
                   {keys?.map((key) => (
-                    <tr key={key.id} className="hover:bg-slate-50/50 transition-colors" data-testid={`row-key-${key.id}`}>
+                    <tr key={key.id} className="hover:bg-muted/50 transition-colors" data-testid={`row-key-${key.id}`}>
                       <td className="p-4 pl-6 flex items-center gap-3">
                         <Key className={`h-5 w-5 ${key.isActive ? 'text-primary' : 'text-slate-400'}`} />
                         <span className={`font-medium ${!key.isActive ? 'text-slate-400' : ''}`}>{key.name}</span>

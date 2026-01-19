@@ -4,7 +4,7 @@ Descreve como o sistema é montado e por que o design atual existe.
 
 ## Visão Geral da Arquitetura do Sistema
 
-PrimeCloudProV2 é uma aplicação **monolítica modular** organizada em um **monorepo** com três camadas principais: `client/`, `server/` e `shared/`.
+Prime Cloud Pro é uma aplicação **monolítica modular** organizada em um **monorepo** com três camadas principais: `client/`, `server/` e `shared/`.
 
 ### Topologia
 

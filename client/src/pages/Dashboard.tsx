@@ -60,13 +60,13 @@ export default function Dashboard() {
   const showWarningBanner = storagePercentage > 80 && storagePercentage <= 95;
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 ml-72 p-8 overflow-y-auto">
         <header className="flex justify-between items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold text-slate-900">Dashboard</h1>
-            <p className="text-muted-foreground">Visão geral de <span className="font-semibold text-slate-900">{currentAccount?.name}</span></p>
+            <h1 className="text-3xl font-display font-bold text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground">Visão geral de <span className="font-semibold text-foreground">{currentAccount?.name}</span></p>
           </div>
           <div className="flex items-center gap-4">
             {currentAccount && <NotificationsBell accountId={currentAccount.id} />}
@@ -81,7 +81,7 @@ export default function Dashboard() {
             <AlertTitle className="text-red-800 dark:text-red-400">Crítico: Limite de Armazenamento Quase Atingido</AlertTitle>
             <AlertDescription className="flex justify-between items-center gap-4">
               <span className="text-red-700 dark:text-red-300">Você usou {storagePercentage.toFixed(0)}% da sua quota de armazenamento. Faça upgrade agora para evitar interrupções.</span>
-              <Button size="sm" className="bg-red-600 hover-elevate" onClick={() => setLocation("/billing")} data-testid="button-upgrade-critical">
+              <Button size="sm" className="bg-red-600 hover-elevate" onClick={() => setLocation("/dashboard/billing")} data-testid="button-upgrade-critical">
                 Fazer Upgrade
               </Button>
             </AlertDescription>
@@ -94,7 +94,7 @@ export default function Dashboard() {
             <AlertTitle className="text-yellow-800 dark:text-yellow-400">Aviso: Uso de Armazenamento Alto</AlertTitle>
             <AlertDescription className="flex justify-between items-center gap-4">
               <span className="text-yellow-700 dark:text-yellow-300">Você usou {storagePercentage.toFixed(0)}% da sua quota de armazenamento. Considere fazer upgrade do seu plano.</span>
-              <Button size="sm" variant="outline" className="border-yellow-600 text-yellow-700" onClick={() => setLocation("/billing")} data-testid="button-upgrade-warning">
+              <Button size="sm" variant="outline" className="border-yellow-600 text-yellow-700" onClick={() => setLocation("/dashboard/billing")} data-testid="button-upgrade-warning">
                 Fazer Upgrade
               </Button>
             </AlertDescription>
@@ -152,7 +152,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <h3 className="text-3xl font-bold text-slate-900">R$ {totalEstimatedCost.toFixed(2)}</h3>
+                <h3 className="text-3xl font-bold text-foreground">R$ {totalEstimatedCost.toFixed(2)}</h3>
                 <p className="text-sm text-muted-foreground">Estimativa do mês atual</p>
               </div>
               <div className="space-y-2 text-sm">
@@ -174,15 +174,15 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-4">
-                <Button className="flex items-center gap-2" onClick={() => setLocation("/storage")} data-testid="button-create-bucket">
+                <Button className="flex items-center gap-2" onClick={() => setLocation("/dashboard/storage")} data-testid="button-create-bucket">
                   <Plus className="h-4 w-4" />
                   Criar Bucket
                 </Button>
-                <Button variant="outline" className="flex items-center gap-2" onClick={() => setLocation("/api-keys")} data-testid="button-generate-api-key">
+                <Button variant="outline" className="flex items-center gap-2" onClick={() => setLocation("/dashboard/api-keys")} data-testid="button-generate-api-key">
                   <Key className="h-4 w-4" />
                   Gerar Chave de API
                 </Button>
-                <Button variant="outline" className="flex items-center gap-2" onClick={() => setLocation("/team")} data-testid="button-invite-team">
+                <Button variant="outline" className="flex items-center gap-2" onClick={() => setLocation("/dashboard/team")} data-testid="button-invite-team">
                   <UserPlus className="h-4 w-4" />
                   Convidar Membro
                 </Button>
@@ -268,7 +268,7 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color, bgColor }:
         </div>
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-1">{title}</p>
-          <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+          <h3 className="text-2xl font-bold text-foreground">{value}</h3>
           {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
         </div>
       </CardContent>
@@ -294,7 +294,7 @@ function StatCardWithProgress({ title, usedValue, totalValue, unit, icon: Icon, 
         </div>
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-1">{title}</p>
-          <h3 className="text-2xl font-bold text-slate-900">{usedValue} {unit}</h3>
+          <h3 className="text-2xl font-bold text-foreground">{usedValue} {unit}</h3>
           <p className="text-xs text-muted-foreground mt-1">
             de {totalValue} {unit} ({percentage.toFixed(0)}%)
           </p>

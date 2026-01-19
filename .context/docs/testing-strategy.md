@@ -1,6 +1,6 @@
 # Estratégia de Testes
 
-Este documento descreve a estratégia de testes para manter a qualidade em toda a base de código do PrimeCloudProV2.
+Este documento descreve a estratégia de testes para manter a qualidade em toda a base de código do Prime Cloud Pro.
 
 ## Estado Atual
 

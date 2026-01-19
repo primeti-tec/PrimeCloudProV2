@@ -173,7 +173,7 @@
     },
     "backup": {
         "title": "Configurar Software de Backup",
-        "subtitle": "Conecte seu software de backup ao CloudStorage Pro",
+        "subtitle": "Conecte seu software de backup ao Prime Cloud Pro",
         "selectSoftware": "Selecione seu Software",
         "recommended": "Recomendado",
         "s3Credentials": "Credenciais S3",
@@ -375,7 +375,7 @@
             "demo": "Ver Demonstração"
         },
         "features": {
-            "title": "Por que escolher o CloudStorage Pro?",
+            "title": "Por que escolher o Prime Cloud Pro?",
             "s3Compatible": {
                 "title": "100% Compatível S3",
                 "description": "Funciona com qualquer software que suporte AWS S3"

@@ -33,6 +33,25 @@ export const accounts = pgTable("accounts", {
   storageUsed: bigint("storage_used", { mode: "number" }).default(0),
   bandwidthUsed: bigint("bandwidth_used", { mode: "number" }).default(0),
   storageQuotaGB: integer("storage_quota_gb").default(100), // Manual quota override
+  // White Label Branding
+  brandingName: text("branding_name"), // Custom application name
+  brandingLogo: text("branding_logo"), // URL to custom logo
+  brandingFavicon: text("branding_favicon"), // URL to custom favicon
+  brandingPrimaryColor: text("branding_primary_color"), // Hex/HSL color for primary actions
+  brandingSidebarColor: text("branding_sidebar_color"), // Color for sidebar background
+  // Custom Domain
+  customDomain: text("custom_domain"), // Custom domain/subdomain (e.g., backup.empresa.com)
+  domainStatus: text("domain_status").default("pending"), // pending, active, failed
+  dnsVerificationToken: text("dns_verification_token"), // Token for DNS validation
+  // SMTP Email Configuration
+  smtpEnabled: boolean("smtp_enabled").default(false), // Enable/disable custom SMTP
+  smtpHost: text("smtp_host"), // SMTP server hostname
+  smtpPort: integer("smtp_port"), // SMTP port (587, 465, etc)
+  smtpUser: text("smtp_user"), // SMTP username/email
+  smtpPass: text("smtp_pass"), // SMTP password (should be encrypted)
+  smtpFromEmail: text("smtp_from_email"), // From email address
+  smtpFromName: text("smtp_from_name"), // From display name
+  smtpEncryption: text("smtp_encryption"), // none, ssl, tls
   createdAt: timestamp("created_at").defaultNow(),
 });
 

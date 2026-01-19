@@ -69,7 +69,7 @@ export default function SftpAccess() {
   const isLoading = isLoadingCredential || isLoadingBuckets;
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 ml-72 p-8">
         <div className="max-w-4xl mx-auto">

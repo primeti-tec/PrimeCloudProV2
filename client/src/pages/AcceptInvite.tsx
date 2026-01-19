@@ -37,7 +37,7 @@ export default function AcceptInvite() {
 
   if (isLoading || authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50" data-testid="loading-container">
+      <div className="min-h-screen flex items-center justify-center bg-background" data-testid="loading-container">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -45,7 +45,7 @@ export default function AcceptInvite() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" data-testid="error-container">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" data-testid="error-container">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <XCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
@@ -64,7 +64,7 @@ export default function AcceptInvite() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" data-testid="success-container">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" data-testid="success-container">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
@@ -79,7 +79,7 @@ export default function AcceptInvite() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" data-testid="invite-container">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4" data-testid="invite-container">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
@@ -89,7 +89,7 @@ export default function AcceptInvite() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-4 bg-slate-50 rounded-lg p-4">
+          <div className="space-y-4 bg-muted rounded-lg p-4">
             <div className="flex items-center gap-3">
               <Building2 className="h-5 w-5 text-muted-foreground" />
               <div>

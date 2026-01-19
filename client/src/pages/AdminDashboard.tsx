@@ -257,14 +257,14 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50 dark:bg-background">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 ml-72 p-8">
         <header className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Badge variant="destructive" data-testid="badge-admin">Super Admin</Badge>
           </div>
-          <h1 className="text-3xl font-display font-bold text-slate-900 dark:text-foreground" data-testid="text-page-title">Painel Administrativo</h1>
+          <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-page-title">Painel Administrativo</h1>
           <p className="text-muted-foreground">Gerencie contas e visualize métricas da plataforma.</p>
         </header>
 

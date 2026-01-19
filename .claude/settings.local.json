@@ -15,7 +15,22 @@
       "Bash(node --loader tsx --test:*)",
       "Bash(npx tsx:*)",
       "Bash(npx vitest:*)",
-      "mcp__ai-context__listFiles"
+      "mcp__ai-context__listFiles",
+      "mcp__ai-context__scaffoldPlan",
+      "Bash(npm run check:*)",
+      "Bash(npm run db:generate:*)",
+      "Bash(npm run:*)",
+      "Bash(node -e:*)",
+      "Bash(git checkout:*)",
+      "Bash(if [ -f .env ])",
+      "Bash(then grep -E \"CLERK_\" .env)",
+      "Bash(else echo \".env file not found\")",
+      "Bash(fi)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(curl:*)"
     ]
   }
 }

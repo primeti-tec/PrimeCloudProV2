@@ -189,11 +189,11 @@ export default function Billing() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50 dark:bg-slate-900/50">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 ml-72 p-8">
         <header className="mb-8">
-          <h1 className="text-3xl font-display font-bold text-slate-900 dark:text-slate-100" data-testid="text-page-title">Faturamento e Planos</h1>
+          <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-page-title">Faturamento e Planos</h1>
           <p className="text-muted-foreground">Gerencie sua assinatura, faturas e métodos de pagamento.</p>
         </header>
 

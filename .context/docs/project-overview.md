@@ -1,6 +1,6 @@
 # Visão Geral do Projeto
 
-O PrimeCloudProV2 é uma plataforma de gerenciamento de armazenamento em nuvem que permite que organizações gerenciem contas de armazenamento, buckets, chaves de acesso e assinaturas. A plataforma oferece uma solução completa para provisionamento de armazenamento em nuvem com funcionalidades de cobrança, gerenciamento de quotas e colaboração em equipe.
+O Prime Cloud Pro é uma plataforma de gerenciamento de armazenamento em nuvem que permite que organizações gerenciem contas de armazenamento, buckets, chaves de acesso e assinaturas. A plataforma oferece uma solução completa para provisionamento de armazenamento em nuvem com funcionalidades de cobrança, gerenciamento de quotas e colaboração em equipe.
 
 ## Fatos Rápidos
 

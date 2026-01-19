@@ -111,12 +111,12 @@ export default function AuditLogs() {
   );
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 ml-72 p-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold text-slate-900">Logs de Auditoria</h1>
+            <h1 className="text-3xl font-display font-bold text-foreground">Logs de Auditoria</h1>
             <p className="text-muted-foreground">Acompanhe todas as atividades na sua organização.</p>
           </div>
 
@@ -144,10 +144,10 @@ export default function AuditLogs() {
               </div>
             ) : !auditLogs || auditLogs.length === 0 ? (
               <div className="p-12 flex flex-col items-center justify-center text-center">
-                <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-                  <History className="h-6 w-6 text-slate-400" />
+                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <History className="h-6 w-6 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-1">Nenhum log de auditoria ainda</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-1">Nenhum log de auditoria ainda</h3>
                 <p className="text-muted-foreground text-sm max-w-sm">
                   Atividades na sua conta serão registradas aqui. Ações como criar buckets,
                   gerenciar chaves e alterações na equipe aparecerão neste log.
@@ -155,7 +155,7 @@ export default function AuditLogs() {
               </div>
             ) : (
               <table className="w-full" data-testid="audit-logs-table">
-                <thead className="bg-slate-50 border-b">
+                <thead className="bg-muted/50 border-b">
                   <tr>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Data</th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Usuário</th>
@@ -166,10 +166,10 @@ export default function AuditLogs() {
                 </thead>
                 <tbody className="divide-y">
                   {auditLogs.map((log) => (
-                    <tr key={log.id} className="group hover:bg-slate-50/50 transition-colors" data-testid={`audit-log-row-${log.id}`}>
+                    <tr key={log.id} className="group hover:bg-muted/50 transition-colors" data-testid={`audit-log-row-${log.id}`}>
                       <td className="p-4 pl-6">
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium text-slate-900">
+                          <span className="text-sm font-medium text-foreground">
                             {(() => {
                               const date = new Date(log.timestamp);
                               if (isNaN(date.getTime())) return "Data Inválida";
@@ -195,17 +195,17 @@ export default function AuditLogs() {
                             {log.userName?.[0] || log.userEmail?.[0] || "U"}
                           </div>
                           <div>
-                            <div className="font-medium text-slate-900 text-sm">{log.userName || "Usuário Desconhecido"}</div>
+                            <div className="font-medium text-foreground text-sm">{log.userName || "Usuário Desconhecido"}</div>
                             <div className="text-xs text-muted-foreground">{log.userEmail}</div>
                           </div>
                         </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-md bg-slate-100">
+                          <div className="p-1.5 rounded-md bg-muted">
                             {getActionIcon(log.action)}
                           </div>
-                          <span className="text-sm font-medium text-slate-700">
+                          <span className="text-sm font-medium text-foreground">
                             {formatActionLabel(log.action)}
                           </span>
                         </div>
@@ -214,13 +214,13 @@ export default function AuditLogs() {
                         <div className="flex items-center gap-2">
                           {getResourceIcon(log.resourceType)}
                           <div>
-                            <span className="text-sm text-slate-900">{log.resourceName}</span>
+                            <span className="text-sm text-foreground">{log.resourceName}</span>
                             <span className="text-xs text-muted-foreground ml-1">({getResourceTypeLabel(log.resourceType)})</span>
                           </div>
                         </div>
                       </td>
                       <td className="p-4 pr-6">
-                        <code className="text-sm bg-slate-100 px-2 py-1 rounded font-mono text-slate-600">
+                        <code className="text-sm bg-muted px-2 py-1 rounded font-mono text-muted-foreground">
                           {log.ipAddress}
                         </code>
                       </td>

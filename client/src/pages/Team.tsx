@@ -84,12 +84,12 @@ export default function Team() {
   const pendingInvitations = invitations?.filter(inv => !inv.acceptedAt) || [];
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 ml-72 p-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold text-slate-900">Gestão de Equipe</h1>
+            <h1 className="text-3xl font-display font-bold text-foreground">Gestão de Equipe</h1>
             <p className="text-muted-foreground">Gerencie o acesso à sua organização.</p>
           </div>
 
@@ -162,7 +162,7 @@ export default function Team() {
             </CardHeader>
             <CardContent className="p-0">
               <table className="w-full">
-                <thead className="bg-slate-50 border-b">
+                <thead className="bg-muted/50 border-b">
                   <tr>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">E-mail</th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Função</th>
@@ -172,7 +172,7 @@ export default function Team() {
                 </thead>
                 <tbody className="divide-y">
                   {pendingInvitations.map((invitation) => (
-                    <tr key={invitation.id} className="group hover:bg-slate-50/50 transition-colors" data-testid={`row-invitation-${invitation.id}`}>
+                    <tr key={invitation.id} className="group hover:bg-muted/50 transition-colors" data-testid={`row-invitation-${invitation.id}`}>
                       <td className="p-4 pl-6">
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
@@ -220,7 +220,7 @@ export default function Team() {
               <div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>
             ) : (
               <table className="w-full">
-                <thead className="bg-slate-50 border-b">
+                <thead className="bg-muted/50 border-b">
                   <tr>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Usuário</th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Função</th>
@@ -230,7 +230,7 @@ export default function Team() {
                 </thead>
                 <tbody className="divide-y">
                   {members?.map((member) => (
-                    <tr key={member.id} className="group hover:bg-slate-50/50 transition-colors" data-testid={`row-member-${member.id}`}>
+                    <tr key={member.id} className="group hover:bg-muted/50 transition-colors" data-testid={`row-member-${member.id}`}>
                       <td className="p-4 pl-6">
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">

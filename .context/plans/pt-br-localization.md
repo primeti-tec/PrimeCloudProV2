@@ -75,10 +75,10 @@ phases:
 
 # Pt Br Localization Plan
 
-> Plano para traduzir todo o sistema CloudStorage Pro para Português Brasileiro (pt-BR). Inclui: UI do frontend (labels, botões, mensagens), emails, notificações, erros, e documentação. Manter termos técnicos em inglês quando apropriado (ex: bucket, endpoint, access key, API, SFTP, etc).
+> Plano para traduzir todo o sistema Prime Cloud Pro para Português Brasileiro (pt-BR). Inclui: UI do frontend (labels, botões, mensagens), emails, notificações, erros, e documentação. Manter termos técnicos em inglês quando apropriado (ex: bucket, endpoint, access key, API, SFTP, etc).
 
 ## Task Snapshot
-- **Primary goal:** To provide a fully localized pt-BR experience across the PrimeCloudProV2 platform, encompassing UI elements, email communications, notification messages, and documentation while maintaining the clarity and accuracy suitable for our Brazilian user base and technical terminology in English.
+- **Primary goal:** To provide a fully localized pt-BR experience across the Prime Cloud Pro platform, encompassing UI elements, email communications, notification messages, and documentation while maintaining the clarity and accuracy suitable for our Brazilian user base and technical terminology in English.
 - **Success signal:** Measurable KPIs include a 90% or higher satisfaction score from Brazilian users regarding language accuracy and clarity, a reduction in support tickets related to language comprehension, and complete translation of all identified text strings within the platform.
 - **Key references:**
   - [Documentation Index](../docs/README.md)
@@ -186,7 +186,7 @@ Identify potential blockers, dependencies, and mitigation strategies before begi
 1.  Test Writer: Create unit and integration tests to verify the accuracy and functionality of the pt-BR translations. Accountable Owner: Test Writer.
 2.  Frontend Specialist & Backend Specialist: Perform user acceptance testing with Brazilian users to gather feedback on language accuracy and clarity. Accountable Owner: Frontend Specialist & Backend Specialist.
 3.  Documentation Writer: Ensure that all documentation is correctly translated and formatted in pt-BR. Accountable Owner: Documentation Writer.
-4.  Devops Specialist: Configure the CI/CD pipeline to automatically build and deploy the localized version of the PrimeCloudProV2 platform. Accountable Owner: Devops Specialist.
+4.  Devops Specialist: Configure the CI/CD pipeline to automatically build and deploy the localized version of the Prime Cloud Pro platform. Accountable Owner: Devops Specialist.
 
 **Commit Checkpoint**
 - Record the validation evidence and create a commit signalling the handoff completion (for example, `git commit -m "chore(plan): complete phase 3 validation"`).

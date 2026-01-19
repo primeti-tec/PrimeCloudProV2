@@ -6,12 +6,38 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { authStorage } from "./replit_integrations/auth"; // To find users by email
 import { validateDocument } from "./lib/document-validation";
+import * as domainService from "./services/domain-service";
+import * as smtpRoutes from "./routes/smtp";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   // Clerk middleware is registered in server/index.ts
+
+  // Multi-tenancy middleware - Identify tenant by custom domain
+  app.use(async (req: any, res, next) => {
+    const host = req.get("host");
+
+    if (host) {
+      // Remove port if present
+      const cleanHost = host.split(":")[0];
+
+      // Check if this host matches a custom domain
+      const allAccounts = await storage.getAllAccounts();
+      const matchedAccount = allAccounts.find((account: any) =>
+        account.customDomain?.toLowerCase() === cleanHost.toLowerCase() &&
+        account.domainStatus === "active"
+      );
+
+      if (matchedAccount) {
+        // Store the tenant context in the request
+        req.tenantAccount = matchedAccount;
+      }
+    }
+
+    next();
+  });
 
   // --- Public Routes ---
   app.get(api.products.list.path, async (req, res) => {
@@ -113,6 +139,193 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
+    }
+  });
+
+  // Update Account Branding
+  app.patch("/api/accounts/:id/branding", requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.id);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const brandingSchema = z.object({
+        brandingName: z.string().optional().nullable().transform(val => val === "" ? null : val),
+        brandingLogo: z.string().optional().nullable().transform(val => val === "" ? null : val).refine(val => !val || z.string().url().safeParse(val).success, "Invalid URL"),
+        brandingFavicon: z.string().optional().nullable().transform(val => val === "" ? null : val).refine(val => !val || z.string().url().safeParse(val).success, "Invalid URL"),
+        brandingPrimaryColor: z.string().optional().nullable().transform(val => val === "" ? null : val).refine(val => !val || /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(val), "Invalid color"),
+        brandingSidebarColor: z.string().optional().nullable().transform(val => val === "" ? null : val).refine(val => !val || /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(val), "Invalid color"),
+      });
+
+      const input = brandingSchema.parse(req.body);
+      const account = await storage.updateAccount(accountId, input);
+
+      // Audit log
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'account.branding_updated',
+        resource: 'account',
+        details: { updatedFields: Object.keys(input), resourceId: accountId.toString() },
+      });
+
+      res.json(account);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Configure Custom Domain
+  app.patch("/api/accounts/:id/domain", requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.id);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const domainSchema = z.object({
+        customDomain: z.string().min(1, "Domain is required"),
+      });
+
+      const { customDomain } = domainSchema.parse(req.body);
+
+      // Validate domain format
+      if (!domainService.isValidDomain(customDomain)) {
+        return res.status(400).json({ message: "Invalid domain format" });
+      }
+
+      // Check if domain is already in use
+      const allAccounts = await storage.getAllAccounts();
+      if (!domainService.isDomainUnique(customDomain, allAccounts, accountId)) {
+        return res.status(409).json({ message: "This domain is already in use by another account" });
+      }
+
+      // Generate verification token
+      const verificationToken = domainService.generateVerificationToken();
+
+      // Update account with domain and token
+      const account = await storage.updateAccount(accountId, {
+        customDomain: customDomain.replace(/^https?:\/\//, "").replace(/\/$/, ""),
+        domainStatus: "pending",
+        dnsVerificationToken: verificationToken,
+      });
+
+      // Audit log
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'account.domain_configured',
+        resource: 'account',
+        details: { customDomain, resourceId: accountId.toString() },
+      });
+
+      res.json({
+        account,
+        verificationToken,
+        instructions: {
+          cname: `Add a CNAME record pointing ${customDomain} to app.primecloudpro.com.br`,
+          txt: `Or add a TXT record with: primecloudpro-verification=${verificationToken}`,
+        },
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Verify Custom Domain
+  app.post("/api/accounts/:id/domain/verify", requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.id);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const account = await storage.getAccount(accountId);
+      if (!account || !account.customDomain || !account.dnsVerificationToken) {
+        return res.status(400).json({ message: "No domain configured for verification" });
+      }
+
+      // Verify DNS records
+      const verificationResult = await domainService.verifyDomainOwnership(
+        account.customDomain,
+        account.dnsVerificationToken
+      );
+
+      // Update domain status based on verification result
+      const newStatus = verificationResult.verified ? "active" : "failed";
+      await storage.updateAccount(accountId, {
+        domainStatus: newStatus,
+      });
+
+      // Audit log
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: verificationResult.verified ? 'account.domain_verified' : 'account.domain_verification_failed',
+        resource: 'account',
+        details: {
+          customDomain: account.customDomain,
+          method: verificationResult.method,
+          resourceId: accountId.toString(),
+        },
+      });
+
+      res.json({
+        verified: verificationResult.verified,
+        status: newStatus,
+        message: verificationResult.message,
+        method: verificationResult.method,
+      });
+    } catch (err) {
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Remove Custom Domain
+  app.delete("/api/accounts/:id/domain", requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.id);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const account = await storage.updateAccount(accountId, {
+        customDomain: null,
+        domainStatus: "pending",
+        dnsVerificationToken: null,
+      });
+
+      // Audit log
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'account.domain_removed',
+        resource: 'account',
+        details: { resourceId: accountId.toString() },
+      });
+
+      res.json({ message: "Custom domain removed successfully", account });
+    } catch (err) {
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -1114,6 +1327,10 @@ export async function registerRoutes(
 
   // Seed Data
   await seedDatabase();
+
+  // SMTP Email Configuration Routes
+  app.patch("/api/accounts/:id/email-config", requireAuth(), smtpRoutes.handleConfigureSMTP);
+  app.post("/api/accounts/:id/email-test", requireAuth(), smtpRoutes.handleTestSMTP);
 
   return httpServer;
 }

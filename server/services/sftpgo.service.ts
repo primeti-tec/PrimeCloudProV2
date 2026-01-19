@@ -72,22 +72,28 @@ async function checkSftpGoAvailability(): Promise<boolean> {
     const config = getSftpGoConfig();
 
     if (!config.apiKey) {
-        console.warn("⚠️ SFTPGO_API_KEY not set, running in mock mode");
+        console.warn("[SFTPGo] ⚠️ API Key não configurada. Executando em MOCK MODE.");
         return false;
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+
         const response = await fetch(`${config.apiUrl}/api/v2/status`, {
             headers: { "X-SFTPGO-API-KEY": config.apiKey },
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (response.ok) {
-            console.log("✅ SFTPGo connection verified");
+            console.log("[SFTPGo] ✅ Conexão estabelecida com sucesso.");
             return true;
         }
+        console.warn(`[SFTPGo] ⚠️ Erro na resposta do servidor: ${response.status}`);
         return false;
     } catch (error) {
-        console.warn("⚠️ SFTPGo not available:", (error as Error).message);
+        console.warn(`[SFTPGo] ⚠️ Serviço não disponível (MOCK MODE ativado): ${(error as Error).message}`);
         return false;
     }
 }

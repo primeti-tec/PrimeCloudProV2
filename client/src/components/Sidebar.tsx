@@ -1,11 +1,14 @@
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, FileText, HardDrive, ShoppingCart, Save } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useBranding } from "./branding-provider";
+import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui-custom";
 
 export function Sidebar() {
   const [location] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
+  const branding = useBranding();
 
   // For demo purposes, assume email containing "admin" is super admin
   const isSuperAdmin = user?.email?.includes("admin");
@@ -29,12 +32,23 @@ export function Sidebar() {
 
   return (
     <div className="h-screen w-72 bg-card border-r border-border flex flex-col fixed left-0 top-0 z-20">
-      <div className="p-8 border-b border-border/50">
+      <div className="p-8 border-b border-border/50" style={{ backgroundColor: branding.sidebarColor ? `${branding.sidebarColor}15` : undefined }}>
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-lg">C</span>
-          </div>
-          <span className="font-display font-bold text-xl tracking-tight">CloudStorage</span>
+          {/* Custom Logo or Default */}
+          {branding.logo ? (
+            <img src={branding.logo} alt={branding.name} className="h-8 w-auto" />
+          ) : (
+            <>
+              <img src="/logo.png" alt={branding.name} className="h-8 w-auto" onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }} />
+              <div className="hidden h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg">{branding.name[0]}</span>
+              </div>
+            </>
+          )}
+          <span className="font-display font-bold text-xl tracking-tight">{branding.name}</span>
         </Link>
       </div>
 
@@ -77,15 +91,18 @@ export function Sidebar() {
             <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
           </div>
         </div>
-        <Button
-          variant="outline"
-          className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/20"
-          size="sm"
-          onClick={logout}
-          disabled={isLoggingOut}
-        >
-          Sair
-        </Button>
+        <div className="flex gap-2 mb-2">
+          <ModeToggle />
+          <Button
+            variant="outline"
+            className="flex-1 justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/20"
+            size="sm"
+            onClick={logout}
+            disabled={isLoggingOut}
+          >
+            Sair
+          </Button>
+        </div>
       </div>
     </div>
   );

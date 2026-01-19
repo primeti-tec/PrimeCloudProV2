@@ -143,7 +143,7 @@ export default function BackupConfig() {
 <ImperiusBackupConfig>
   <CloudStorage>
     <Provider>S3Compatible</Provider>
-    <DisplayName>CloudStorage Pro</DisplayName>
+    <DisplayName>Prime Cloud Pro</DisplayName>
     <ServiceURL>https://${config.endpoint}</ServiceURL>
     <Region>${config.region}</Region>
     <AccessKeyID>${config.accessKeyId}</AccessKeyID>
@@ -159,7 +159,7 @@ export default function BackupConfig() {
             case "veeam":
                 content = JSON.stringify({
                     provider: "S3Compatible",
-                    displayName: "CloudStorage Pro",
+                    displayName: "Prime Cloud Pro",
                     serviceUrl: `https://${config.endpoint}`,
                     region: config.region,
                     accessKeyId: config.accessKeyId,
@@ -181,7 +181,7 @@ region = ${config.region}`;
 
             case "restic":
                 content = `#!/bin/bash
-# Restic Environment Configuration for CloudStorage Pro
+# Restic Environment Configuration for Prime Cloud Pro
 export AWS_ACCESS_KEY_ID="${config.accessKeyId}"
 export AWS_SECRET_ACCESS_KEY="${config.secretAccessKey}"
 export RESTIC_REPOSITORY="s3:https://${config.endpoint}/${config.bucketName}"
@@ -190,7 +190,7 @@ export RESTIC_PASSWORD="your_restic_password_here"`;
                 break;
 
             default:
-                content = `# CloudStorage Pro - S3 Credentials
+                content = `# Prime Cloud Pro - S3 Credentials
 S3_ENDPOINT=https://${config.endpoint}
 S3_REGION=${config.region}
 S3_ACCESS_KEY_ID=${config.accessKeyId}
@@ -213,7 +213,7 @@ S3_BUCKET=${config.bucketName}`;
     };
 
     const downloadEnvFile = () => {
-        const content = `# CloudStorage Pro - S3 Credentials
+        const content = `# Prime Cloud Pro - S3 Credentials
 # Generated: ${new Date().toISOString()}
 
 S3_ENDPOINT=https://${S3_CONFIG.endpoint}
@@ -241,7 +241,7 @@ AWS_ENDPOINT_URL=https://${S3_CONFIG.endpoint}
         <div className="flex min-h-screen bg-background">
             <Sidebar />
 
-            <main className="flex-1 p-6 lg:p-8 overflow-auto">
+            <main className="flex-1 ml-72 p-6 lg:p-8 overflow-auto">
                 <div className="max-w-5xl mx-auto space-y-8">
                     {/* Header */}
                     <div>
@@ -250,7 +250,7 @@ AWS_ENDPOINT_URL=https://${S3_CONFIG.endpoint}
                             Configurar Software de Backup
                         </h1>
                         <p className="text-muted-foreground mt-2">
-                            Conecte seu software de backup ao CloudStorage Pro para proteger seus dados.
+                            Conecte seu software de backup ao Prime Cloud Pro para proteger seus dados.
                         </p>
                     </div>
 
@@ -456,10 +456,25 @@ AWS_ENDPOINT_URL=https://${S3_CONFIG.endpoint}
                                                 <PlayCircle className="h-4 w-4" />
                                                 Assistir Vídeo Tutorial
                                             </Button>
-                                            <Button variant="outline" className="gap-2">
-                                                <Download className="h-4 w-4" />
-                                                Baixar PDF Detalhado
-                                            </Button>
+
+                                            {/* Link para o Guia Markdown */}
+                                            {["imperius", "veeam"].includes(selectedSoftware!) && (
+                                                <Button
+                                                    variant="outline"
+                                                    className="gap-2"
+                                                    onClick={() => window.open(`/tutorials/${selectedSoftware}-guide.md`, '_blank')}
+                                                >
+                                                    <FileCode className="h-4 w-4" />
+                                                    Ler Guia de Configuração
+                                                </Button>
+                                            )}
+
+                                            {!["imperius", "veeam"].includes(selectedSoftware!) && (
+                                                <Button variant="outline" className="gap-2" disabled>
+                                                    <Download className="h-4 w-4" />
+                                                    Guia Indisponível
+                                                </Button>
+                                            )}
                                         </div>
                                     </TabsContent>
 

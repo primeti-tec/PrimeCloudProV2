@@ -1,10 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { type CreateAccountRequest, type UpdateAccountRequest } from "@shared/schema";
+import { useAuth } from "./use-auth";
 
 export function useMyAccounts() {
+  const { user } = useAuth();
+
   return useQuery({
     queryKey: [api.accounts.listMy.path],
+    enabled: !!user, // Only fetch when user is authenticated
     queryFn: async () => {
       const res = await fetch(api.accounts.listMy.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch my accounts");
