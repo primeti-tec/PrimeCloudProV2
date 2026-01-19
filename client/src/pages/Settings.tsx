@@ -368,16 +368,24 @@ export default function Settings() {
 
   const handleSmtpSave = async () => {
     try {
-      await saveSmtpConfig.mutateAsync({
+      // Build config object - only include smtpPass if user entered a new password
+      // This prevents overwriting existing password when user just wants to update other settings
+      const config: any = {
         smtpEnabled,
         smtpHost: smtpHost || null,
         smtpPort: smtpPort || null,
         smtpUser: smtpUser || null,
-        smtpPass: smtpPass || null,
         smtpFromEmail: smtpFromEmail || null,
         smtpFromName: smtpFromName || null,
         smtpEncryption: smtpEncryption || null,
-      });
+      };
+
+      // Only include password if user entered a new one
+      if (smtpPass && smtpPass.trim()) {
+        config.smtpPass = smtpPass;
+      }
+
+      await saveSmtpConfig.mutateAsync(config);
     } catch (error) {
       toast({
         title: "Erro",
@@ -386,6 +394,7 @@ export default function Settings() {
       });
     }
   };
+
 
   const handleTestConnection = async () => {
     if (!smtpEnabled || !smtpHost) {

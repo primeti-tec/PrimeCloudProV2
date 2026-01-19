@@ -135,18 +135,37 @@ ${text || '(Nenhuma versão em texto disponível)'}
  * Create a nodemailer transporter from SMTP config
  */
 function createSmtpTransporter(config: AccountSmtpConfig) {
-  const secure = config.smtpEncryption === 'ssl';
+  // Sanitize host by trimming whitespace
+  const host = (config.smtpHost || '').trim();
+  const port = config.smtpPort || 587;
+  const encryption = config.smtpEncryption || 'none';
+
+  // Determine security settings based on encryption type and port
+  // Port 465 typically uses implicit SSL
+  // Port 587 typically uses STARTTLS
+  const secure = encryption === 'ssl' || port === 465;
+  const requireTLS = encryption === 'tls' || (port === 587 && encryption !== 'ssl');
+
+  console.log(`📧 [SMTP Config] Host: ${host}, Port: ${port}, Encryption: ${encryption}`);
+  console.log(`📧 [SMTP Config] Secure (SSL): ${secure}, RequireTLS: ${requireTLS}`);
+  console.log(`📧 [SMTP Config] User: ${config.smtpUser}, From: ${config.smtpFromEmail}`);
 
   const options: SMTPTransport.Options = {
-    host: config.smtpHost!,
-    port: config.smtpPort || 587,
+    host,
+    port,
     secure,
     auth: {
       user: config.smtpUser!,
       pass: config.smtpPass!,
     },
-    // Use STARTTLS for 'tls' encryption
-    requireTLS: config.smtpEncryption === 'tls',
+    requireTLS,
+    // Additional options for better compatibility
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 30000,
+    // Debug mode to see what's happening
+    debug: true,
+    logger: true,
   };
 
   return nodemailer.createTransport(options);
@@ -159,7 +178,8 @@ export async function sendInvitationEmail(
   email: string,
   inviterName: string,
   accountName: string,
-  inviteUrl: string
+  inviteUrl: string,
+  accountSmtpConfig?: AccountSmtpConfig
 ): Promise<void> {
   const html = `
 <!DOCTYPE html>
@@ -220,7 +240,7 @@ Se você não esperava este convite, pode ignorar este email.`;
     subject: `${inviterName} convidou você para ${accountName}`,
     html,
     text,
-  });
+  }, accountSmtpConfig);
 }
 
 /**

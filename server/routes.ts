@@ -8,6 +8,7 @@ import { authStorage } from "./replit_integrations/auth"; // To find users by em
 import { validateDocument } from "./lib/document-validation";
 import * as domainService from "./services/domain-service";
 import * as smtpRoutes from "./routes/smtp";
+import { sendInvitationEmail, sendEmail } from "./services/email";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -875,6 +876,50 @@ export async function registerRoutes(
 
     try {
       const invitation = await storage.createInvitation(accountId, email, role, userId);
+
+      // Get account and inviter info for the email
+      const account = await storage.getAccount(accountId);
+      const inviter = userId ? await authStorage.getUser(userId) : null;
+
+      // Build invite URL
+      const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+      const inviteUrl = `${baseUrl}/invite/${invitation.token}`;
+
+      // Get account's SMTP config
+      const smtpConfig = account ? {
+        smtpEnabled: account.smtpEnabled || false,
+        smtpHost: account.smtpHost,
+        smtpPort: account.smtpPort,
+        smtpUser: account.smtpUser,
+        smtpPass: account.smtpPass,
+        smtpFromEmail: account.smtpFromEmail,
+        smtpFromName: account.smtpFromName,
+        smtpEncryption: account.smtpEncryption,
+      } : undefined;
+
+      // Send invitation email
+      try {
+        const inviterName = inviter?.firstName
+          ? `${inviter.firstName} ${inviter.lastName || ''}`.trim()
+          : inviter?.email || 'Um administrador';
+        const accountName = account?.name || 'Prime Cloud Pro';
+
+        await sendInvitationEmail(email, inviterName, accountName, inviteUrl, smtpConfig);
+        console.log(`✅ [Invitation] Email de convite enviado para ${email}`);
+      } catch (emailError) {
+        // Log error but don't fail the request - invitation was created successfully
+        console.error(`⚠️ [Invitation] Falha ao enviar email de convite:`, emailError);
+      }
+
+      // Audit log
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'MEMBER_INVITED',
+        resource: 'invitation',
+        details: { email, role, invitationId: invitation.id },
+      });
+
       res.status(201).json(invitation);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to create invitation" });

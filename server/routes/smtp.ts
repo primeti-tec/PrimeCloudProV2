@@ -35,8 +35,18 @@ export async function handleConfigureSMTP(req: any, res: Response) {
 
         const smtpConfig = smtpSchema.parse(req.body);
 
+        // Build update object - only include smtpPass if it was explicitly provided with a value
+        // This prevents accidentally clearing the password when updating other settings
+        const updateData: any = { ...smtpConfig };
+
+        // If smtpPass is null, undefined, or empty string, don't update it
+        // This preserves the existing password in the database
+        if (!smtpConfig.smtpPass || smtpConfig.smtpPass.trim() === '') {
+            delete updateData.smtpPass;
+        }
+
         // Update account with SMTP config
-        const account = await storage.updateAccount(accountId, smtpConfig);
+        const account = await storage.updateAccount(accountId, updateData);
 
         // Audit log
         await storage.createAuditLog({
