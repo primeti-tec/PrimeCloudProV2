@@ -5,6 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CheckCircle, XCircle, Mail, Building2, User } from "lucide-react";
 
+const roleLabels: Record<string, string> = {
+  owner: "Proprietário",
+  admin: "Administrador",
+  developer: "Desenvolvedor",
+};
+
 export default function AcceptInvite() {
   const { token } = useParams<{ token: string }>();
   const [, setLocation] = useLocation();
@@ -25,7 +31,8 @@ export default function AcceptInvite() {
   };
 
   const handleLogin = () => {
-    window.location.href = `/__replit/auth/login?redirect=/invite/${token}`;
+    const redirectUrl = encodeURIComponent(`/invite/${token}`);
+    window.location.href = `/sign-in?redirect_url=${redirectUrl}`;
   };
 
   if (isLoading || authLoading) {
@@ -42,12 +49,12 @@ export default function AcceptInvite() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <XCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <CardTitle className="text-xl">Invalid Invitation</CardTitle>
+            <CardTitle className="text-xl">Convite Inválido</CardTitle>
             <CardDescription>{error.message}</CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center">
             <Button onClick={() => setLocation("/")} data-testid="button-go-home">
-              Go to Home
+              Ir para o Início
             </Button>
           </CardContent>
         </Card>
@@ -61,9 +68,9 @@ export default function AcceptInvite() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <CardTitle className="text-xl">Welcome to {invitation?.account?.name}!</CardTitle>
+            <CardTitle className="text-xl">Bem-vindo à {invitation?.account?.name}!</CardTitle>
             <CardDescription>
-              You have successfully joined the team. Redirecting to dashboard...
+              Você entrou na equipe com sucesso. Redirecionando para o dashboard...
             </CardDescription>
           </CardHeader>
         </Card>
@@ -76,9 +83,9 @@ export default function AcceptInvite() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
-          <CardTitle className="text-xl">You're Invited!</CardTitle>
+          <CardTitle className="text-xl">Você Foi Convidado!</CardTitle>
           <CardDescription>
-            You've been invited to join a team
+            Você foi convidado para participar de uma equipe
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -86,57 +93,59 @@ export default function AcceptInvite() {
             <div className="flex items-center gap-3">
               <Building2 className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-sm text-muted-foreground">Organization</p>
+                <p className="text-sm text-muted-foreground">Organização</p>
                 <p className="font-medium" data-testid="text-account-name">{invitation?.account?.name}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <User className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-sm text-muted-foreground">Invited by</p>
+                <p className="text-sm text-muted-foreground">Convidado por</p>
                 <p className="font-medium" data-testid="text-inviter-name">
-                  {invitation?.inviter?.firstName || invitation?.inviter?.email || "A team member"}
+                  {invitation?.inviter?.firstName || invitation?.inviter?.email || "Um membro da equipe"}
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <Mail className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-sm text-muted-foreground">Your role</p>
-                <p className="font-medium capitalize" data-testid="text-role">{invitation?.role}</p>
+                <p className="text-sm text-muted-foreground">Sua função</p>
+                <p className="font-medium" data-testid="text-role">
+                  {roleLabels[invitation?.role || ''] || invitation?.role}
+                </p>
               </div>
             </div>
           </div>
 
           {user ? (
-            <Button 
-              onClick={handleAccept} 
-              className="w-full" 
+            <Button
+              onClick={handleAccept}
+              className="w-full"
               disabled={isAccepting}
               data-testid="button-accept-invite"
             >
               {isAccepting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Accepting...
+                  Aceitando...
                 </>
               ) : (
-                "Accept Invitation"
+                "Aceitar Convite"
               )}
             </Button>
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-center text-muted-foreground">
-                Please log in to accept this invitation
+                Faça login para aceitar este convite
               </p>
-              <Button 
-                onClick={handleLogin} 
+              <Button
+                onClick={handleLogin}
                 className="w-full"
                 data-testid="button-login"
               >
-                Log in to Accept
+                Fazer Login para Aceitar
               </Button>
             </div>
           )}

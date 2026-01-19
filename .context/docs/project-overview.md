@@ -1,89 +1,110 @@
----
-status: filled
-generated: 2026-01-18
----
+# Visão Geral do Projeto
 
-# Project Overview
+O PrimeCloudProV2 é uma plataforma de gerenciamento de armazenamento em nuvem que permite que organizações gerenciem contas de armazenamento, buckets, chaves de acesso e assinaturas. A plataforma oferece uma solução completa para provisionamento de armazenamento em nuvem com funcionalidades de cobrança, gerenciamento de quotas e colaboração em equipe.
 
-PrimeCloudProV2 is a cloud storage management platform that enables organizations to manage storage accounts, buckets, access keys, and subscriptions. The platform provides a complete solution for cloud storage provisioning with billing, quota management, and team collaboration features.
+## Fatos Rápidos
 
-## Quick Facts
+- **Caminho raiz**: `D:\PROJETOS\PRINECLOUDPROV2\PrimeCloudProV2`
+- **Linguagens principais**:
+  - TypeScript (.tsx, .ts) - 105 arquivos
+  - Arquivos de configuração JavaScript
+- **Arquitetura**: Full-stack monorepo (client + server + shared)
 
-- **Root path**: `D:\PROJETOS\PRINECLOUDPROV2\PrimeCloudProV2`
-- **Primary languages**:
-  - TypeScript (.tsx, .ts) - 105 files
-  - JavaScript configuration files
-- **Architecture**: Full-stack monorepo (client + server + shared)
-
-## Technology Stack
+## Stack Tecnológico
 
 ### Backend
-- **Runtime**: Node.js with Express.js 5
-- **Database**: PostgreSQL with Drizzle ORM
-- **Authentication**: Passport.js (local + OpenID Connect)
-- **Session**: Express Session with pg-simple store
+- **Runtime**: Node.js com Express.js 5
+- **Banco de Dados**: PostgreSQL com Drizzle ORM
+- **Autenticação**: Passport.js (local + OpenID Connect)
+- **Sessão**: Express Session com armazenamento pg-simple
 
 ### Frontend
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite 7
-- **Styling**: Tailwind CSS 3 with Radix UI components
-- **State Management**: TanStack React Query
-- **Routing**: Wouter
+- **Framework**: React 18 com TypeScript
+- **Ferramenta de Build**: Vite 7
+- **Estilização**: Tailwind CSS 3 com componentes Radix UI
+- **Gerenciamento de Estado**: TanStack React Query
+- **Roteamento**: Wouter
 
-### Shared
-- **Validation**: Zod schemas
-- **Type Safety**: Shared types between client and server
+### Compartilhado
+- **Validação**: Schemas Zod
+- **Type Safety**: Tipos compartilhados entre cliente e servidor
 
-## Entry Points
+## Pontos de Entrada
 
-- [`server/index.ts`](../../server/index.ts) - Express server initialization
-- [`client/src/main.tsx`](../../client/src/main.tsx) - React application entry
-- [`server/replit_integrations/auth/index.ts`](../../server/replit_integrations/auth/index.ts) - Auth module
+- [`server/index.ts`](../../server/index.ts) - Inicialização do servidor Express
+- [`client/src/main.tsx`](../../client/src/main.tsx) - Entrada da aplicação React
+- [`server/replit_integrations/auth/index.ts`](../../server/replit_integrations/auth/index.ts) - Módulo de autenticação
 
-## Core Features
+## Funcionalidades Principais
 
-1. **Account Management** - Create, manage, and approve organizational accounts
-2. **Bucket Management** - Cloud storage buckets with lifecycle rules and versioning
-3. **Access Keys** - API key management with rotation and toggle capabilities
-4. **Team Collaboration** - Invite members with role-based permissions
-5. **Subscription & Billing** - Product subscriptions, invoices, and usage tracking
-6. **Quota Management** - Request and manage storage quotas
-7. **Audit Logging** - Track all system activities
-8. **Notifications** - In-app notification system
+1. **Gerenciamento de Contas**: Criar, gerenciar e aprovar contas organizacionais
+2. **Gerenciamento de Buckets**: Buckets de armazenamento em nuvem com regras de ciclo de vida e versionamento
+3. **Chaves de Acesso**: Gerenciamento de chaves de API com rotação e ativação/desativação
+4. **Colaboração em Equipe**: Convidar membros com permissões baseadas em funções
+5. **Assinaturas e Faturamento**: Assinaturas de produtos, faturas e rastreamento de uso
+6. **Gerenciamento de Quotas**: Solicitar e gerenciar quotas de armazenamento
+7. **Logs de Auditoria**: Rastreamento de todas as atividades do sistema
+8. **Notificações**: Sistema de notificação in-app
 
-## File Structure
+## Estrutura de Arquivos
 
-- `client/` - React frontend application
-  - `src/pages/` - Page components
-  - `src/components/` - Reusable UI components
-  - `src/hooks/` - Custom React hooks for data fetching
-  - `src/lib/` - Utilities and helpers
-- `server/` - Express backend
-  - `routes.ts` - API route definitions
-  - `storage.ts` - Database storage layer
-  - `services/` - Business logic (email service)
-  - `lib/` - Server utilities
-- `shared/` - Shared code between client and server
-  - `schema.ts` - Zod schemas and types
-  - `routes.ts` - URL builder utilities
-  - `models/` - Shared type definitions
+- `client/` - Aplicação frontend React
+  - `src/pages/` - Componentes de página
+  - `src/components/` - Componentes de UI reutilizáveis
+  - `src/hooks/` - Hooks React customizados para busca de dados
+  - `src/lib/` - Utilitários e helpers
+- `server/` - Backend Express
+  - `routes.ts` - Definições de rota da API
+  - `storage.ts` - Camada de armazenamento de banco de dados ([`DatabaseStorage`](../../server/storage.ts)) que implementa a interface [`IStorage`](../../server/storage.ts).
+  - `services/` - Lógica de negócios (serviço de email)
+  - `lib/` - Utilitários do servidor
+- `shared/` - Código compartilhado entre cliente e servidor
+  - `schema.ts` - Schemas Zod e tipos (e.g., [`Account`](../../shared/schema.ts), [`Order`](../../shared/schema.ts), definindo a estrutura de dados em toda a aplicação.)
+  - `routes.ts` - Utilitários para construir URLs
+  - `models/` - Definições de tipo compartilhadas
 
-## Getting Started
+## Primeiros Passos
 
-1. Install dependencies: `npm install`
-2. Set up PostgreSQL database
-3. Push schema: `npm run db:push`
-4. Start development: `npm run dev`
-5. Build for production: `npm run build`
+1. Instale as dependências: `npm install`
+2. Configure o banco de dados PostgreSQL
+3. Envie o schema: `npm run db:push`
+4. Inicie o desenvolvimento: `npm run dev`
+5. Compile para produção: `npm run build`
 
-## Key Stakeholders
+## Principais Interessados
 
-- **End Users**: Organizations needing cloud storage management
-- **Administrators**: Platform operators managing accounts and quotas
-- **Developers**: Team members integrating via access keys
+- **Usuários Finais**: Organizações que precisam de gerenciamento de armazenamento em nuvem
+- **Administradores**: Operadores da plataforma gerenciando contas e quotas
+- **Desenvolvedores**: Membros da equipe integrando via chaves de acesso
 
-## Related Documentation
+## API Pública
 
-- [Architecture Notes](./architecture.md)
-- [Development Workflow](./development-workflow.md)
-- [Security & Compliance](./security.md)
+O projeto expõe vários componentes e estruturas de dados chave:
+
+- **`apiRequest` (client/src/lib/queryClient.ts)**: Uma função utilitária para fazer requisições à API usando `fetch`. Ela lida com autenticação recuperando um token Clerk.
+  ```typescript
+  import { apiRequest } from "@/lib/queryClient";
+
+  apiRequest("GET", "/accounts").then(response => {
+      console.log(response);
+  });
+  ```
+
+- **`cn` (client/src/lib/utils.ts)**: Um utilitário para combinar nomes de classes CSS condicionalmente, usando `tailwind-merge` e `clsx`.
+  ```typescript
+  import { cn } from "@/lib/utils";
+
+  <div className={cn("p-4", props.className)}>Exemplo</div>
+  ```
+
+- **`isValidCPF` e `isValidCNPJ` (ambos em client/src/lib/document-validation.ts e server/lib/document-validation.ts)**: Funções para validar documentos CPF e CNPJ brasileiros.
+
+- **Schemas Zod (shared/schema.ts)**: Definem a estrutura de dados e regras de validação para várias entidades como `Account`, `Order`, `Bucket`, etc.
+
+- **`buildUrl` (shared/routes.ts)**: Uma função para construir URLs baseadas em padrões de rota e parâmetros.
+
+## Documentação Relacionada
+
+- [Notas de Arquitetura](./architecture.md)
+- [Fluxo de Trabalho de Desenvolvimento](./development-workflow.md)
+- [Segurança e Conformidade](./security.md)

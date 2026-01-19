@@ -32,10 +32,10 @@ export default function SftpAccess() {
     onSuccess: (data: SftpCredential & { rawPassword: string }) => {
       setNewPassword(data.rawPassword);
       queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'sftp'] });
-      toast({ title: "SFTP credentials created!", description: "Save your password now. It won't be shown again." });
+      toast({ title: "Credenciais SFTP criadas!", description: "Salve sua senha agora. Ela não será exibida novamente." });
     },
     onError: () => {
-      toast({ title: "Failed to create credentials", variant: "destructive" });
+      toast({ title: "Falha ao criar credenciais", variant: "destructive" });
     },
   });
 
@@ -47,22 +47,22 @@ export default function SftpAccess() {
     onSuccess: (data: SftpCredential & { rawPassword: string }) => {
       setNewPassword(data.rawPassword);
       queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'sftp'] });
-      toast({ title: "Password reset successfully!", description: "Save your new password now. It won't be shown again." });
+      toast({ title: "Senha redefinida!", description: "Salve sua nova senha agora. Ela não será exibida novamente." });
     },
     onError: () => {
-      toast({ title: "Failed to reset password", variant: "destructive" });
+      toast({ title: "Falha ao redefinir senha", variant: "destructive" });
     },
   });
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: `${label} copied to clipboard` });
+    toast({ title: `${label} copiado para a área de transferência` });
   };
 
-  const sftpHost = "sftp.cloudstorage.example.com";
+  const sftpHost = "sftp.cloudstoragepro.com.br";
   const sftpPort = "22";
 
-  const connectionString = sftpCredential 
+  const connectionString = sftpCredential
     ? `sftp://${sftpCredential.username}@${sftpHost}:${sftpPort}`
     : "";
 
@@ -74,9 +74,9 @@ export default function SftpAccess() {
       <main className="flex-1 ml-72 p-8">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="text-page-title">SFTP Access</h1>
+            <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="text-page-title">Acesso SFTP</h1>
             <p className="text-muted-foreground">
-              Connect to your storage via SFTP for file transfers and integrations.
+              Conecte-se ao seu armazenamento via SFTP para transferências de arquivos e integrações.
             </p>
           </div>
 
@@ -90,9 +90,9 @@ export default function SftpAccess() {
                 <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-6">
                   <HardDrive className="h-8 w-8 text-primary" />
                 </div>
-                <h2 className="text-xl font-semibold mb-2">No SFTP Credentials</h2>
+                <h2 className="text-xl font-semibold mb-2">Sem Credenciais SFTP</h2>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Generate SFTP credentials to access your buckets via SFTP protocol for file uploads and downloads.
+                  Gere credenciais SFTP para acessar seus buckets via protocolo SFTP para uploads e downloads de arquivos.
                 </p>
                 <Button
                   onClick={() => createCredentialsMutation.mutate()}
@@ -101,7 +101,7 @@ export default function SftpAccess() {
                 >
                   {createCredentialsMutation.isPending && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
                   <Key className="mr-2 h-4 w-4" />
-                  Generate Credentials
+                  Gerar Credenciais
                 </Button>
               </CardContent>
             </Card>
@@ -111,7 +111,7 @@ export default function SftpAccess() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Server className="h-5 w-5" />
-                    Connection Details
+                    Detalhes da Conexão
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -119,15 +119,15 @@ export default function SftpAccess() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-muted-foreground">Host</label>
                       <div className="flex items-center gap-2">
-                        <Input 
-                          value={sftpHost} 
-                          readOnly 
-                          className="font-mono bg-muted" 
+                        <Input
+                          value={sftpHost}
+                          readOnly
+                          className="font-mono bg-muted"
                           data-testid="input-sftp-host"
                         />
-                        <Button 
-                          size="icon" 
-                          variant="outline" 
+                        <Button
+                          size="icon"
+                          variant="outline"
                           onClick={() => copyToClipboard(sftpHost, "Host")}
                           data-testid="button-copy-host"
                         >
@@ -136,18 +136,18 @@ export default function SftpAccess() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">Port</label>
+                      <label className="text-sm font-medium text-muted-foreground">Porta</label>
                       <div className="flex items-center gap-2">
-                        <Input 
-                          value={sftpPort} 
-                          readOnly 
-                          className="font-mono bg-muted w-24" 
+                        <Input
+                          value={sftpPort}
+                          readOnly
+                          className="font-mono bg-muted w-24"
                           data-testid="input-sftp-port"
                         />
-                        <Button 
-                          size="icon" 
-                          variant="outline" 
-                          onClick={() => copyToClipboard(sftpPort, "Port")}
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={() => copyToClipboard(sftpPort, "Porta")}
                           data-testid="button-copy-port"
                         >
                           <Copy className="h-4 w-4" />
@@ -157,18 +157,18 @@ export default function SftpAccess() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Username</label>
+                    <label className="text-sm font-medium text-muted-foreground">Usuário</label>
                     <div className="flex items-center gap-2">
-                      <Input 
-                        value={sftpCredential.username} 
-                        readOnly 
-                        className="font-mono bg-muted" 
+                      <Input
+                        value={sftpCredential.username}
+                        readOnly
+                        className="font-mono bg-muted"
                         data-testid="input-sftp-username"
                       />
-                      <Button 
-                        size="icon" 
-                        variant="outline" 
-                        onClick={() => copyToClipboard(sftpCredential.username, "Username")}
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => copyToClipboard(sftpCredential.username, "Usuário")}
                         data-testid="button-copy-username"
                       >
                         <Copy className="h-4 w-4" />
@@ -180,28 +180,28 @@ export default function SftpAccess() {
                     <div className="space-y-2 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                       <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 mb-2">
                         <AlertCircle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Save this password - it won't be shown again!</span>
+                        <span className="text-sm font-medium">Salve esta senha - ela não será exibida novamente!</span>
                       </div>
-                      <label className="text-sm font-medium text-muted-foreground">Password</label>
+                      <label className="text-sm font-medium text-muted-foreground">Senha</label>
                       <div className="flex items-center gap-2">
-                        <Input 
+                        <Input
                           value={showPassword ? newPassword : "••••••••••••••••••••"}
-                          readOnly 
-                          className="font-mono bg-white dark:bg-background" 
+                          readOnly
+                          className="font-mono bg-white dark:bg-background"
                           data-testid="input-sftp-password"
                         />
-                        <Button 
-                          size="icon" 
-                          variant="outline" 
+                        <Button
+                          size="icon"
+                          variant="outline"
                           onClick={() => setShowPassword(!showPassword)}
                           data-testid="button-toggle-password"
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
-                        <Button 
-                          size="icon" 
-                          variant="outline" 
-                          onClick={() => copyToClipboard(newPassword, "Password")}
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={() => copyToClipboard(newPassword, "Senha")}
                           data-testid="button-copy-password"
                         >
                           <Copy className="h-4 w-4" />
@@ -211,18 +211,18 @@ export default function SftpAccess() {
                   )}
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Connection String</label>
+                    <label className="text-sm font-medium text-muted-foreground">String de Conexão</label>
                     <div className="flex items-center gap-2">
-                      <Input 
-                        value={connectionString} 
-                        readOnly 
-                        className="font-mono bg-muted text-sm" 
+                      <Input
+                        value={connectionString}
+                        readOnly
+                        className="font-mono bg-muted text-sm"
                         data-testid="input-connection-string"
                       />
-                      <Button 
-                        size="icon" 
-                        variant="outline" 
-                        onClick={() => copyToClipboard(connectionString, "Connection string")}
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => copyToClipboard(connectionString, "String de conexão")}
                         data-testid="button-copy-connection-string"
                       >
                         <Copy className="h-4 w-4" />
@@ -239,10 +239,10 @@ export default function SftpAccess() {
                     >
                       {resetPasswordMutation.isPending && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
                       <RefreshCw className="mr-2 h-4 w-4" />
-                      Reset Password
+                      Redefinir Senha
                     </Button>
                     <p className="text-sm text-muted-foreground">
-                      Generate a new password. Current password will be invalidated.
+                      Gera uma nova senha. A senha atual será invalidada.
                     </p>
                   </div>
                 </CardContent>
@@ -252,15 +252,15 @@ export default function SftpAccess() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Database className="h-5 w-5" />
-                    Accessible Buckets
+                    Buckets Acessíveis
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {buckets && buckets.length > 0 ? (
                     <div className="space-y-3">
                       {buckets.map((bucket: Bucket) => (
-                        <div 
-                          key={bucket.id} 
+                        <div
+                          key={bucket.id}
                           className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
                           data-testid={`bucket-row-${bucket.id}`}
                         >
@@ -268,12 +268,12 @@ export default function SftpAccess() {
                             <Database className="h-5 w-5 text-muted-foreground" />
                             <div>
                               <p className="font-medium" data-testid={`text-bucket-name-${bucket.id}`}>{bucket.name}</p>
-                              <p className="text-xs text-muted-foreground">Region: {bucket.region}</p>
+                              <p className="text-xs text-muted-foreground">Região: {bucket.region}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant={bucket.isPublic ? "secondary" : "outline"}>
-                              {bucket.isPublic ? "Public" : "Private"}
+                              {bucket.isPublic ? "Público" : "Privado"}
                             </Badge>
                             <Badge variant="outline">
                               <Lock className="h-3 w-3 mr-1" />
@@ -286,8 +286,8 @@ export default function SftpAccess() {
                   ) : (
                     <div className="text-center py-8">
                       <Database className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                      <p className="text-muted-foreground">No buckets created yet.</p>
-                      <p className="text-sm text-muted-foreground">Create buckets in the Storage section to access them via SFTP.</p>
+                      <p className="text-muted-foreground">Nenhum bucket criado ainda.</p>
+                      <p className="text-sm text-muted-foreground">Crie buckets na seção Armazenamento para acessá-los via SFTP.</p>
                     </div>
                   )}
                 </CardContent>
@@ -295,23 +295,23 @@ export default function SftpAccess() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Quick Start Guide</CardTitle>
+                  <CardTitle>Guia Rápido</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <h4 className="font-medium">Using Command Line</h4>
+                    <h4 className="font-medium">Usando Linha de Comando</h4>
                     <div className="bg-muted p-3 rounded-lg font-mono text-sm">
                       sftp {sftpCredential.username}@{sftpHost}
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <h4 className="font-medium">Using FileZilla or similar clients</h4>
+                    <h4 className="font-medium">Usando FileZilla ou clientes similares</h4>
                     <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1">
-                      <li>Open your SFTP client</li>
-                      <li>Enter Host: <code className="bg-muted px-1 rounded">{sftpHost}</code></li>
-                      <li>Enter Port: <code className="bg-muted px-1 rounded">{sftpPort}</code></li>
-                      <li>Enter Username: <code className="bg-muted px-1 rounded">{sftpCredential.username}</code></li>
-                      <li>Enter your password and connect</li>
+                      <li>Abra seu cliente SFTP</li>
+                      <li>Digite o Host: <code className="bg-muted px-1 rounded">{sftpHost}</code></li>
+                      <li>Digite a Porta: <code className="bg-muted px-1 rounded">{sftpPort}</code></li>
+                      <li>Digite o Usuário: <code className="bg-muted px-1 rounded">{sftpCredential.username}</code></li>
+                      <li>Digite sua senha e conecte-se</li>
                     </ol>
                   </div>
                 </CardContent>

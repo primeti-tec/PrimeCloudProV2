@@ -14,7 +14,7 @@ export default function CreateAccount() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const [documentType, setDocumentType] = useState<'cpf' | 'cnpj'>('cnpj');
-  
+
   const form = useForm<CreateAccountRequest>({
     resolver: zodResolver(insertAccountSchema),
     defaultValues: {
@@ -27,7 +27,7 @@ export default function CreateAccount() {
   });
 
   const documentValue = form.watch('document') || '';
-  
+
   const documentValidation = useMemo(() => {
     if (!documentValue || documentValue.replace(/\D/g, '').length === 0) {
       return { valid: true };
@@ -62,9 +62,9 @@ export default function CreateAccount() {
           <div className="mx-auto h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
             <Rocket className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Create Organization</CardTitle>
+          <CardTitle className="text-2xl">Criar Organização</CardTitle>
           <p className="text-muted-foreground mt-2">
-            Welcome, {user?.firstName || 'there'}! Set up your organization workspace to get started.
+            Bem-vindo, {user?.firstName || 'usuário'}! Configure sua organização para começar.
           </p>
         </CardHeader>
         <CardContent>
@@ -72,10 +72,10 @@ export default function CreateAccount() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-muted-foreground" />
-                Organization Name
+                Nome da Organização
               </label>
               <Input
-                placeholder="Acme Corp"
+                placeholder="Minha Empresa Ltda"
                 {...form.register("name")}
                 className="h-12"
                 data-testid="input-org-name"
@@ -88,7 +88,7 @@ export default function CreateAccount() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <FileText className="h-4 w-4 text-muted-foreground" />
-                Document (CPF/CNPJ)
+                Documento (CPF/CNPJ)
               </label>
               <div className="flex gap-2">
                 <select
@@ -126,7 +126,7 @@ export default function CreateAccount() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Phone className="h-4 w-4 text-muted-foreground" />
-                Phone Number
+                Telefone
               </label>
               <Input
                 placeholder="(11) 99999-9999"
@@ -138,23 +138,23 @@ export default function CreateAccount() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Slug (Optional)</label>
+              <label className="text-sm font-medium">Slug (Opcional)</label>
               <Input
-                placeholder="acme-corp"
+                placeholder="minha-empresa"
                 {...form.register("slug")}
                 className="h-12"
                 data-testid="input-slug"
               />
-              <p className="text-xs text-muted-foreground">Unique identifier for your organization URL.</p>
+              <p className="text-xs text-muted-foreground">Identificador único para a URL da sua organização.</p>
             </div>
 
             <Button type="submit" className="w-full h-12 text-base" disabled={isPending || !documentValidation.valid} data-testid="button-create">
               {isPending ? <Loader2 className="animate-spin mr-2" /> : null}
-              Create Workspace
+              Criar Organização
             </Button>
 
             <p className="text-xs text-center text-muted-foreground">
-              Your workspace will be created and ready to use immediately.
+              Sua organização será criada e estará pronta para uso imediatamente.
             </p>
           </form>
         </CardContent>

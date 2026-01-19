@@ -1,0 +1,79 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CNPJ validation 1`] = `
+{
+  "valid": true,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CNPJ validation 2`] = `
+{
+  "valid": true,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CNPJ validation 3`] = `
+{
+  "valid": true,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CNPJ validation 4`] = `
+{
+  "error": "Invalid CNPJ",
+  "valid": false,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CNPJ validation 5`] = `
+{
+  "error": "Document is required",
+  "valid": false,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CNPJ validation 6`] = `
+{
+  "error": "CNPJ must have 14 digits",
+  "valid": false,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CPF validation 1`] = `
+{
+  "valid": true,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CPF validation 2`] = `
+{
+  "valid": true,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CPF validation 3`] = `
+{
+  "valid": true,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CPF validation 4`] = `
+{
+  "error": "Invalid CPF",
+  "valid": false,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CPF validation 5`] = `
+{
+  "error": "Document is required",
+  "valid": false,
+}
+`;
+
+exports[`Server-side document validation - validateDocument > Parity with client-side validation > should produce identical results for CPF validation 6`] = `
+{
+  "error": "CPF must have 11 digits",
+  "valid": false,
+}
+`;

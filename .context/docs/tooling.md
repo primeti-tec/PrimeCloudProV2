@@ -1,100 +1,95 @@
----
-status: filled
-generated: 2026-01-18
----
+# Guia de Ferramentas e Produtividade
 
-# Tooling & Productivity Guide
+Este documento coleta os scripts, automação e configurações de editor para ajudar colaboradores a manter a eficiência.
 
-Collect the scripts, automation, and editor settings that keep contributors efficient.
+## Ferramentas Necessárias
 
-## Required Tooling
+| Ferramenta | Versão | Propósito |
+|------------|--------|-----------|
+| Node.js | v18+ | Runtime JavaScript |
+| npm | v9+ | Gerenciador de pacotes |
+| PostgreSQL | v14+ | Banco de dados |
+| TypeScript | 5.6.3 | Verificação de tipos |
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Node.js | v18+ | JavaScript runtime |
-| npm | v9+ | Package manager |
-| PostgreSQL | v14+ | Database |
-| TypeScript | 5.6.3 | Type checking |
-
-## Build Tools
+## Ferramentas de Build
 
 ### Vite
-- **Version**: 7.3.0
-- **Purpose**: Frontend build tool and dev server
+- **Versão**: 7.3.0
+- **Propósito**: Ferramenta de build frontend e servidor de desenvolvimento. Lida com HMR (Hot Module Replacement) para desenvolvimento mais rápido. Veja `server/vite.ts` para integração com o backend.
 - **Config**: `vite.config.ts`
-- **Features**: Hot Module Replacement, TypeScript support
+- **Funcionalidades**: Hot Module Replacement, suporte a TypeScript
 
 ### tsx
-- **Purpose**: TypeScript execution for server
-- **Usage**: `tsx server/index.ts`
+- **Propósito**: Execução TypeScript para código backend.
+- **Uso**: `tsx server/index.ts`
 
 ### esbuild
-- **Purpose**: Production bundling
+- **Propósito**: Bundling de produção da aplicação servidora.
 - **Script**: `script/build.ts`
 
 ### Drizzle Kit
-- **Version**: 0.31.8
-- **Purpose**: Database schema management
+- **Versão**: 0.31.8
+- **Propósito**: Gerenciamento de schema de banco de dados. Usa `drizzle.config.ts` para conectar ao banco e definir migrações.
 - **Config**: `drizzle.config.ts`
-- **Commands**: `npm run db:push`
+- **Comandos**: `npm run db:push`
 
-## Development Scripts
+## Scripts de Desenvolvimento
 
 ```bash
-# Start development (client + server with HMR)
+# Iniciar desenvolvimento (cliente + servidor com HMR)
 npm run dev
 
-# Type checking
+# Verificação de tipos
 npm run check
 
-# Production build
+# Build de produção
 npm run build
 
-# Run production
+# Executar produção
 npm run start
 
-# Push database schema
+# Enviar schema de banco de dados
 npm run db:push
 ```
 
-## Frontend Libraries
+## Bibliotecas Frontend
 
-### UI Components
-- **Radix UI**: Headless accessible components
-- **Tailwind CSS**: Utility-first styling
-- **Lucide React**: Icon library
-- **Framer Motion**: Animations
+### Componentes de UI
+- **Radix UI**: Componentes acessíveis headless provendo acessibilidade e estilização mínima.
+- **Tailwind CSS**: Framework CSS utility-first para desenvolvimento rápido de UI.
+- **Lucide React**: Biblioteca de ícones oferecendo um conjunto consistente de ícones.
+- **Framer Motion**: Biblioteca de animação para adicionar transições suaves e efeitos.
 
-### State & Data
-- **TanStack React Query**: Server state management
-- **React Hook Form**: Form handling
-- **Zod**: Schema validation
+### Estado e Dados
+- **TanStack React Query**: Gerenciamento de estado do servidor para cache, atualizações em segundo plano e atualizações otimistas. Usa `client/src/lib/queryClient.ts` para configuração.
+- **React Hook Form**: Manipulação de formulários performática e flexível.
+- **Zod**: Validação de schema para integridade de dados e segurança de tipos.
 
-### Navigation
-- **Wouter**: Lightweight routing
+### Navegação
+- **Wouter**: Solução de roteamento leve.
 
-## Backend Libraries
+## Bibliotecas Backend
 
-### Server
-- **Express 5**: Web framework
-- **Passport.js**: Authentication
-- **OpenID Client**: OAuth/OIDC support
+### Servidor
+- **Express 5**: Framework web para construir a API.
+- **Passport.js**: Middleware de autenticação.
+- **OpenID Client**: Suporte OAuth/OIDC para autenticação com provedores externos.
 
-### Database
-- **Drizzle ORM**: TypeScript ORM
-- **pg**: PostgreSQL driver
-- **connect-pg-simple**: Session store
+### Banco de Dados
+- **Drizzle ORM**: ORM TypeScript para interagir com o banco de dados. Veja `drizzle.config.ts`
+- **pg**: Driver PostgreSQL.
+- **connect-pg-simple**: Store de sessão para persistir sessões de usuário no banco de dados.
 
-## IDE / Editor Setup
+## Configuração de IDE / Editor
 
-### VS Code Recommended Extensions
+### Extensões Recomendadas VS Code
 - ESLint
 - Prettier
 - Tailwind CSS IntelliSense
 - TypeScript Vue Plugin (Volar)
 - Drizzle ORM extension
 
-### Settings
+### Configurações
 ```json
 {
   "typescript.preferences.importModuleSpecifier": "relative",
@@ -105,33 +100,208 @@ npm run db:push
 }
 ```
 
-## Productivity Tips
+## Dicas de Produtividade
 
-### Type-Safe API Calls
-Use the `apiRequest` helper from `client/src/lib/queryClient.ts` for all API calls.
+### Chamadas de API Type-Safe
 
-### URL Building
-Use `buildUrl()` from `shared/routes.ts` for type-safe URL construction:
+Use a função helper `apiRequest` de `client/src/lib/queryClient.ts` para todas as chamadas de API para garantir segurança de tipos e tratamento centralizado de erros.
+
+```typescript
+import { apiRequest } from "@/lib/queryClient";
+
+async function updateAccount(id: string, data: UpdateAccountRequest) {
+  return apiRequest(`/api/accounts/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+```
+
+### Construção de URL
+
+Use `buildUrl()` de `shared/routes.ts` para construção de URL type-safe, especialmente ao lidar com rotas parametrizadas. Isso reduz erros e melhora a manutenibilidade.
+
 ```typescript
 import { buildUrl } from '@shared/routes';
-const url = buildUrl('/api/accounts/:id', { id: '123' });
+
+const accountId = "123e4567-e89b-12d3-a456-426614174000";
+const url = buildUrl('/api/accounts/:id', { id: accountId }); // url será "/api/accounts/123e4567-e89b-12d3-a456-426614174000"
+
+fetch(url).then(...)
 ```
 
-### Custom Hooks Pattern
-All data fetching uses custom hooks in `client/src/hooks/`:
+### Padrão de Hooks Customizados
+
+Toda busca de dados deve ser feita através de hooks customizados localizados em `client/src/hooks/`. Isso fornece uma API consistente, simplifica a lógica de componentes, e permite testes e reutilização mais fáceis.
+
 ```typescript
 import { useAccounts } from '@/hooks/use-accounts';
-const { data, isLoading } = useAccounts();
+
+function AccountsList() {
+  const { data: accounts, isLoading } = useAccounts();
+
+  if (isLoading) {
+    return <p>Carregando...</p>;
+  }
+
+  return (
+    <ul>
+      {accounts?.map(account => (
+        <li key={account.id}>{account.name}</li>
+      ))}
+    </ul>
+  );
+}
 ```
 
-### Document Validation
-Brazilian CPF/CNPJ validation utilities available in both client and server:
+### Validação de Documento
+
+Utilize os utilitários de validação de CPF/CNPJ brasileiros tanto no código cliente quanto servidor usando:
+
 - `client/src/lib/document-validation.ts`
 - `server/lib/document-validation.ts`
 
-## Environment Variables
+```typescript
+import { isValidCPF } from 'client/src/lib/document-validation';
 
-Required environment variables:
-- Database connection string
-- Session secret
-- Email service configuration (for notifications)
+const cpf = '123.456.789-00';
+if (isValidCPF(cpf)) {
+  console.log('CPF é válido');
+} else {
+  console.log('CPF é inválido');
+}
+```
+
+## Ferramentas de IA e Automação
+
+### @ai-coders/context
+
+O projeto usa **@ai-coders/context** - um MCP (Model Context Protocol) server que gerencia documentação estruturada, playbooks de agentes e planos de implementação.
+
+#### Configuração de Provedores de IA
+
+O projeto está configurado para usar **Anthropic (Claude)** como provedor principal de IA, com OpenRouter como fallback.
+
+**Provedores Configurados:**
+
+| Provedor | Uso | Configuração |
+|----------|-----|--------------|
+| **Anthropic (Claude)** | ⭐ Principal - Todas as tarefas | `ANTHROPIC_API_KEY` no `.env` |
+| **OpenRouter** | Fallback - Modelos alternativos | `OPENROUTER_API_KEY` no `.env` |
+| **Google Gemini** | Opcional - Tarefas rápidas | `GOOGLE_API_KEY` no `.env` |
+
+**Obter API Keys:**
+- Anthropic: https://console.anthropic.com/settings/keys
+- OpenRouter: https://openrouter.ai/keys
+- Google AI: https://aistudio.google.com/app/apikey
+
+#### Scripts NPM Disponíveis
+
+```bash
+# Preencher documentação com Claude
+npm run ai:fill
+
+# Atualizar documentação após mudanças no código
+npm run ai:update
+
+# Criar novo plano de implementação
+npm run ai:plan <nome-do-plano> -- --fill -p anthropic
+
+# Preencher skills com conhecimento do projeto
+npm run ai:skill:fill
+
+# Sincronizar agentes para todas as ferramentas AI
+npm run ai:sync
+```
+
+#### Comandos Detalhados
+
+**Preencher Documentação:**
+```bash
+# Usar Claude (padrão)
+npx @ai-coders/context fill . -p anthropic
+
+# Usar modelo específico
+npx @ai-coders/context fill . -p anthropic -m claude-3-haiku-20240307
+
+# Limitar número de arquivos
+npx @ai-coders/context fill . -p anthropic --limit 5
+```
+
+**Criar Planos:**
+```bash
+# Criar plano com preenchimento automático
+npx @ai-coders/context plan meu-plano --fill -p anthropic --summary "Descrição do plano"
+
+# Criar apenas scaffold (sem IA)
+npx @ai-coders/context plan meu-plano
+```
+
+**Atualizar Documentação:**
+```bash
+# Atualizar docs dos últimos 7 dias
+npx @ai-coders/context update -p anthropic --days 7
+
+# Preview sem aplicar mudanças
+npx @ai-coders/context update -p anthropic --dry-run
+```
+
+**Gerenciar Skills:**
+```bash
+# Listar skills disponíveis
+npx @ai-coders/context skill list
+
+# Preencher todas as skills
+npx @ai-coders/context skill fill . -p anthropic
+
+# Preencher skill específico
+npx @ai-coders/context skill fill . -p anthropic --skills code-review
+```
+
+#### Modelos Disponíveis
+
+**Anthropic (Claude):**
+- `claude-3-5-sonnet-20241022` - Padrão (melhor custo-benefício)
+- `claude-3-haiku-20240307` - Rápido e econômico
+- `claude-3-opus-20240229` - Máxima qualidade
+
+**Quando Usar Cada Provedor:**
+
+| Tarefa | Provedor Recomendado |
+|--------|---------------------|
+| Criar planos complexos | Anthropic (Claude Sonnet) |
+| Preencher documentação | Anthropic (Claude Haiku) |
+| Análise profunda de código | Anthropic (Claude Opus) |
+| Tarefas rápidas | Google (Gemini Flash) |
+| Modelos alternativos | OpenRouter |
+
+#### Estrutura do Contexto
+
+```
+.context/
+├── agents/          # Playbooks de agentes especializados
+├── docs/            # Documentação estruturada do projeto
+├── plans/           # Planos de implementação
+└── skills/          # Habilidades reutilizáveis
+```
+
+**Agentes Disponíveis:**
+- architect-specialist, backend-specialist, frontend-specialist
+- bug-fixer, code-reviewer, test-writer
+- performance-optimizer, security-auditor
+- documentation-writer, refactoring-specialist
+- database-specialist, devops-specialist, mobile-specialist
+
+Para mais detalhes, consulte `.context/agents/README.md`.
+
+## Variáveis de Ambiente
+
+Variáveis de ambiente requeridas:
+
+- String de conexão do banco de dados (`DATABASE_URL`)
+- Segredo de sessão (`SESSION_SECRET`)
+- Configuração do serviço de email (ex: configurações SMTP ou chaves de API para serviços como SendGrid ou Mailgun)
+- Chaves API Clerk se usando Clerk para autenticação
+- **Chaves de Provedor de IA** (`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `GOOGLE_API_KEY`)
+
+Consulte arquivos `.env.example` no repositório para listas completas e descrições.

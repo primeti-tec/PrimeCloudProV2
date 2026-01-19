@@ -1,7 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
-import { isAuthenticated } from "./replit_integrations/auth";
+import { getAuth, requireAuth } from "@clerk/express";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
@@ -12,14 +11,18 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup Auth
-  await setupAuth(app);
-  registerAuthRoutes(app);
+  // Clerk middleware is registered in server/index.ts
 
   // --- Public Routes ---
   app.get(api.products.list.path, async (req, res) => {
     const products = await storage.getProducts();
     res.json(products);
+  });
+
+  app.get("/api/auth/user", requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const user = req.currentUser || (userId ? await authStorage.getUser(userId) : null);
+    res.json(user ?? null);
   });
 
   // --- Protected Routes ---
@@ -28,18 +31,18 @@ export async function registerRoutes(
   // For simplicity in this structure:
 
   // List My Accounts
-  app.get(api.accounts.listMy.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get(api.accounts.listMy.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accounts = await storage.getUserAccounts(userId);
     res.json(accounts.map(a => ({ ...a.account, role: a.role })));
   });
 
   // Create Account
-  app.post(api.accounts.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.accounts.create.path, requireAuth(), async (req: any, res) => {
     try {
       const input = api.accounts.create.input.parse(req.body);
-      const userId = req.user.claims.sub;
-      
+      const { userId } = getAuth(req);
+
       // Validate document if provided
       if (input.document && input.documentType) {
         const validation = validateDocument(input.document, input.documentType as 'cpf' | 'cnpj');
@@ -47,7 +50,7 @@ export async function registerRoutes(
           return res.status(400).json({ message: validation.error });
         }
       }
-      
+
       const account = await storage.createAccount(input, userId);
       res.status(201).json(account);
     } catch (err) {
@@ -59,10 +62,10 @@ export async function registerRoutes(
   });
 
   // Get Account Details (with check membership)
-  app.get(api.accounts.get.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get(api.accounts.get.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.id);
-    
+
     const membership = await storage.getMembership(userId, accountId);
     if (!membership) return res.status(403).json({ message: "Forbidden" });
 
@@ -74,10 +77,10 @@ export async function registerRoutes(
   });
 
   // Update Account
-  app.patch(api.accounts.update.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.patch(api.accounts.update.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.id);
-    
+
     const membership = await storage.getMembership(userId, accountId);
     if (!membership || !['owner', 'admin'].includes(membership.role)) {
       return res.status(403).json({ message: "Forbidden" });
@@ -85,7 +88,7 @@ export async function registerRoutes(
 
     try {
       const input = api.accounts.update.input.parse(req.body);
-      
+
       // Validate document if provided
       if (input.document && input.documentType) {
         const validation = validateDocument(input.document, input.documentType as 'cpf' | 'cnpj');
@@ -93,31 +96,29 @@ export async function registerRoutes(
           return res.status(400).json({ message: validation.error });
         }
       }
-      
+
       const account = await storage.updateAccount(accountId, input);
-      
+
       // Audit log
       await storage.createAuditLog({
         accountId,
         userId,
         action: 'account.updated',
         resource: 'account',
-        resourceId: accountId.toString(),
-        details: { updatedFields: Object.keys(input) },
+        details: { updatedFields: Object.keys(input), resourceId: accountId.toString() },
       });
-      
+
       res.json(account);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      res.status(500).json({ message: "Internal Server Error" });
     }
   });
 
   // List Members
-  app.get(api.members.list.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get(api.members.list.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -128,8 +129,8 @@ export async function registerRoutes(
   });
 
   // Add Member
-  app.post(api.members.add.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post(api.members.add.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const { email, role } = req.body;
 
@@ -148,14 +149,14 @@ export async function registerRoutes(
     // Replit Auth users are only created on login. 
     // Solution: Just fail if not found for MVP, or implement a "pending invitations" table.
     // I'll implement "fail if not found" for simplicity of MVP.
-    
+
     // Hack: import db to find user
     const { users } = await import("@shared/models/auth");
     const { eq } = await import("drizzle-orm");
     const { db } = await import("./db");
-    
+
     const [targetUser] = await db.select().from(users).where(eq(users.email, email));
-    
+
     if (!targetUser) {
       return res.status(404).json({ message: "User not found. They must log in at least once." });
     }
@@ -165,8 +166,8 @@ export async function registerRoutes(
   });
 
   // Subscribe
-  app.post(api.subscriptions.subscribe.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post(api.subscriptions.subscribe.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const { productId } = req.body;
 
@@ -184,19 +185,21 @@ export async function registerRoutes(
   // No, that's insecure. I'll check if the user is the FIRST user or specific email.
   // I'll just check if email contains "@admin.com" for demo purposes or "admin" role in a special way.
   // Better: I'll hardcode a "isSuperAdmin" check function.
-  const isSuperAdmin = (email?: string) => email?.endsWith("@admin.com") || false; // Mock
+  // Admin Routes Logic
+  const SUPER_ADMINS = ["sergio.louzan@gmail.com", "admin@primecloudpro.com"];
+  const isSuperAdmin = (email?: string) => email ? SUPER_ADMINS.includes(email) : false;
 
-  app.get(api.admin.listAccounts.path, isAuthenticated, async (req: any, res) => {
-    // if (!isSuperAdmin(req.user.claims.email)) return res.status(403).json({ message: "Forbidden" });
+  app.get(api.admin.listAccounts.path, requireAuth(), async (req: any, res) => {
+    // if (!isSuperAdmin(req.currentUser?.email)) return res.status(403).json({ message: "Forbidden" });
     // Relaxed for MVP demo: allow any authenticated user to see admin for now? No.
     // I'll just allow it for now so the user can test.
     const accounts = await storage.getAllAccounts();
     res.json(accounts);
   });
 
-  app.post(api.admin.approveAccount.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.admin.approveAccount.path, requireAuth(), async (req: any, res) => {
     const accountId = parseInt(req.params.id);
-    const userId = req.user.claims.sub;
+    const { userId } = getAuth(req);
     const account = await storage.updateAccount(accountId, { status: 'active' });
     await storage.createAuditLog({
       accountId,
@@ -208,9 +211,9 @@ export async function registerRoutes(
     res.json(account);
   });
 
-  app.post(api.admin.rejectAccount.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.admin.rejectAccount.path, requireAuth(), async (req: any, res) => {
     const accountId = parseInt(req.params.id);
-    const userId = req.user.claims.sub;
+    const { userId } = getAuth(req);
     const { reason } = req.body || {};
     const account = await storage.updateAccount(accountId, { status: 'rejected' });
     await storage.createAuditLog({
@@ -223,9 +226,9 @@ export async function registerRoutes(
     res.json(account);
   });
 
-  app.post(api.admin.suspendAccount.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.admin.suspendAccount.path, requireAuth(), async (req: any, res) => {
     const accountId = parseInt(req.params.id);
-    const userId = req.user.claims.sub;
+    const { userId } = getAuth(req);
     const { reason } = req.body || {};
     const account = await storage.updateAccount(accountId, { status: 'suspended' });
     await storage.createAuditLog({
@@ -238,9 +241,9 @@ export async function registerRoutes(
     res.json(account);
   });
 
-  app.post(api.admin.reactivateAccount.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.admin.reactivateAccount.path, requireAuth(), async (req: any, res) => {
     const accountId = parseInt(req.params.id);
-    const userId = req.user.claims.sub;
+    const { userId } = getAuth(req);
     const account = await storage.updateAccount(accountId, { status: 'active' });
     await storage.createAuditLog({
       accountId,
@@ -252,10 +255,10 @@ export async function registerRoutes(
     res.json(account);
   });
 
-  app.post(api.admin.adjustQuota.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.admin.adjustQuota.path, requireAuth(), async (req: any, res) => {
     try {
       const accountId = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
+      const { userId } = getAuth(req);
       const input = api.admin.adjustQuota.input.parse(req.body);
       const previousAccount = await storage.getAccount(accountId);
       const previousQuota = previousAccount?.storageQuotaGB || 100;
@@ -265,12 +268,12 @@ export async function registerRoutes(
         userId,
         action: 'QUOTA_ADJUSTED',
         resource: 'account',
-        details: { 
-          accountId, 
-          accountName: account.name, 
-          previousQuotaGB: previousQuota, 
-          newQuotaGB: input.quotaGB, 
-          reason: input.reason 
+        details: {
+          accountId,
+          accountName: account.name,
+          previousQuotaGB: previousQuota,
+          newQuotaGB: input.quotaGB,
+          reason: input.reason
         },
       });
       res.json(account);
@@ -283,14 +286,14 @@ export async function registerRoutes(
   });
 
   // Admin Products CRUD (protected by isSuperAdmin check)
-  app.get(api.admin.listProducts.path, isAuthenticated, async (req: any, res) => {
+  app.get(api.admin.listProducts.path, requireAuth(), async (req: any, res) => {
     // Listing products is public for now (needed for billing page)
     const products = await storage.getProducts();
     res.json(products);
   });
 
-  app.post(api.admin.createProduct.path, isAuthenticated, async (req: any, res) => {
-    if (!isSuperAdmin(req.user.claims.email)) {
+  app.post(api.admin.createProduct.path, requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
       return res.status(403).json({ message: "Forbidden: Admin access required" });
     }
     try {
@@ -311,8 +314,8 @@ export async function registerRoutes(
     }
   });
 
-  app.patch(api.admin.updateProduct.path, isAuthenticated, async (req: any, res) => {
-    if (!isSuperAdmin(req.user.claims.email)) {
+  app.patch(api.admin.updateProduct.path, requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
       return res.status(403).json({ message: "Forbidden: Admin access required" });
     }
     try {
@@ -334,8 +337,8 @@ export async function registerRoutes(
     }
   });
 
-  app.delete(api.admin.deleteProduct.path, isAuthenticated, async (req: any, res) => {
-    if (!isSuperAdmin(req.user.claims.email)) {
+  app.delete(api.admin.deleteProduct.path, requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
       return res.status(403).json({ message: "Forbidden: Admin access required" });
     }
     const productId = parseInt(req.params.id);
@@ -351,8 +354,8 @@ export async function registerRoutes(
   });
 
   // Remove Member
-  app.delete(api.members.remove.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.delete(api.members.remove.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const memberId = parseInt(req.params.memberId);
 
@@ -366,8 +369,8 @@ export async function registerRoutes(
   });
 
   // Update Member Role
-  app.patch('/api/accounts/:accountId/members/:memberId', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.patch('/api/accounts/:accountId/members/:memberId', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const memberId = parseInt(req.params.memberId);
     const { role } = req.body;
@@ -382,8 +385,8 @@ export async function registerRoutes(
   });
 
   // --- Buckets Routes ---
-  app.get(api.buckets.list.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get(api.buckets.list.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -393,8 +396,8 @@ export async function registerRoutes(
     res.json(bucketList);
   });
 
-  app.post(api.buckets.create.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post(api.buckets.create.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const { name, region, isPublic } = req.body;
 
@@ -407,8 +410,8 @@ export async function registerRoutes(
     res.status(201).json(bucket);
   });
 
-  app.delete(api.buckets.delete.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.delete(api.buckets.delete.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const bucketId = parseInt(req.params.bucketId);
 
@@ -422,8 +425,8 @@ export async function registerRoutes(
   });
 
   // Bucket Versioning
-  app.put('/api/accounts/:accountId/buckets/:bucketId/versioning', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.put('/api/accounts/:accountId/buckets/:bucketId/versioning', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const bucketId = parseInt(req.params.bucketId);
     const { enabled } = req.body;
@@ -438,8 +441,8 @@ export async function registerRoutes(
   });
 
   // Bucket Lifecycle Rules
-  app.get('/api/accounts/:accountId/buckets/:bucketId/lifecycle', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get('/api/accounts/:accountId/buckets/:bucketId/lifecycle', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const bucketId = parseInt(req.params.bucketId);
 
@@ -450,8 +453,8 @@ export async function registerRoutes(
     res.json(rules);
   });
 
-  app.post('/api/accounts/:accountId/buckets/:bucketId/lifecycle', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post('/api/accounts/:accountId/buckets/:bucketId/lifecycle', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const bucketId = parseInt(req.params.bucketId);
     const rule = req.body;
@@ -465,8 +468,8 @@ export async function registerRoutes(
     res.json(bucket);
   });
 
-  app.delete('/api/accounts/:accountId/buckets/:bucketId/lifecycle/:ruleId', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.delete('/api/accounts/:accountId/buckets/:bucketId/lifecycle/:ruleId', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const bucketId = parseInt(req.params.bucketId);
     const ruleId = req.params.ruleId;
@@ -481,8 +484,8 @@ export async function registerRoutes(
   });
 
   // --- Access Keys Routes ---
-  app.get(api.accessKeys.list.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get(api.accessKeys.list.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -492,8 +495,8 @@ export async function registerRoutes(
     res.json(keys);
   });
 
-  app.post(api.accessKeys.create.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post(api.accessKeys.create.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const { name, permissions } = req.body;
 
@@ -506,8 +509,8 @@ export async function registerRoutes(
     res.status(201).json(key);
   });
 
-  app.delete(api.accessKeys.revoke.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.delete(api.accessKeys.revoke.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const keyId = parseInt(req.params.keyId);
 
@@ -520,8 +523,8 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  app.post(api.accessKeys.rotate.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post(api.accessKeys.rotate.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const keyId = parseInt(req.params.keyId);
 
@@ -546,8 +549,8 @@ export async function registerRoutes(
     res.json(key);
   });
 
-  app.post(api.accessKeys.toggleActive.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post(api.accessKeys.toggleActive.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const keyId = parseInt(req.params.keyId);
 
@@ -573,8 +576,8 @@ export async function registerRoutes(
   });
 
   // --- Notifications Routes ---
-  app.get('/api/accounts/:accountId/notifications', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get('/api/accounts/:accountId/notifications', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -584,8 +587,8 @@ export async function registerRoutes(
     res.json(notificationList);
   });
 
-  app.get('/api/accounts/:accountId/notifications/unread-count', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get('/api/accounts/:accountId/notifications/unread-count', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -595,8 +598,8 @@ export async function registerRoutes(
     res.json({ count });
   });
 
-  app.patch('/api/accounts/:accountId/notifications/:notificationId/read', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.patch('/api/accounts/:accountId/notifications/:notificationId/read', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const notificationId = parseInt(req.params.notificationId);
 
@@ -607,8 +610,8 @@ export async function registerRoutes(
     res.json(notification);
   });
 
-  app.patch('/api/accounts/:accountId/notifications/read-all', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.patch('/api/accounts/:accountId/notifications/read-all', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -618,8 +621,8 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  app.delete('/api/accounts/:accountId/notifications/:id', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.delete('/api/accounts/:accountId/notifications/:id', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const notificationId = parseInt(req.params.id);
 
@@ -631,8 +634,8 @@ export async function registerRoutes(
   });
 
   // --- Audit Logs Routes ---
-  app.get('/api/accounts/:accountId/audit-logs', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get('/api/accounts/:accountId/audit-logs', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -643,8 +646,8 @@ export async function registerRoutes(
   });
 
   // --- Invitations Routes ---
-  app.post('/api/accounts/:accountId/invitations', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post('/api/accounts/:accountId/invitations', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const { email, role } = req.body;
 
@@ -665,8 +668,8 @@ export async function registerRoutes(
     }
   });
 
-  app.get('/api/accounts/:accountId/invitations', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get('/api/accounts/:accountId/invitations', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -676,8 +679,8 @@ export async function registerRoutes(
     res.json(invitationsList);
   });
 
-  app.delete('/api/accounts/:accountId/invitations/:id', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.delete('/api/accounts/:accountId/invitations/:id', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const invitationId = parseInt(req.params.id);
 
@@ -693,30 +696,30 @@ export async function registerRoutes(
   app.get('/api/invitations/:token', async (req: any, res) => {
     const { token } = req.params;
     const invitation = await storage.getInvitationByToken(token);
-    
+
     if (!invitation) {
       return res.status(404).json({ message: "Invitation not found" });
     }
-    
+
     if (invitation.acceptedAt) {
       return res.status(400).json({ message: "Invitation already accepted" });
     }
-    
+
     if (new Date() > invitation.expiresAt) {
       return res.status(400).json({ message: "Invitation has expired" });
     }
-    
+
     const account = await storage.getAccount(invitation.accountId!);
     const { users } = await import("@shared/models/auth");
     const { eq } = await import("drizzle-orm");
     const { db } = await import("./db");
-    
+
     let inviter = null;
     if (invitation.invitedBy) {
       const [user] = await db.select().from(users).where(eq(users.id, invitation.invitedBy));
       inviter = user ? { firstName: user.firstName, email: user.email } : null;
     }
-    
+
     res.json({
       ...invitation,
       account: account ? { id: account.id, name: account.name } : null,
@@ -724,8 +727,9 @@ export async function registerRoutes(
     });
   });
 
-  app.post('/api/invitations/:token/accept', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post('/api/invitations/:token/accept', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
     const { token } = req.params;
 
     try {
@@ -743,8 +747,8 @@ export async function registerRoutes(
   });
 
   // --- SFTP Credentials Routes ---
-  app.get('/api/accounts/:accountId/sftp', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get('/api/accounts/:accountId/sftp', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -754,8 +758,8 @@ export async function registerRoutes(
     res.json(credential || null);
   });
 
-  app.post('/api/accounts/:accountId/sftp', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post('/api/accounts/:accountId/sftp', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -779,8 +783,8 @@ export async function registerRoutes(
     res.status(201).json(credential);
   });
 
-  app.post('/api/accounts/:accountId/sftp/reset-password', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.post('/api/accounts/:accountId/sftp/reset-password', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -805,8 +809,8 @@ export async function registerRoutes(
   });
 
   // --- Invoices Routes ---
-  app.get(api.invoices.list.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get(api.invoices.list.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -817,8 +821,8 @@ export async function registerRoutes(
   });
 
   // --- Usage Routes ---
-  app.get(api.usage.get.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get(api.usage.get.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -830,9 +834,9 @@ export async function registerRoutes(
 
   // --- Quota Requests Routes ---
   // Create a quota request
-  app.post(api.quotaRequests.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.quotaRequests.create.path, requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const { userId } = getAuth(req);
       const accountId = parseInt(req.params.accountId);
       const { requestedQuotaGB, reason } = req.body;
 
@@ -843,7 +847,7 @@ export async function registerRoutes(
       if (!account) return res.status(404).json({ message: "Account not found" });
 
       const currentQuotaGB = account.storageQuotaGB || 100;
-      
+
       const request = await storage.createQuotaRequest({
         accountId,
         currentQuotaGB,
@@ -867,8 +871,8 @@ export async function registerRoutes(
   });
 
   // List quota requests for an account
-  app.get(api.quotaRequests.list.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get(api.quotaRequests.list.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -879,15 +883,15 @@ export async function registerRoutes(
   });
 
   // List all pending quota requests (admin)
-  app.get(api.quotaRequests.listPending.path, isAuthenticated, async (req: any, res) => {
+  app.get(api.quotaRequests.listPending.path, requireAuth(), async (req: any, res) => {
     const requests = await storage.getAllPendingQuotaRequests();
     res.json(requests);
   });
 
   // Approve quota request
-  app.post(api.quotaRequests.approve.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.quotaRequests.approve.path, requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const { userId } = getAuth(req);
       const requestId = parseInt(req.params.id);
       const { note } = req.body || {};
 
@@ -909,9 +913,9 @@ export async function registerRoutes(
   });
 
   // Reject quota request
-  app.post(api.quotaRequests.reject.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.quotaRequests.reject.path, requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const { userId } = getAuth(req);
       const requestId = parseInt(req.params.id);
       const { note } = req.body || {};
 
@@ -933,10 +937,10 @@ export async function registerRoutes(
   });
 
   // === ORDERS ROUTES ===
-  
+
   // List orders for an account
-  app.get(api.orders.list.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get(api.orders.list.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
 
     const membership = await storage.getMembership(userId, accountId);
@@ -949,9 +953,9 @@ export async function registerRoutes(
   });
 
   // Create order
-  app.post(api.orders.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.orders.create.path, requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const { userId } = getAuth(req);
       const accountId = parseInt(req.params.accountId);
 
       const membership = await storage.getMembership(userId, accountId);
@@ -1000,8 +1004,8 @@ export async function registerRoutes(
   });
 
   // Get single order
-  app.get(api.orders.get.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  app.get(api.orders.get.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
     const orderId = parseInt(req.params.orderId);
 
@@ -1019,9 +1023,9 @@ export async function registerRoutes(
   });
 
   // Update order
-  app.patch(api.orders.update.path, isAuthenticated, async (req: any, res) => {
+  app.patch(api.orders.update.path, requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const { userId } = getAuth(req);
       const accountId = parseInt(req.params.accountId);
       const orderId = parseInt(req.params.orderId);
 
@@ -1062,9 +1066,9 @@ export async function registerRoutes(
   });
 
   // Cancel order
-  app.post(api.orders.cancel.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.orders.cancel.path, requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const { userId } = getAuth(req);
       const accountId = parseInt(req.params.accountId);
       const orderId = parseInt(req.params.orderId);
 
@@ -1100,8 +1104,8 @@ export async function registerRoutes(
   });
 
   // Admin: List all orders (protected by isSuperAdmin)
-  app.get(api.orders.listAll.path, isAuthenticated, async (req: any, res) => {
-    if (!isSuperAdmin(req.user.claims.email)) {
+  app.get(api.orders.listAll.path, requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
       return res.status(403).json({ message: "Forbidden: Admin access required" });
     }
     const allOrders = await storage.getAllOrders();

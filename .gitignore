@@ -4,3 +4,26 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+
+# IDEs
+.vscode/
+.idea/
+.cursor/
+.windsurf/
+.continue/
+*.swp
+*.swo

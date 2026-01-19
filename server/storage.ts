@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { minioService } from "./services/minio.service";
 import {
   users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs, invitations, sftpCredentials, invoices, usageRecords, quotaRequests, orders,
   type Account, type Product, type Subscription, type AccountMember, type Bucket, type AccessKey,
@@ -18,17 +19,17 @@ export interface IStorage {
   deleteProduct(id: number): Promise<void>;
 
   // Accounts
-  createAccount(data: CreateAccountRequest, ownerId: string): Promise<Account>;
+  createAccount(data: CreateAccountRequest, ownerId: string | null): Promise<Account>;
   getAccount(id: number): Promise<Account | undefined>;
-  getAccountsByOwner(userId: string): Promise<Account[]>;
+  getAccountsByOwner(userId: string | null): Promise<Account[]>;
   updateAccount(id: number, data: Partial<Account>): Promise<Account>;
   getAllAccounts(): Promise<Account[]>; // Admin
 
   // Members
   addMember(accountId: number, userId: string, role: string): Promise<AccountMember>;
   getMembers(accountId: number): Promise<(AccountMember & { user: any })[]>;
-  getMembership(userId: string, accountId: number): Promise<AccountMember | undefined>;
-  getUserAccounts(userId: string): Promise<{ account: Account, role: string }[]>;
+  getMembership(userId: string | null, accountId: number): Promise<AccountMember | undefined>;
+  getUserAccounts(userId: string | null): Promise<{ account: Account, role: string }[]>;
   removeMember(accountId: number, memberId: number): Promise<void>;
   updateMemberRole(memberId: number, role: string): Promise<AccountMember>;
 
@@ -63,7 +64,7 @@ export interface IStorage {
   getAuditLogs(accountId: number, limit?: number): Promise<AuditLog[]>;
 
   // Invitations
-  createInvitation(accountId: number, email: string, role: string, invitedById: string): Promise<Invitation>;
+  createInvitation(accountId: number, email: string, role: string, invitedById: string | null): Promise<Invitation>;
   getInvitationsByAccount(accountId: number): Promise<Invitation[]>;
   getInvitationByToken(token: string): Promise<Invitation | undefined>;
   deleteInvitation(id: number): Promise<void>;
@@ -90,15 +91,15 @@ export interface IStorage {
   getQuotaRequests(accountId: number): Promise<QuotaRequest[]>;
   getAllPendingQuotaRequests(): Promise<(QuotaRequest & { account: Account })[]>;
   getQuotaRequest(id: number): Promise<QuotaRequest | undefined>;
-  approveQuotaRequest(id: number, reviewerId: string, note?: string): Promise<QuotaRequest>;
-  rejectQuotaRequest(id: number, reviewerId: string, note?: string): Promise<QuotaRequest>;
+  approveQuotaRequest(id: number, reviewerId: string | null, note?: string): Promise<QuotaRequest>;
+  rejectQuotaRequest(id: number, reviewerId: string | null, note?: string): Promise<QuotaRequest>;
 
   // Orders
   createOrder(data: CreateOrderRequest): Promise<Order>;
   getOrders(accountId: number): Promise<OrderWithDetails[]>;
   getAllOrders(): Promise<OrderWithDetails[]>;
   getOrder(id: number): Promise<OrderWithDetails | undefined>;
-  updateOrder(id: number, data: UpdateOrderRequest): Promise<Order>;
+  updateOrder(id: number, data: Partial<Order>): Promise<Order>;
   cancelOrder(id: number, reason?: string): Promise<Order>;
 }
 
@@ -126,7 +127,8 @@ export class DatabaseStorage implements IStorage {
     await db.delete(products).where(eq(products.id, id));
   }
 
-  async createAccount(data: CreateAccountRequest, ownerId: string): Promise<Account> {
+  async createAccount(data: CreateAccountRequest, ownerId: string | null): Promise<Account> {
+    if (!ownerId) throw new Error("Owner ID is required");
     const [account] = await db.insert(accounts).values({ ...data, ownerId }).returning();
     // Add owner as member
     await this.addMember(account.id, ownerId, "owner");
@@ -138,7 +140,8 @@ export class DatabaseStorage implements IStorage {
     return account;
   }
 
-  async getAccountsByOwner(userId: string): Promise<Account[]> {
+  async getAccountsByOwner(userId: string | null): Promise<Account[]> {
+    if (!userId) return [];
     return await db.select().from(accounts).where(eq(accounts.ownerId, userId));
   }
 
@@ -161,27 +164,29 @@ export class DatabaseStorage implements IStorage {
       member: accountMembers,
       user: users
     })
-    .from(accountMembers)
-    .innerJoin(users, eq(accountMembers.userId, users.id))
-    .where(eq(accountMembers.accountId, accountId));
-    
+      .from(accountMembers)
+      .innerJoin(users, eq(accountMembers.userId, users.id))
+      .where(eq(accountMembers.accountId, accountId));
+
     return results.map(r => ({ ...r.member, user: r.user }));
   }
 
-  async getMembership(userId: string, accountId: number): Promise<AccountMember | undefined> {
+  async getMembership(userId: string | null, accountId: number): Promise<AccountMember | undefined> {
+    if (!userId) return undefined;
     const [member] = await db.select().from(accountMembers)
       .where(and(eq(accountMembers.userId, userId), eq(accountMembers.accountId, accountId)));
     return member;
   }
 
-  async getUserAccounts(userId: string): Promise<{ account: Account, role: string }[]> {
+  async getUserAccounts(userId: string | null): Promise<{ account: Account, role: string }[]> {
+    if (!userId) return [];
     const results = await db.select({
       account: accounts,
       member: accountMembers
     })
-    .from(accountMembers)
-    .innerJoin(accounts, eq(accountMembers.accountId, accounts.id))
-    .where(eq(accountMembers.userId, userId));
+      .from(accountMembers)
+      .innerJoin(accounts, eq(accountMembers.accountId, accounts.id))
+      .where(eq(accountMembers.userId, userId));
 
     return results.map(r => ({ account: r.account, role: r.member.role }));
   }
@@ -205,10 +210,10 @@ export class DatabaseStorage implements IStorage {
       subscription: subscriptions,
       product: products
     })
-    .from(subscriptions)
-    .innerJoin(products, eq(subscriptions.productId, products.id))
-    .where(and(eq(subscriptions.accountId, accountId), eq(subscriptions.status, 'active')))
-    .limit(1);
+      .from(subscriptions)
+      .innerJoin(products, eq(subscriptions.productId, products.id))
+      .where(and(eq(subscriptions.accountId, accountId), eq(subscriptions.status, 'active')))
+      .limit(1);
 
     if (!sub) return undefined;
     return { ...sub.subscription, product: sub.product };
@@ -229,6 +234,26 @@ export class DatabaseStorage implements IStorage {
 
   // Buckets
   async createBucket(data: CreateBucketRequest): Promise<Bucket> {
+    // 1. Create in MinIO first
+    console.log(`[STORAGE] Iniciando criação de bucket: ${data.name}`);
+    if (!minioService.isAvailable()) {
+      console.warn(`[STORAGE] ALERTA: Serviço MinIO reporta INDISPONÍVEL.`);
+    }
+
+    const result = await minioService.createBucket(data.name, data.region || "us-east-1");
+    console.log(`[STORAGE] Resultado MinIO para bucket '${data.name}':`, result);
+
+    if (!result.success) {
+      // If it fails because it already exists, we might still want to register it if we are importing
+      if (result.error !== "Bucket already exists") {
+        console.error(`[STORAGE] ERRO CRÍTICO ao criar bucket no MinIO: ${result.error}`);
+        throw new Error(`Failed to create bucket in storage: ${result.error}`);
+      } else {
+        console.log(`[STORAGE] Bucket já existia no MinIO, prosseguindo para registro no DB.`);
+      }
+    }
+
+    // 2. Save to DB
     const [bucket] = await db.insert(buckets).values(data).returning();
     return bucket;
   }
@@ -243,6 +268,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteBucket(id: number): Promise<void> {
+    const bucket = await this.getBucket(id);
+    if (bucket) {
+      // 1. Remove from MinIO
+      // We don't throw if it fails to delete in MinIO (maybe it was already deleted manually), 
+      // but we log it.
+      const result = await minioService.deleteBucket(bucket.name);
+      if (!result.success) {
+        console.warn(`Failed to delete bucket from MinIO: ${result.error}`);
+      }
+    }
+
+    // 2. Remove from DB
     await db.delete(buckets).where(eq(buckets.id, id));
   }
 
@@ -344,7 +381,7 @@ export class DatabaseStorage implements IStorage {
     const query = db.select().from(notifications)
       .where(eq(notifications.accountId, accountId))
       .orderBy(desc(notifications.createdAt));
-    
+
     if (limit) {
       return await query.limit(limit);
     }
@@ -386,7 +423,7 @@ export class DatabaseStorage implements IStorage {
     const query = db.select().from(auditLogs)
       .where(eq(auditLogs.accountId, accountId))
       .orderBy(desc(auditLogs.createdAt));
-    
+
     if (limit) {
       return await query.limit(limit);
     }
@@ -394,7 +431,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Invitations
-  async createInvitation(accountId: number, email: string, role: string, invitedById: string): Promise<Invitation> {
+  async createInvitation(accountId: number, email: string, role: string, invitedById: string | null): Promise<Invitation> {
     const token = crypto.randomUUID();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -443,7 +480,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const member = await this.addMember(invitation.accountId!, userId, invitation.role);
-    
+
     await db.update(invitations)
       .set({ acceptedAt: new Date() })
       .where(eq(invitations.id, invitation.id));
@@ -491,33 +528,43 @@ export class DatabaseStorage implements IStorage {
     const existingInvoices = await db.select().from(invoices)
       .where(eq(invoices.accountId, accountId))
       .orderBy(desc(invoices.createdAt));
-    
+
     // If no invoices exist, generate mock data for demo purposes
     if (existingInvoices.length === 0) {
       const now = new Date();
       const mockInvoices: Invoice[] = [];
-      
+
       for (let i = 0; i < 6; i++) {
         const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const dueDate = new Date(date.getFullYear(), date.getMonth() + 1, 15);
         const isPaid = i > 0;
         const isOverdue = !isPaid && dueDate < now;
-        
+
         mockInvoices.push({
           id: i + 1,
           accountId,
           invoiceNumber: `INV-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}-${String(1000 + i).slice(1)}`,
-          createdAt: date,
-          dueDate: dueDate,
+          periodStart: date,
+          periodEnd: dueDate,
+          storageGB: 10 + i * 5,
+          storageCost: (10 + i * 5) * 20, // 0.20 per GB
+          bandwidthGB: 50 + i * 10,
+          bandwidthCost: 0,
+          subtotal: 2900 + Math.floor(Math.random() * 2000),
+          taxAmount: 0,
           totalAmount: 2900 + Math.floor(Math.random() * 2000),
           status: isPaid ? 'paid' : isOverdue ? 'overdue' : 'pending',
+          dueDate: dueDate,
           paidAt: isPaid ? new Date(dueDate.getTime() - 86400000 * 3) : null,
+          paymentMethod: isPaid ? 'credit_card' : null,
+          pdfUrl: null,
+          createdAt: date,
         });
       }
-      
+
       return mockInvoices;
     }
-    
+
     return existingInvoices;
   }
 
@@ -530,24 +577,24 @@ export class DatabaseStorage implements IStorage {
   }> {
     const account = await this.getAccount(accountId);
     const subscription = await this.getSubscription(accountId);
-    
+
     let storageUsedGB = Math.round((account?.storageUsed || 0) / (1024 * 1024 * 1024) * 100) / 100;
     let bandwidthUsedGB = Math.round((account?.bandwidthUsed || 0) / (1024 * 1024 * 1024) * 100) / 100;
-    
+
     const bucketList = await this.getBuckets(accountId);
     let apiRequestsCount = bucketList.reduce((sum, b) => sum + (b.objectCount || 0), 0) * 10;
-    
+
     // Generate realistic mock data if no actual usage
     if (storageUsedGB === 0 && bandwidthUsedGB === 0) {
       storageUsedGB = 24.7;
       bandwidthUsedGB = 156.3;
       apiRequestsCount = 45230;
     }
-    
+
     const baseCost = subscription?.product?.price || 2900;
     const storageCost = Math.max(0, storageUsedGB - (subscription?.product?.storageLimit || 100)) * 2;
     const projectedCost = baseCost + storageCost * 100;
-    
+
     return {
       storageUsedGB,
       bandwidthUsedGB,
@@ -573,10 +620,10 @@ export class DatabaseStorage implements IStorage {
       request: quotaRequests,
       account: accounts
     })
-    .from(quotaRequests)
-    .innerJoin(accounts, eq(quotaRequests.accountId, accounts.id))
-    .where(eq(quotaRequests.status, 'pending'))
-    .orderBy(desc(quotaRequests.createdAt));
+      .from(quotaRequests)
+      .innerJoin(accounts, eq(quotaRequests.accountId, accounts.id))
+      .where(eq(quotaRequests.status, 'pending'))
+      .orderBy(desc(quotaRequests.createdAt));
 
     return results.map(r => ({ ...r.request, account: r.account }));
   }
@@ -586,20 +633,21 @@ export class DatabaseStorage implements IStorage {
     return request;
   }
 
-  async approveQuotaRequest(id: number, reviewerId: string, note?: string): Promise<QuotaRequest> {
+  async approveQuotaRequest(id: number, reviewerId: string | null, note?: string): Promise<QuotaRequest> {
     const request = await this.getQuotaRequest(id);
     if (!request) throw new Error("Quota request not found");
+    // reviewerId can be null if auto-approved, but usually required. If null, we'll store null.
 
     // Update the account's quota
     await this.updateAccount(request.accountId!, { storageQuotaGB: request.requestedQuotaGB });
 
     // Update the request status
     const [updated] = await db.update(quotaRequests)
-      .set({ 
-        status: 'approved', 
-        reviewedById: reviewerId, 
+      .set({
+        status: 'approved',
+        reviewedById: reviewerId,
         reviewNote: note || null,
-        reviewedAt: new Date() 
+        reviewedAt: new Date()
       })
       .where(eq(quotaRequests.id, id))
       .returning();
@@ -607,13 +655,13 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async rejectQuotaRequest(id: number, reviewerId: string, note?: string): Promise<QuotaRequest> {
+  async rejectQuotaRequest(id: number, reviewerId: string | null, note?: string): Promise<QuotaRequest> {
     const [updated] = await db.update(quotaRequests)
-      .set({ 
-        status: 'rejected', 
-        reviewedById: reviewerId, 
+      .set({
+        status: 'rejected',
+        reviewedById: reviewerId,
         reviewNote: note || null,
-        reviewedAt: new Date() 
+        reviewedAt: new Date()
       })
       .where(eq(quotaRequests.id, id))
       .returning();
@@ -630,9 +678,9 @@ export class DatabaseStorage implements IStorage {
 
   async createOrder(data: CreateOrderRequest): Promise<Order> {
     const orderNumber = this.generateOrderNumber();
-    const [order] = await db.insert(orders).values({ 
-      ...data, 
-      orderNumber 
+    const [order] = await db.insert(orders).values({
+      ...data,
+      orderNumber
     }).returning();
     return order;
   }
@@ -643,16 +691,16 @@ export class DatabaseStorage implements IStorage {
       account: accounts,
       product: products
     })
-    .from(orders)
-    .leftJoin(accounts, eq(orders.accountId, accounts.id))
-    .leftJoin(products, eq(orders.productId, products.id))
-    .where(eq(orders.accountId, accountId))
-    .orderBy(desc(orders.createdAt));
+      .from(orders)
+      .leftJoin(accounts, eq(orders.accountId, accounts.id))
+      .leftJoin(products, eq(orders.productId, products.id))
+      .where(eq(orders.accountId, accountId))
+      .orderBy(desc(orders.createdAt));
 
-    return results.map(r => ({ 
-      ...r.order, 
-      account: r.account || undefined, 
-      product: r.product || undefined 
+    return results.map(r => ({
+      ...r.order,
+      account: r.account || undefined,
+      product: r.product || undefined
     }));
   }
 
@@ -662,15 +710,15 @@ export class DatabaseStorage implements IStorage {
       account: accounts,
       product: products
     })
-    .from(orders)
-    .leftJoin(accounts, eq(orders.accountId, accounts.id))
-    .leftJoin(products, eq(orders.productId, products.id))
-    .orderBy(desc(orders.createdAt));
+      .from(orders)
+      .leftJoin(accounts, eq(orders.accountId, accounts.id))
+      .leftJoin(products, eq(orders.productId, products.id))
+      .orderBy(desc(orders.createdAt));
 
-    return results.map(r => ({ 
-      ...r.order, 
-      account: r.account || undefined, 
-      product: r.product || undefined 
+    return results.map(r => ({
+      ...r.order,
+      account: r.account || undefined,
+      product: r.product || undefined
     }));
   }
 
@@ -680,22 +728,22 @@ export class DatabaseStorage implements IStorage {
       account: accounts,
       product: products
     })
-    .from(orders)
-    .leftJoin(accounts, eq(orders.accountId, accounts.id))
-    .leftJoin(products, eq(orders.productId, products.id))
-    .where(eq(orders.id, id));
+      .from(orders)
+      .leftJoin(accounts, eq(orders.accountId, accounts.id))
+      .leftJoin(products, eq(orders.productId, products.id))
+      .where(eq(orders.id, id));
 
     if (results.length === 0) return undefined;
-    
+
     const r = results[0];
-    return { 
-      ...r.order, 
-      account: r.account || undefined, 
-      product: r.product || undefined 
+    return {
+      ...r.order,
+      account: r.account || undefined,
+      product: r.product || undefined
     };
   }
 
-  async updateOrder(id: number, data: UpdateOrderRequest): Promise<Order> {
+  async updateOrder(id: number, data: Partial<Order>): Promise<Order> {
     const [order] = await db.update(orders)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(orders.id, id))
@@ -705,9 +753,9 @@ export class DatabaseStorage implements IStorage {
 
   async cancelOrder(id: number, reason?: string): Promise<Order> {
     const [order] = await db.update(orders)
-      .set({ 
-        status: 'canceled', 
-        canceledAt: new Date(), 
+      .set({
+        status: 'canceled',
+        canceledAt: new Date(),
         cancelReason: reason || null,
         updatedAt: new Date()
       })

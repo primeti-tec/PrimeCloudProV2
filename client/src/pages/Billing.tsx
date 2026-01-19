@@ -25,32 +25,32 @@ interface Invoice {
 
 function downloadInvoicePdf(invoice: Invoice) {
   const content = `
-INVOICE
+FATURA
 ========================================
 
-Invoice Number: ${invoice.invoiceNumber}
-Issue Date: ${new Date(invoice.createdAt).toLocaleDateString()}
-Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}
+Número da Fatura: ${invoice.invoiceNumber}
+Data de Emissão: ${new Date(invoice.createdAt).toLocaleDateString('pt-BR')}
+Data de Vencimento: ${new Date(invoice.dueDate).toLocaleDateString('pt-BR')}
 Status: ${invoice.status.toUpperCase()}
-${invoice.paidAt ? `Paid Date: ${new Date(invoice.paidAt).toLocaleDateString()}` : ''}
+${invoice.paidAt ? `Data de Pagamento: ${new Date(invoice.paidAt).toLocaleDateString('pt-BR')}` : ''}
 
 ----------------------------------------
-BILLING SUMMARY
+RESUMO DE COBRANÇA
 ----------------------------------------
 
-Cloud Storage Services
-  - Base Plan Fee:              $29.00
-  - Additional Storage:         $${((invoice.totalAmount - 2900) / 100).toFixed(2)}
+Serviços de Cloud Storage
+  - Taxa do Plano Base:            R$ 99,00
+  - Armazenamento Adicional:       R$ ${((invoice.totalAmount - 9900) / 100).toFixed(2).replace('.', ',')}
 ----------------------------------------
-Subtotal:                       $${(invoice.totalAmount / 100).toFixed(2)}
-Tax (0%):                       $0.00
+Subtotal:                          R$ ${(invoice.totalAmount / 100).toFixed(2).replace('.', ',')}
+Impostos (0%):                     R$ 0,00
 ----------------------------------------
-TOTAL:                          $${(invoice.totalAmount / 100).toFixed(2)}
+TOTAL:                             R$ ${(invoice.totalAmount / 100).toFixed(2).replace('.', ',')}
 
 ========================================
-Thank you for your business!
+Obrigado pela preferência!
   `.trim();
-  
+
   const blob = new Blob([content], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -75,6 +75,21 @@ function getStatusBadgeVariant(status: string): "default" | "secondary" | "outli
   }
 }
 
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case 'paid':
+      return 'Pago';
+    case 'pending':
+      return 'Pendente';
+    case 'overdue':
+      return 'Vencido';
+    case 'canceled':
+      return 'Cancelado';
+    default:
+      return status;
+  }
+}
+
 export default function Billing() {
   const { data: products, isLoading: productsLoading } = useProducts();
   const { data: accounts } = useMyAccounts();
@@ -92,27 +107,27 @@ export default function Billing() {
   const [quotaDialogOpen, setQuotaDialogOpen] = useState(false);
   const [requestedQuota, setRequestedQuota] = useState("");
   const [quotaReason, setQuotaReason] = useState("");
-  
+
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices(currentAccount?.id);
   const { data: usage, isLoading: usageLoading } = useUsageSummary(currentAccount?.id);
-  
+
   const usageData = usage || {
     storageUsedGB: 0,
     bandwidthUsedGB: 0,
     apiRequestsCount: 0,
     projectedCost: 0,
   };
-  
+
   const handleSubscribe = async (productId: number) => {
     if (!currentAccount) return;
     setLoadingId(productId);
     try {
       await subscribe({ accountId: currentAccount.id, productId });
       setPlanDialogOpen(false);
-      alert("Plan updated successfully!");
+      toast({ title: "Plano atualizado!", description: "Seu plano foi alterado com sucesso." });
     } catch (e) {
       console.error(e);
-      alert("Failed to update plan");
+      toast({ title: "Erro", description: "Falha ao atualizar plano.", variant: "destructive" });
     } finally {
       setLoadingId(null);
     }
@@ -133,25 +148,25 @@ export default function Billing() {
     if (!currentAccount) return;
     const quotaValue = parseInt(requestedQuota);
     if (isNaN(quotaValue) || quotaValue <= (currentAccount.storageQuotaGB || 100)) {
-      toast({ title: "Error", description: "Requested quota must be greater than current quota.", variant: "destructive" });
+      toast({ title: "Erro", description: "A quota solicitada deve ser maior que a quota atual.", variant: "destructive" });
       return;
     }
-    createQuotaRequest({ 
-      accountId: currentAccount.id, 
-      requestedQuotaGB: quotaValue, 
-      reason: quotaReason || undefined 
+    createQuotaRequest({
+      accountId: currentAccount.id,
+      requestedQuotaGB: quotaValue,
+      reason: quotaReason || undefined
     }, {
       onSuccess: () => {
-        toast({ title: "Request Submitted", description: "Your quota increase request has been submitted for review." });
+        toast({ title: "Solicitação Enviada", description: "Sua solicitação de aumento de quota foi enviada para análise." });
         setQuotaDialogOpen(false);
       },
       onError: () => {
-        toast({ title: "Error", description: "Failed to submit quota request.", variant: "destructive" });
+        toast({ title: "Erro", description: "Falha ao enviar solicitação de quota.", variant: "destructive" });
       },
     });
   };
 
-  const getQuotaStatusIcon = (status: string) => {
+  const getQuotaStatusIcon = (status: string | null) => {
     switch (status) {
       case 'approved':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
@@ -162,14 +177,14 @@ export default function Billing() {
     }
   };
 
-  const getQuotaStatusBadge = (status: string) => {
+  const getQuotaStatusBadge = (status: string | null) => {
     switch (status) {
       case 'approved':
-        return <Badge variant="success">Approved</Badge>;
+        return <Badge variant="success">Aprovado</Badge>;
       case 'rejected':
-        return <Badge variant="destructive">Rejected</Badge>;
+        return <Badge variant="destructive">Rejeitado</Badge>;
       default:
-        return <Badge variant="secondary">Pending</Badge>;
+        return <Badge variant="secondary">Pendente</Badge>;
     }
   };
 
@@ -178,24 +193,24 @@ export default function Billing() {
       <Sidebar />
       <main className="flex-1 ml-72 p-8">
         <header className="mb-8">
-          <h1 className="text-3xl font-display font-bold text-slate-900 dark:text-slate-100" data-testid="text-page-title">Billing & Plans</h1>
-          <p className="text-muted-foreground">Manage your subscription, invoices, and payment methods.</p>
+          <h1 className="text-3xl font-display font-bold text-slate-900 dark:text-slate-100" data-testid="text-page-title">Faturamento e Planos</h1>
+          <p className="text-muted-foreground">Gerencie sua assinatura, faturas e métodos de pagamento.</p>
         </header>
 
         {/* Payment Method Section */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5" /> Payment Method</CardTitle>
+            <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5" /> Método de Pagamento</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap justify-between items-center gap-4">
             <div className="flex items-center gap-4">
-              <div className="h-10 w-16 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-slate-400">VISA</div>
+              <div className="h-10 w-16 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-slate-400">PIX</div>
               <div>
-                <div className="font-semibold text-slate-900 dark:text-slate-100">Visa ending in 4242</div>
-                <div className="text-sm text-muted-foreground">Expires 12/28</div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Boleto/PIX</div>
+                <div className="text-sm text-muted-foreground">Fatura mensal</div>
               </div>
             </div>
-            <Button variant="outline" data-testid="button-update-payment">Update</Button>
+            <Button variant="outline" data-testid="button-update-payment">Atualizar</Button>
           </CardContent>
         </Card>
 
@@ -204,11 +219,11 @@ export default function Billing() {
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <CardTitle className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5" /> Storage Quota
+                <HardDrive className="h-5 w-5" /> Quota de Armazenamento
               </CardTitle>
               <Button onClick={openQuotaDialog} data-testid="button-request-quota">
                 <FileUp className="h-4 w-4 mr-2" />
-                Request Quota Increase
+                Solicitar Aumento de Quota
               </Button>
             </div>
           </CardHeader>
@@ -217,16 +232,16 @@ export default function Billing() {
               <div className="text-3xl font-bold text-slate-900 dark:text-slate-100" data-testid="text-current-quota">
                 {currentAccount?.storageQuotaGB || 100} GB
               </div>
-              <span className="text-muted-foreground">Current Quota</span>
+              <span className="text-muted-foreground">Quota Atual</span>
             </div>
-            
+
             {quotaRequests && quotaRequests.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">Previous Requests</h3>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Solicitações Anteriores</h3>
                 <div className="space-y-2">
                   {quotaRequests.map((request) => (
-                    <div 
-                      key={request.id} 
+                    <div
+                      key={request.id}
                       className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/50 rounded-lg"
                       data-testid={`row-quota-request-${request.id}`}
                     >
@@ -244,12 +259,12 @@ export default function Billing() {
                       <div className="flex items-center gap-3">
                         {getQuotaStatusBadge(request.status)}
                         <span className="text-xs text-muted-foreground">
-                          {request.createdAt ? new Date(request.createdAt).toLocaleDateString() : ''}
+                          {request.createdAt ? new Date(request.createdAt).toLocaleDateString('pt-BR') : ''}
                         </span>
                       </div>
                       {request.reviewNote && (
                         <div className="w-full text-xs text-muted-foreground italic pl-7">
-                          Note: {request.reviewNote}
+                          Observação: {request.reviewNote}
                         </div>
                       )}
                     </div>
@@ -262,7 +277,7 @@ export default function Billing() {
 
         {/* Usage Summary Section */}
         <h2 className="text-xl font-bold font-display mb-4 flex items-center gap-2">
-          <Activity className="h-5 w-5" /> Usage Summary
+          <Activity className="h-5 w-5" /> Resumo de Uso
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card>
@@ -271,77 +286,77 @@ export default function Billing() {
                 <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                   <HardDrive className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
-                <span className="text-sm text-muted-foreground">Storage Used</span>
+                <span className="text-sm text-muted-foreground">Armazenamento Usado</span>
               </div>
               <div className="text-2xl font-bold text-slate-900 dark:text-slate-100" data-testid="text-storage-used">{usageData.storageUsedGB} GB</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
                   <Wifi className="h-5 w-5 text-green-600 dark:text-green-400" />
                 </div>
-                <span className="text-sm text-muted-foreground">Bandwidth Used</span>
+                <span className="text-sm text-muted-foreground">Bandwidth Usado</span>
               </div>
               <div className="text-2xl font-bold text-slate-900 dark:text-slate-100" data-testid="text-bandwidth-used">{usageData.bandwidthUsedGB} GB</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
                   <Activity className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 </div>
-                <span className="text-sm text-muted-foreground">API Requests</span>
+                <span className="text-sm text-muted-foreground">Requisições API</span>
               </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100" data-testid="text-api-requests">{usageData.apiRequestsCount.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100" data-testid="text-api-requests">{usageData.apiRequestsCount.toLocaleString('pt-BR')}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
                   <DollarSign className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                 </div>
-                <span className="text-sm text-muted-foreground">Projected Cost</span>
+                <span className="text-sm text-muted-foreground">Custo Projetado</span>
               </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100" data-testid="text-projected-cost">${(usageData.projectedCost / 100).toFixed(2)}</div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100" data-testid="text-projected-cost">R$ {(usageData.projectedCost / 100).toFixed(2).replace('.', ',')}</div>
             </CardContent>
           </Card>
         </div>
 
         {/* Plan Management Section */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <h2 className="text-xl font-bold font-display">Current Plan</h2>
+          <h2 className="text-xl font-bold font-display">Plano Atual</h2>
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => openPlanDialog('downgrade')} data-testid="button-downgrade-plan">
               <ArrowDown className="h-4 w-4 mr-2" />
-              Downgrade Plan
+              Fazer Downgrade
             </Button>
             <Button variant="primary" onClick={() => openPlanDialog('upgrade')} data-testid="button-upgrade-plan">
               <ArrowUp className="h-4 w-4 mr-2" />
-              Upgrade Plan
+              Fazer Upgrade
             </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           {productsLoading ? <Loader2 className="animate-spin" /> : products?.map((product) => (
-            <Card key={product.id} className={`relative flex flex-col ${product.price > 0 && product.price < 5000 ? "border-primary shadow-lg ring-1 ring-primary/20" : ""}`} data-testid={`card-plan-${product.id}`}>
-              {product.price > 0 && product.price < 5000 && (
+            <Card key={product.id} className={`relative flex flex-col ${product.price > 0 && product.price < 15000 ? "border-primary shadow-lg ring-1 ring-primary/20" : ""}`} data-testid={`card-plan-${product.id}`}>
+              {product.price > 0 && product.price < 15000 && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                  Recommended
+                  Recomendado
                 </div>
               )}
               <CardHeader>
                 <CardTitle>{product.name}</CardTitle>
                 <div className="mt-2">
-                  <span className="text-3xl font-bold">${product.price / 100}</span>
-                  <span className="text-muted-foreground">/month</span>
+                  <span className="text-3xl font-bold">R$ {(product.price / 100).toFixed(0)}</span>
+                  <span className="text-muted-foreground">/mês</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">{product.description}</p>
               </CardHeader>
@@ -349,21 +364,21 @@ export default function Billing() {
                 <ul className="space-y-3 mb-8 flex-1">
                   <li className="flex items-center text-sm">
                     <Check className="h-4 w-4 text-green-500 mr-2" />
-                    {product.storageLimit} GB Storage
+                    {product.storageLimit} GB de Armazenamento
                   </li>
                   <li className="flex items-center text-sm">
                     <Check className="h-4 w-4 text-green-500 mr-2" />
-                    {product.transferLimit || "Unlimited"} Transfer
+                    {product.transferLimit || "Ilimitado"} GB Transferência
                   </li>
                 </ul>
-                <Button 
-                  className="w-full" 
-                  variant={product.price > 0 && product.price < 5000 ? "primary" : "outline"}
+                <Button
+                  className="w-full"
+                  variant={product.price > 0 && product.price < 15000 ? "primary" : "outline"}
                   disabled={isSubscribing || loadingId !== null}
                   onClick={() => handleSubscribe(product.id)}
                   data-testid={`button-select-plan-${product.id}`}
                 >
-                  {loadingId === product.id ? <Loader2 className="animate-spin" /> : "Select Plan"}
+                  {loadingId === product.id ? <Loader2 className="animate-spin" /> : "Selecionar Plano"}
                 </Button>
               </CardContent>
             </Card>
@@ -372,40 +387,40 @@ export default function Billing() {
 
         {/* Invoices Section */}
         <h2 className="text-xl font-bold font-display mb-4 flex items-center gap-2">
-          <FileText className="h-5 w-5" /> Invoices
+          <FileText className="h-5 w-5" /> Faturas
         </h2>
         <Card className="mb-8">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Amount</TableHead>
+                  <TableHead>Fatura #</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {invoices.map((invoice) => (
                   <TableRow key={invoice.id} data-testid={`row-invoice-${invoice.id}`}>
                     <TableCell className="font-medium" data-testid={`text-invoice-number-${invoice.id}`}>{invoice.invoiceNumber}</TableCell>
-                    <TableCell data-testid={`text-invoice-date-${invoice.id}`}>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
-                    <TableCell data-testid={`text-invoice-amount-${invoice.id}`}>${(invoice.totalAmount / 100).toFixed(2)}</TableCell>
+                    <TableCell data-testid={`text-invoice-date-${invoice.id}`}>{new Date(invoice.createdAt).toLocaleDateString('pt-BR')}</TableCell>
+                    <TableCell data-testid={`text-invoice-amount-${invoice.id}`}>R$ {(invoice.totalAmount / 100).toFixed(2).replace('.', ',')}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(invoice.status)} data-testid={`badge-invoice-status-${invoice.id}`}>
-                        {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                        {getStatusLabel(invoice.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => downloadInvoicePdf(invoice)}
                         data-testid={`button-download-invoice-${invoice.id}`}
                       >
                         <Download className="h-4 w-4 mr-1" />
-                        Download
+                        Baixar
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -419,58 +434,58 @@ export default function Billing() {
         <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>{dialogMode === 'upgrade' ? 'Upgrade Your Plan' : 'Downgrade Your Plan'}</DialogTitle>
+              <DialogTitle>{dialogMode === 'upgrade' ? 'Fazer Upgrade do Plano' : 'Fazer Downgrade do Plano'}</DialogTitle>
               <DialogDescription>
-                {dialogMode === 'upgrade' 
-                  ? 'Choose a plan with more features and resources to grow your business.'
-                  : 'Select a smaller plan if you need fewer resources. Changes take effect at the next billing cycle.'
+                {dialogMode === 'upgrade'
+                  ? 'Escolha um plano com mais recursos para expandir seu negócio.'
+                  : 'Selecione um plano menor se precisar de menos recursos. As alterações entram em vigor no próximo ciclo de cobrança.'
                 }
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
               {products?.map((product) => (
                 <Card key={product.id} className="flex flex-col" data-testid={`dialog-card-plan-${product.id}`}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg">{product.name}</CardTitle>
                     <div className="mt-1">
-                      <span className="text-2xl font-bold">${product.price / 100}</span>
-                      <span className="text-sm text-muted-foreground">/mo</span>
+                      <span className="text-2xl font-bold">R$ {(product.price / 100).toFixed(0)}</span>
+                      <span className="text-sm text-muted-foreground">/mês</span>
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col pt-2">
                     <ul className="space-y-2 mb-4 flex-1 text-sm">
                       <li className="flex items-center">
                         <Check className="h-3 w-3 text-green-500 mr-2" />
-                        {product.storageLimit} GB Storage
+                        {product.storageLimit} GB Armazenamento
                       </li>
                       <li className="flex items-center">
                         <Check className="h-3 w-3 text-green-500 mr-2" />
-                        {product.transferLimit || "Unlimited"} Transfer
+                        {product.transferLimit || "Ilimitado"} Transferência
                       </li>
                       <li className="flex items-center">
                         <Check className="h-3 w-3 text-green-500 mr-2" />
-                        24/7 Support
+                        Suporte 24/7
                       </li>
                     </ul>
-                    <Button 
-                      className="w-full" 
+                    <Button
+                      className="w-full"
                       variant="outline"
                       size="sm"
                       disabled={isSubscribing || loadingId !== null}
                       onClick={() => handleSubscribe(product.id)}
                       data-testid={`dialog-button-select-plan-${product.id}`}
                     >
-                      {loadingId === product.id ? <Loader2 className="animate-spin h-4 w-4" /> : "Select"}
+                      {loadingId === product.id ? <Loader2 className="animate-spin h-4 w-4" /> : "Selecionar"}
                     </Button>
                   </CardContent>
                 </Card>
               ))}
             </div>
-            
+
             <DialogFooter>
               <Button variant="ghost" onClick={() => setPlanDialogOpen(false)} data-testid="button-cancel-plan-change">
-                Cancel
+                Cancelar
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -480,9 +495,9 @@ export default function Billing() {
         <Dialog open={quotaDialogOpen} onOpenChange={setQuotaDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Request Quota Increase</DialogTitle>
+              <DialogTitle>Solicitar Aumento de Quota</DialogTitle>
               <DialogDescription>
-                Submit a request to increase your storage quota. Current quota: {currentAccount?.storageQuotaGB || 100} GB
+                Envie uma solicitação para aumentar sua quota de armazenamento. Quota atual: {currentAccount?.storageQuotaGB || 100} GB
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -490,30 +505,30 @@ export default function Billing() {
                 <div className="flex items-center gap-3">
                   <HardDrive className="h-8 w-8 text-muted-foreground" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Current Storage Used</p>
+                    <p className="text-sm text-muted-foreground">Armazenamento Atual</p>
                     <p className="text-xl font-bold">{usageData.storageUsedGB} GB / {currentAccount?.storageQuotaGB || 100} GB</p>
                   </div>
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="requested-quota">Requested Quota (GB)</Label>
+                <Label htmlFor="requested-quota">Quota Solicitada (GB)</Label>
                 <Input
                   id="requested-quota"
                   type="number"
                   min={(currentAccount?.storageQuotaGB || 100) + 1}
                   value={requestedQuota}
                   onChange={(e) => setRequestedQuota(e.target.value)}
-                  placeholder={`Enter quota greater than ${currentAccount?.storageQuotaGB || 100} GB`}
+                  placeholder={`Digite um valor maior que ${currentAccount?.storageQuotaGB || 100} GB`}
                   data-testid="input-requested-quota"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="quota-reason">Reason for increase (optional)</Label>
+                <Label htmlFor="quota-reason">Motivo do aumento (opcional)</Label>
                 <Textarea
                   id="quota-reason"
                   value={quotaReason}
                   onChange={(e) => setQuotaReason(e.target.value)}
-                  placeholder="Explain why you need additional storage..."
+                  placeholder="Explique por que você precisa de armazenamento adicional..."
                   className="resize-none"
                   data-testid="input-quota-reason"
                 />
@@ -521,11 +536,11 @@ export default function Billing() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setQuotaDialogOpen(false)} data-testid="button-quota-cancel">
-                Cancel
+                Cancelar
               </Button>
               <Button onClick={handleCreateQuotaRequest} disabled={isCreatingQuotaRequest} data-testid="button-quota-submit">
                 {isCreatingQuotaRequest && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Submit Request
+                Enviar Solicitação
               </Button>
             </DialogFooter>
           </DialogContent>

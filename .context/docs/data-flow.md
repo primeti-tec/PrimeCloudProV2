@@ -1,181 +1,195 @@
----
-status: filled
-generated: 2026-01-18
----
+# Fluxo de Dados e Integrações
 
-# Data Flow & Integrations
+Explica como os dados entram, movem-se através e saem do sistema, incluindo interações com serviços externos.
 
-Explain how data enters, moves through, and exits the system, including interactions with external services.
-
-## High-Level Architecture
+## Arquitetura de Alto Nível
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   React Client  │────▶│  Express Server │────▶│   PostgreSQL    │
+│  Cliente React  │────▶│ Servidor Express│────▶│   PostgreSQL    │
 │  (Vite + React) │◀────│  (API + Auth)   │◀────│   (Drizzle)     │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
                                │
                                ▼
                         ┌─────────────────┐
-                        │  Email Service  │
+                        │ Serviço de Email│
                         │   (SMTP/API)    │
                         └─────────────────┘
 ```
 
-## Request Flow
+## Fluxo de Requisição
 
-### Client → Server → Database
-1. **React Component** triggers action (form submit, button click)
-2. **Custom Hook** (e.g., `useCreateAccount`) calls `apiRequest()`
-3. **apiRequest** makes fetch to Express API
-4. **Express Route** validates with Zod schema
-5. **Storage Layer** executes Drizzle query
-6. **Response** flows back through React Query cache
+### Cliente → Servidor → Banco de Dados
+1. **Componente React** dispara ação (envio de formulário, clique em botão)
+2. **Hook Customizado** (ex: `useCreateAccount`) chama `apiRequest()`
+3. **`apiRequest`** (`client\src\lib\queryClient.ts`) faz fetch para API Express
+4. **Rota Express** valida com schema Zod
+5. **Camada de Armazenamento** executa query Drizzle via `DatabaseStorage` (`server\storage.ts`)
+6. **Resposta** flui de volta através do cache do React Query
 
-### Authentication Flow
-1. User submits credentials
-2. Passport.js validates against database
-3. Session created and stored in PostgreSQL
-4. Session cookie returned to client
-5. Subsequent requests include session cookie
+### Fluxo de Autenticação
+1. Usuário envia credenciais
+2. Passport.js valida contra o banco de dados
+3. Sessão criada e armazenada no PostgreSQL
+4. Cookie de sessão retornado ao cliente
+5. Requisições subsequentes incluem cookie de sessão
 
-## Module Dependencies
+## Dependências de Módulos
 
-### Server Dependencies
+### Dependências do Servidor
 ```
 server/index.ts
-├── server/routes.ts (API route handlers)
-├── server/static.ts (static file serving)
-├── server/vite.ts (Vite dev server integration)
+├── server/routes.ts (handlers de rota da API)
+├── server/static.ts (serviço de arquivos estáticos)
+├── server/vite.ts (integração do servidor dev Vite)
 └── server/storage.ts
-    └── server/db.ts (Drizzle instance)
+    └── server/db.ts (instância Drizzle)
 ```
 
-### Client Dependencies
+### Dependências do Cliente
 ```
 client/src/main.tsx
 └── client/src/App.tsx
     └── client/src/lib/queryClient.ts
-        └── Pages and Components
-            └── client/src/hooks/* (data fetching)
+        └── Páginas e Componentes
+            └── client/src/hooks/* (busca de dados)
 ```
 
-### Shared Module
+### Módulo Compartilhado
 ```
 shared/schema.ts
-├── Zod schemas for validation
-├── Type exports for client/server
-└── shared/models/auth.ts (User types)
+├── Schemas Zod para validação
+├── Exportações de tipos para cliente/servidor
+└── shared/models/auth.ts (Tipos de Usuário)
 
 shared/routes.ts
-└── buildUrl() for type-safe URL construction
+└── buildUrl() para construção de URL type-safe
 ```
 
-## Data Layer
+## Camada de Dados
 
-### Storage Interface
-The `IStorage` interface (`server/storage.ts:12`) defines all database operations:
-- Account management (CRUD, approval, suspension)
-- Bucket operations (create, delete, versioning, lifecycle)
-- Access key management (create, rotate, revoke)
-- Member/invitation handling
-- Billing (invoices, usage records, quotas)
-- Notifications and audit logs
+### Interface de Armazenamento
+A interface `IStorage` (`server/storage.ts:12`) define todas as operações de banco de dados:
+- Gerenciamento de contas (CRUD, aprovação, suspensão)
+- Operações de Bucket (criar, deletar, versionamento, ciclo de vida)
+- Gerenciamento de chaves de acesso (criar, rotacionar, revogar)
+- Manipulação de membros/convites
+- Faturamento (faturas, registros de uso, quotas)
+- Notificações e logs de auditoria
 
-### Database Operations
-All operations go through `DatabaseStorage` class (`server/storage.ts:105`):
-- Uses Drizzle ORM for type-safe queries
-- Transactions for complex operations
-- Connection pooling via `pg`
+### Operações de Banco de Dados
+Todas as operações passam pela classe `DatabaseStorage` (`server/storage.ts:105`):
+- Usa Drizzle ORM para queries type-safe
+- Transações para operações complexas
+- Pooling de conexões via `pg`
 
-## API Endpoints Pattern
+## Padrão de Endpoints da API
 
-### Resource Operations
+### Operações de Recursos
 ```
-GET    /api/accounts           → List accounts
-POST   /api/accounts           → Create account
-GET    /api/accounts/:id       → Get account
-PATCH  /api/accounts/:id       → Update account
+GET    /api/accounts           → Listar contas
+POST   /api/accounts           → Criar conta
+GET    /api/accounts/:id       → Obter conta
+PATCH  /api/accounts/:id       → Atualizar conta
 
-GET    /api/accounts/:id/buckets     → List buckets
-POST   /api/accounts/:id/buckets     → Create bucket
-DELETE /api/accounts/:id/buckets/:id → Delete bucket
-```
-
-### Admin Operations
-```
-POST /api/admin/accounts/:id/approve  → Approve account
-POST /api/admin/accounts/:id/reject   → Reject account
-POST /api/admin/accounts/:id/suspend  → Suspend account
-POST /api/admin/quotas/:id/adjust     → Adjust quota
+GET    /api/accounts/:id/buckets     → Listar buckets
+POST   /api/accounts/:id/buckets     → Criar bucket
+DELETE /api/accounts/:id/buckets/:id → Deletar bucket
 ```
 
-## External Integrations
+### Operações Administrativas
+```
+POST /api/admin/accounts/:id/approve  → Aprovar conta
+POST /api/admin/accounts/:id/reject   → Rejeitar conta
+POST /api/admin/accounts/:id/suspend  → Suspender conta
+POST /api/admin/quotas/:id/adjust     → Ajustar quota
+```
 
-### Email Service
-- **Location**: `server/services/email.ts`
-- **Functions**:
-  - `sendEmail()` - Generic email sending
-  - `sendInvitationEmail()` - Team invitations
-  - `sendVerificationEmail()` - Account verification
-  - `sendWelcomeEmail()` - New user welcome
-  - `sendPasswordResetEmail()` - Password recovery
+## Integrações Externas
 
-### Authentication Providers
-- **Passport Local**: Username/password authentication
-- **OpenID Connect**: OAuth 2.0 / OIDC providers
-- **Session Store**: PostgreSQL via `connect-pg-simple`
-
-## Client State Management
-
-### React Query Pattern
+### Serviço de Email
+- **Localização**: `server/services/email.ts`
+- **Funções**:
+  - `sendEmail()` - Envio genérico de email
+  - `sendInvitationEmail()` - Convites de equipe
+  - `sendVerificationEmail()` - Verificação de conta
+  - `sendWelcomeEmail()` - Boas-vindas a novo usuário
+  - `sendPasswordResetEmail()` - Recuperação de senha
 ```typescript
-// Data fetching hook
+import { sendEmail } from "~/server/services/email";
+import { EmailOptions } from "~/server/services/email";
+
+const options: EmailOptions = {
+  to: "teste@exemplo.com",
+  subject: "Email de Teste",
+  html: "<p>Este é um email de teste.</p>",
+};
+
+sendEmail(options);
+```
+
+### Provedores de Autenticação
+- **Passport Local**: Autenticação usuário/senha
+- **OpenID Connect**: OAuth 2.0 / Provedores OIDC
+- **Store de Sessão**: PostgreSQL via `connect-pg-simple`
+
+## Gerenciamento de Estado do Cliente
+
+### Padrão React Query
+```typescript
+// Hook de busca de dados
 const { data, isLoading, error } = useAccounts();
 
-// Mutation hook
+// Hook de mutação
 const createAccount = useCreateAccount();
 await createAccount.mutateAsync(data);
 ```
 
-### Cache Invalidation
-Mutations automatically invalidate related queries:
-- Creating bucket → invalidates bucket list
-- Updating account → invalidates account details
-- Adding member → invalidates member list
+### Invalidação de Cache
+Mutações invalidam queries relacionadas automaticamente:
+- Criar bucket → invalida lista de buckets
+- Atualizar conta → invalida detalhes da conta
+- Adicionar membro → invalida lista de membros
 
-## Observability
+## Observabilidade
 
-### Logging
-- Server logging via `log()` function (`server/index.ts:25`)
-- Structured log format for production
+### Logs
+- Log do servidor via função `log()` (`server/index.ts:62`)
+- Formato de log estruturado para produção
 
-### Audit Trail
-- All significant actions logged to `AuditLog` table
-- Queryable via API and `useAuditLogs` hook
-- Tracks: action, user, timestamp, affected resources
+```typescript
+// Exemplo de log do servidor
+import { log } from "./index";
 
-## Error Handling
+log.info("Servidor iniciado com sucesso");
+```
 
-### Client-Side
-- `isUnauthorizedError()` detects 401 responses
-- `redirectToLogin()` handles session expiration
-- React Query handles retries and error states
+### Trilha de Auditoria
+- Todas as ações significativas logadas na tabela `AuditLog`
+- Consultável via API e hook `useAuditLogs`
+- Rastreia: ação, usuário, timestamp, recursos afetados
 
-### Server-Side
-- Zod validation errors return 400 with details
-- Authentication errors return 401
-- Not found errors return 404
-- Internal errors logged and return 500
+## Tratamento de Erros
 
-## Security Considerations
+### Lado do Cliente
+- `isUnauthorizedError()` detecta respostas 401
+- `redirectToLogin()` lida com expiração de sessão
+- React Query lida com retentativas e estados de erro
 
-### Input Validation
-- All API inputs validated with Zod schemas
-- Brazilian documents (CPF/CNPJ) validated server-side
-- Type coercion handled by Drizzle
+### Lado do Servidor
+- Erros de validação Zod retornam 400 com detalhes
+- Erros de autenticação retornam 401
+- Erros de não encontrado retornam 404
+- Erros internos logados e retornam 500
 
-### Output Filtering
-- Sensitive data (passwords, tokens) never returned
-- Access keys show masked values after creation
-- Session data not exposed in API responses
+## Considerações de Segurança
+
+### Validação de Entrada
+- Todas as entradas da API validadas com schemas Zod
+- Documentos brasileiros (CPF/CNPJ) validados no lado do servidor usando `isValidCPF` e `isValidCNPJ` (`server\lib\document-validation.ts`).
+- Coerção de tipos tratada pelo Drizzle
+
+### Filtragem de Saída
+- Dados sensíveis (senhas, tokens) nunca retornados
+- Chaves de acesso mostram valores mascarados após criação
+- Dados de sessão não expostos em respostas da API

@@ -4,6 +4,11 @@ This directory contains plans for coordinating work across documentation and pla
 
 ## Plan Queue
 1. [Analise O Codigo E Crie Um Plano Para Ser Iniciado](./analise-o-codigo-e-crie-um-plano-para-ser-iniciado.md)
+2. [Clerk](./clerk.md)
+3. [Cloudpro Mvp Completion](./cloudpro-mvp-completion.md)
+4. [Pt Br Localization](./pt-br-localization.md)
+5. [Teste Config Anthropic](./teste-config-anthropic.md)
+6. [Teste Config Google](./teste-config-google.md)
 
 ## How To Create Or Update Plans
 - Run "ai-context plan <name>" to scaffold a new plan template.

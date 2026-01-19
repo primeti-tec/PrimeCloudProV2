@@ -16,6 +16,9 @@ import Orders from "@/pages/Orders";
 import Settings from "@/pages/Settings";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AcceptInvite from "@/pages/AcceptInvite";
+import BackupConfig from "@/pages/BackupConfig";
+import SignInPage from "@/pages/SignIn";
+import SignUpPage from "@/pages/SignUp";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
@@ -28,10 +31,12 @@ function PrivateRoute({ component: Component, adminOnly = false }: { component: 
   }
 
   if (!user) {
-    return <Redirect to="/" />;
+    return <Redirect to="/sign-in" />;
   }
 
-  if (adminOnly && !user.email?.includes("admin")) { // Simple check for MVP
+  // Super Admin Check
+  const SUPER_ADMINS = ["sergio.louzan@gmail.com", "admin@primecloudpro.com"];
+  if (adminOnly && !SUPER_ADMINS.includes(user.email || "")) {
     return <Redirect to="/dashboard" />;
   }
 
@@ -42,7 +47,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
-      
+      <Route path="/sign-in" component={SignInPage} />
+      <Route path="/sign-up" component={SignUpPage} />
+
       {/* Auth Protected Routes */}
       <Route path="/create-account">
         <PrivateRoute component={CreateAccount} />
@@ -73,6 +80,9 @@ function Router() {
       </Route>
       <Route path="/dashboard/settings">
         <PrivateRoute component={Settings} />
+      </Route>
+      <Route path="/dashboard/backup">
+        <PrivateRoute component={BackupConfig} />
       </Route>
 
       {/* Admin Route */}

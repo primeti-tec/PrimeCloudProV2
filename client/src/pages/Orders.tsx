@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, ShoppingCart, Package, CreditCard, DollarSign, X, RefreshCw, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { useOrders, useCreateOrder, useUpdateOrder, useCancelOrder } from '@/hooks/use-orders';
 import { useProducts } from '@/hooks/use-products';
 import { useMyAccounts } from '@/hooks/use-accounts';
@@ -30,8 +31,30 @@ const paymentStatusColors: Record<string, string> = {
   refunded: 'bg-purple-500/10 text-purple-500',
 };
 
+const statusLabels: Record<string, string> = {
+  pending: 'Pendente',
+  processing: 'Processando',
+  completed: 'Concluído',
+  canceled: 'Cancelado',
+  refunded: 'Reembolsado',
+};
+
+const paymentStatusLabels: Record<string, string> = {
+  pending: 'Pendente',
+  paid: 'Pago',
+  failed: 'Falhou',
+  refunded: 'Reembolsado',
+};
+
+const paymentMethodLabels: Record<string, string> = {
+  credit_card: 'Cartão de Crédito',
+  pix: 'PIX',
+  boleto: 'Boleto',
+  bank_transfer: 'Transferência Bancária',
+};
+
 function formatCurrency(cents: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
 }
 
 export default function Orders() {
@@ -39,7 +62,7 @@ export default function Orders() {
   const currentAccount = accounts?.[0];
   const accountId = currentAccount?.id || 0;
   const { toast } = useToast();
-  
+
   const { data: orders, isLoading } = useOrders(accountId);
   const { data: products } = useProducts();
   const createOrder = useCreateOrder(accountId);
@@ -62,7 +85,7 @@ export default function Orders() {
 
   const handleCreateOrder = async () => {
     if (!selectedProductId) {
-      toast({ title: 'Error', description: 'Please select a product', variant: 'destructive' });
+      toast({ title: 'Erro', description: 'Por favor, selecione um produto', variant: 'destructive' });
       return;
     }
 
@@ -72,13 +95,13 @@ export default function Orders() {
         paymentMethod: paymentMethod as any || undefined,
         notes: notes || undefined,
       });
-      toast({ title: 'Success', description: 'Order created successfully' });
+      toast({ title: 'Sucesso', description: 'Pedido criado com sucesso' });
       setCreateDialogOpen(false);
       setSelectedProductId('');
       setPaymentMethod('');
       setNotes('');
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to create order', variant: 'destructive' });
+      toast({ title: 'Erro', description: 'Falha ao criar pedido', variant: 'destructive' });
     }
   };
 
@@ -91,11 +114,11 @@ export default function Orders() {
         status: editStatus as any,
         paymentStatus: editPaymentStatus as any,
       });
-      toast({ title: 'Success', description: 'Order updated successfully' });
+      toast({ title: 'Sucesso', description: 'Pedido atualizado com sucesso' });
       setEditDialogOpen(false);
       setEditOrder(null);
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to update order', variant: 'destructive' });
+      toast({ title: 'Erro', description: 'Falha ao atualizar pedido', variant: 'destructive' });
     }
   };
 
@@ -104,12 +127,12 @@ export default function Orders() {
 
     try {
       await cancelOrder.mutateAsync({ orderId: cancelOrderId, reason: cancelReason || undefined });
-      toast({ title: 'Success', description: 'Order canceled successfully' });
+      toast({ title: 'Sucesso', description: 'Pedido cancelado com sucesso' });
       setCancelDialogOpen(false);
       setCancelOrderId(null);
       setCancelReason('');
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to cancel order', variant: 'destructive' });
+      toast({ title: 'Erro', description: 'Falha ao cancelar pedido', variant: 'destructive' });
     }
   };
 
@@ -144,28 +167,28 @@ export default function Orders() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <ShoppingCart className="h-6 w-6" />
-            Orders
+            Pedidos
           </h1>
-          <p className="text-muted-foreground">Manage your storage subscription orders</p>
+          <p className="text-muted-foreground">Gerencie seus pedidos de assinatura de armazenamento</p>
         </div>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-create-order">
               <Plus className="h-4 w-4 mr-2" />
-              New Order
+              Novo Pedido
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New Order</DialogTitle>
-              <DialogDescription>Select a product and payment method to create a new order.</DialogDescription>
+              <DialogTitle>Criar Novo Pedido</DialogTitle>
+              <DialogDescription>Selecione um produto e método de pagamento para criar um novo pedido.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Product</Label>
+                <Label>Produto</Label>
                 <Select value={selectedProductId} onValueChange={setSelectedProductId}>
                   <SelectTrigger data-testid="select-product">
-                    <SelectValue placeholder="Select a product" />
+                    <SelectValue placeholder="Selecione um produto" />
                   </SelectTrigger>
                   <SelectContent>
                     {products?.map((product) => (
@@ -177,33 +200,33 @@ export default function Orders() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Payment Method</Label>
+                <Label>Método de Pagamento</Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                   <SelectTrigger data-testid="select-payment-method">
-                    <SelectValue placeholder="Select payment method" />
+                    <SelectValue placeholder="Selecione o método de pagamento" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="credit_card">Credit Card</SelectItem>
+                    <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
                     <SelectItem value="pix">PIX</SelectItem>
                     <SelectItem value="boleto">Boleto</SelectItem>
-                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="bank_transfer">Transferência Bancária</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Notes (optional)</Label>
+                <Label>Observações (opcional)</Label>
                 <Textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Any additional notes..."
+                  placeholder="Alguma observação adicional..."
                   data-testid="input-order-notes"
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setCreateDialogOpen(false)} data-testid="button-cancel-create-dialog">Cancel</Button>
+              <Button variant="outline" onClick={() => setCreateDialogOpen(false)} data-testid="button-cancel-create-dialog">Cancelar</Button>
               <Button onClick={handleCreateOrder} disabled={createOrder.isPending} data-testid="button-submit-order">
-                {createOrder.isPending ? 'Creating...' : 'Create Order'}
+                {createOrder.isPending ? 'Criando...' : 'Criar Pedido'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -214,8 +237,8 @@ export default function Orders() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Package className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold">No orders yet</h3>
-            <p className="text-muted-foreground text-center">Create your first order to get started with cloud storage.</p>
+            <h3 className="text-lg font-semibold">Nenhum pedido ainda</h3>
+            <p className="text-muted-foreground text-center">Crie seu primeiro pedido para começar a usar o armazenamento em nuvem.</p>
           </CardContent>
         </Card>
       ) : (
@@ -229,16 +252,16 @@ export default function Orders() {
                     {order.orderNumber}
                   </CardTitle>
                   <CardDescription>
-                    {order.createdAt ? format(new Date(order.createdAt), 'PPP pp') : 'N/A'}
+                    {order.createdAt ? format(new Date(order.createdAt), "PPP 'às' HH:mm", { locale: ptBR }) : 'N/A'}
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className={statusColors[order.status || 'pending']}>
-                    {order.status || 'pending'}
+                    {statusLabels[order.status || 'pending'] || order.status}
                   </Badge>
                   <Badge className={paymentStatusColors[order.paymentStatus || 'pending']}>
                     <CreditCard className="h-3 w-3 mr-1" />
-                    {order.paymentStatus || 'pending'}
+                    {paymentStatusLabels[order.paymentStatus || 'pending'] || order.paymentStatus}
                   </Badge>
                 </div>
               </CardHeader>
@@ -246,25 +269,24 @@ export default function Orders() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">
-                      Product: <span className="text-foreground font-medium">{order.product?.name || 'Unknown'}</span>
+                      Produto: <span className="text-foreground font-medium">{order.product?.name || 'Desconhecido'}</span>
                     </p>
                     {order.notes && (
-                      <p className="text-sm text-muted-foreground">Notes: {order.notes}</p>
+                      <p className="text-sm text-muted-foreground">Observações: {order.notes}</p>
                     )}
                     {order.paymentMethod && (
-                      <p className="text-sm text-muted-foreground capitalize">
-                        Payment: {order.paymentMethod.replace('_', ' ')}
+                      <p className="text-sm text-muted-foreground">
+                        Pagamento: {paymentMethodLabels[order.paymentMethod] || order.paymentMethod}
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-2xl font-bold flex items-center gap-1">
-                        <DollarSign className="h-5 w-5" />
                         {formatCurrency(order.totalAmount)}
                       </p>
                       {order.discount && order.discount > 0 && (
-                        <p className="text-sm text-green-600">Discount: -{formatCurrency(order.discount)}</p>
+                        <p className="text-sm text-green-600">Desconto: -{formatCurrency(order.discount)}</p>
                       )}
                     </div>
                     <div className="flex gap-2">
@@ -291,7 +313,7 @@ export default function Orders() {
                       {order.status === 'completed' && (
                         <Badge variant="outline" className="bg-green-50">
                           <CheckCircle className="h-3 w-3 mr-1" />
-                          Completed
+                          Concluído
                         </Badge>
                       )}
                     </div>
@@ -306,43 +328,43 @@ export default function Orders() {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Order</DialogTitle>
-            <DialogDescription>Update the status of order {editOrder?.orderNumber}</DialogDescription>
+            <DialogTitle>Atualizar Pedido</DialogTitle>
+            <DialogDescription>Atualizar o status do pedido {editOrder?.orderNumber}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Order Status</Label>
+              <Label>Status do Pedido</Label>
               <Select value={editStatus} onValueChange={setEditStatus}>
                 <SelectTrigger data-testid="select-edit-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="refunded">Refunded</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="processing">Processando</SelectItem>
+                  <SelectItem value="completed">Concluído</SelectItem>
+                  <SelectItem value="refunded">Reembolsado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Payment Status</Label>
+              <Label>Status do Pagamento</Label>
               <Select value={editPaymentStatus} onValueChange={setEditPaymentStatus}>
                 <SelectTrigger data-testid="select-edit-payment-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                  <SelectItem value="refunded">Refunded</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="paid">Pago</SelectItem>
+                  <SelectItem value="failed">Falhou</SelectItem>
+                  <SelectItem value="refunded">Reembolsado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)} data-testid="button-cancel-edit-dialog">Cancel</Button>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} data-testid="button-cancel-edit-dialog">Cancelar</Button>
             <Button onClick={handleUpdateOrder} disabled={updateOrder.isPending} data-testid="button-update-order">
-              {updateOrder.isPending ? 'Updating...' : 'Update Order'}
+              {updateOrder.isPending ? 'Atualizando...' : 'Atualizar Pedido'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -351,22 +373,22 @@ export default function Orders() {
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancel Order</DialogTitle>
-            <DialogDescription>Are you sure you want to cancel this order?</DialogDescription>
+            <DialogTitle>Cancelar Pedido</DialogTitle>
+            <DialogDescription>Tem certeza que deseja cancelar este pedido?</DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Label>Reason (optional)</Label>
+            <Label>Motivo (opcional)</Label>
             <Textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Why are you canceling this order?"
+              placeholder="Por que você está cancelando este pedido?"
               data-testid="input-cancel-reason"
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCancelDialogOpen(false)} data-testid="button-keep-order">Keep Order</Button>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)} data-testid="button-keep-order">Manter Pedido</Button>
             <Button variant="destructive" onClick={handleCancelOrder} disabled={cancelOrder.isPending} data-testid="button-confirm-cancel">
-              {cancelOrder.isPending ? 'Canceling...' : 'Cancel Order'}
+              {cancelOrder.isPending ? 'Cancelando...' : 'Cancelar Pedido'}
             </Button>
           </DialogFooter>
         </DialogContent>

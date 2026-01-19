@@ -1,47 +1,44 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { User } from "@shared/models/auth";
+import { useMemo, useState } from "react";
+import { useClerk, useUser } from "@clerk/clerk-react";
 
-async function fetchUser(): Promise<User | null> {
-  const response = await fetch("/api/auth/user", {
-    credentials: "include",
-  });
-
-  if (response.status === 401) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(`${response.status}: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-async function logout(): Promise<void> {
-  window.location.href = "/api/logout";
-}
+type AuthUser = {
+  id: string;
+  email?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  profileImageUrl?: string;
+};
 
 export function useAuth() {
-  const queryClient = useQueryClient();
-  const { data: user, isLoading } = useQuery<User | null>({
-    queryKey: ["/api/auth/user"],
-    queryFn: fetchUser,
-    retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const logoutMutation = useMutation({
-    mutationFn: logout,
-    onSuccess: () => {
-      queryClient.setQueryData(["/api/auth/user"], null);
-    },
-  });
+  const mappedUser = useMemo<AuthUser | null>(() => {
+    if (!user) return null;
+    return {
+      id: user.id,
+      email: user.primaryEmailAddress?.emailAddress,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      profileImageUrl: user.imageUrl,
+    };
+  }, [user]);
+
+  const logout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await signOut({ redirectUrl: "/" });
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    logout: logoutMutation.mutate,
-    isLoggingOut: logoutMutation.isPending,
+    user: mappedUser,
+    isLoading: !isLoaded,
+    isAuthenticated: !!mappedUser,
+    logout,
+    isLoggingOut,
   };
 }

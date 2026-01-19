@@ -3,38 +3,39 @@ import { Sidebar } from "@/components/Sidebar";
 import { useAuditLogs, type AuditLog } from "@/hooks/use-audit-logs";
 import { useMyAccounts } from "@/hooks/use-accounts";
 import { Card, CardContent, Button } from "@/components/ui-custom";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
-import { 
-  Loader2, 
-  Database, 
-  Key, 
-  UserPlus, 
-  UserMinus, 
-  Shield, 
-  Trash2, 
-  Plus, 
-  Settings, 
+import {
+  Loader2,
+  Database,
+  Key,
+  UserPlus,
+  UserMinus,
+  Shield,
+  Trash2,
+  Plus,
+  Settings,
   FileText,
   History
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const ACTION_TYPES = [
-  { value: "all", label: "All Actions" },
-  { value: "bucket_created", label: "Bucket Created" },
-  { value: "bucket_deleted", label: "Bucket Deleted" },
-  { value: "key_created", label: "Key Created" },
-  { value: "key_revoked", label: "Key Revoked" },
-  { value: "member_added", label: "Member Added" },
-  { value: "member_removed", label: "Member Removed" },
-  { value: "role_changed", label: "Role Changed" },
-  { value: "settings_updated", label: "Settings Updated" },
+  { value: "all", label: "Todas as Ações" },
+  { value: "bucket_created", label: "Bucket Criado" },
+  { value: "bucket_deleted", label: "Bucket Excluído" },
+  { value: "key_created", label: "Chave Criada" },
+  { value: "key_revoked", label: "Chave Revogada" },
+  { value: "member_added", label: "Membro Adicionado" },
+  { value: "member_removed", label: "Membro Removido" },
+  { value: "role_changed", label: "Função Alterada" },
+  { value: "settings_updated", label: "Configurações Atualizadas" },
 ];
 
 function getActionIcon(action: string) {
@@ -61,7 +62,17 @@ function getActionIcon(action: string) {
 }
 
 function formatActionLabel(action: string): string {
-  return action
+  const actionLabels: Record<string, string> = {
+    bucket_created: "Bucket Criado",
+    bucket_deleted: "Bucket Excluído",
+    key_created: "Chave Criada",
+    key_revoked: "Chave Revogada",
+    member_added: "Membro Adicionado",
+    member_removed: "Membro Removido",
+    role_changed: "Função Alterada",
+    settings_updated: "Configurações Atualizadas",
+  };
+  return actionLabels[action] || action
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
@@ -80,11 +91,20 @@ function getResourceIcon(resourceType: string) {
   }
 }
 
+function getResourceTypeLabel(resourceType: string): string {
+  const labels: Record<string, string> = {
+    bucket: "bucket",
+    key: "chave",
+    member: "membro",
+  };
+  return labels[resourceType] || resourceType;
+}
+
 export default function AuditLogs() {
   const { data: accounts } = useMyAccounts();
   const currentAccount = accounts?.[0];
   const [actionFilter, setActionFilter] = useState<string>("all");
-  
+
   const { data: auditLogs, isLoading } = useAuditLogs(
     currentAccount?.id,
     actionFilter === "all" ? undefined : actionFilter
@@ -96,14 +116,14 @@ export default function AuditLogs() {
       <main className="flex-1 ml-72 p-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold text-slate-900">Audit Logs</h1>
-            <p className="text-muted-foreground">Track all activity in your organization.</p>
+            <h1 className="text-3xl font-display font-bold text-slate-900">Logs de Auditoria</h1>
+            <p className="text-muted-foreground">Acompanhe todas as atividades na sua organização.</p>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <Select value={actionFilter} onValueChange={setActionFilter}>
               <SelectTrigger className="w-[200px]" data-testid="select-action-filter">
-                <SelectValue placeholder="Filter by action" />
+                <SelectValue placeholder="Filtrar por ação" />
               </SelectTrigger>
               <SelectContent>
                 {ACTION_TYPES.map((type) => (
@@ -127,21 +147,21 @@ export default function AuditLogs() {
                 <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
                   <History className="h-6 w-6 text-slate-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-1">No audit logs yet</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-1">Nenhum log de auditoria ainda</h3>
                 <p className="text-muted-foreground text-sm max-w-sm">
-                  Activity in your account will be recorded here. Actions like creating buckets, 
-                  managing keys, and team changes will appear in this log.
+                  Atividades na sua conta serão registradas aqui. Ações como criar buckets,
+                  gerenciar chaves e alterações na equipe aparecerão neste log.
                 </p>
               </div>
             ) : (
               <table className="w-full" data-testid="audit-logs-table">
                 <thead className="bg-slate-50 border-b">
                   <tr>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Date</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">User</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Action</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Resource</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pr-6">IP Address</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Data</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Usuário</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Ação</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Recurso</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pr-6">Endereço IP</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -150,10 +170,10 @@ export default function AuditLogs() {
                       <td className="p-4 pl-6">
                         <div className="flex flex-col">
                           <span className="text-sm font-medium text-slate-900">
-                            {format(new Date(log.timestamp), "MMM d, yyyy")}
+                            {format(new Date(log.timestamp), "d 'de' MMM, yyyy", { locale: ptBR })}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {format(new Date(log.timestamp), "h:mm a")} ({formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })})
+                            {format(new Date(log.timestamp), "HH:mm", { locale: ptBR })} ({formatDistanceToNow(new Date(log.timestamp), { addSuffix: true, locale: ptBR })})
                           </span>
                         </div>
                       </td>
@@ -163,7 +183,7 @@ export default function AuditLogs() {
                             {log.userName?.[0] || log.userEmail?.[0] || "U"}
                           </div>
                           <div>
-                            <div className="font-medium text-slate-900 text-sm">{log.userName || "Unknown User"}</div>
+                            <div className="font-medium text-slate-900 text-sm">{log.userName || "Usuário Desconhecido"}</div>
                             <div className="text-xs text-muted-foreground">{log.userEmail}</div>
                           </div>
                         </div>
@@ -183,7 +203,7 @@ export default function AuditLogs() {
                           {getResourceIcon(log.resourceType)}
                           <div>
                             <span className="text-sm text-slate-900">{log.resourceName}</span>
-                            <span className="text-xs text-muted-foreground ml-1">({log.resourceType})</span>
+                            <span className="text-xs text-muted-foreground ml-1">({getResourceTypeLabel(log.resourceType)})</span>
                           </div>
                         </div>
                       </td>

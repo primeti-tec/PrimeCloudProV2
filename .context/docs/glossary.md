@@ -1,148 +1,150 @@
+```markdown
 ---
 status: filled
 generated: 2026-01-18
 ---
 
-# Glossary & Domain Concepts
+# Glossário e Conceitos de Domínio
 
-List project-specific terminology, acronyms, domain entities, and user personas.
+Lista de terminologia específica do projeto, acrônimos, entidades de domínio e personas de usuário.
 
-## Core Domain Entities
+## Entidades Principais de Domínio
 
-### Account
-The primary organizational unit. Represents a company or organization using the cloud storage service.
+### Account (Conta)
+A unidade organizacional primária. Representa uma empresa ou organização usando o serviço de armazenamento em nuvem.
 - **Schema**: `shared/schema.ts:371`
-- **Related**: AccountMember, AccountWithDetails
-- **States**: pending, approved, suspended, active
+- **Relacionado**: AccountMember, AccountWithDetails
+- **Estados**: pending (pendente), approved (aprovado), suspended (suspenso), active (ativo)
 
 ### Bucket
-Cloud storage container within an account. Supports versioning and lifecycle rules.
+Container de armazenamento em nuvem dentro de uma conta. Suporta versionamento e regras de ciclo de vida.
 - **Schema**: `shared/schema.ts:374`
-- **Features**: Versioning, Lifecycle Rules
+- **Funcionalidades**: Versionamento, Regras de Ciclo de Vida
 
-### Access Key
-API credentials for programmatic access to cloud storage.
+### Access Key (Chave de Acesso)
+Credenciais de API para acesso programático ao armazenamento em nuvem.
 - **Schema**: `shared/schema.ts:375`
-- **States**: active, inactive, revoked
-- **Operations**: Create, Rotate, Toggle, Revoke
+- **Estados**: active (ativo), inactive (inativo), revoked (revogado)
+- **Operações**: Criar, Rotacionar, Alternar (Toggle), Revogar
 
-### Subscription
-Links an account to a product/plan with associated quotas and pricing.
+### Subscription (Assinatura)
+Vincula uma conta a um produto/plano com quotas e preços associados.
 - **Schema**: `shared/schema.ts:373`
 
-### Order
-Purchase or service request by an account.
+### Order (Pedido)
+Solicitação de compra ou serviço por uma conta.
 - **Schema**: `shared/schema.ts:370`
-- **Related**: OrderWithDetails
+- **Relacionado**: OrderWithDetails
 
-### Product
-Service offering with pricing and features.
+### Product (Produto)
+Oferta de serviço com preços e funcionalidades.
 - **Schema**: `shared/schema.ts:369`
 
-## User Management
+## Gerenciamento de Usuários
 
-### User
-Authenticated individual in the system.
+### User (Usuário)
+Indivíduo autenticado no sistema.
 - **Schema**: `shared/models/auth.ts:29`
-- **Related**: UpsertUser
+- **Relacionado**: UpsertUser
 
-### AccountMember
-Association between a User and an Account with role assignment.
+### AccountMember (Membro da Conta)
+Associação entre um Usuário e uma Conta com atribuição de função.
 - **Schema**: `shared/schema.ts:372`
-- **Roles**: owner, admin, member
+- **Funções (Roles)**: owner (proprietário), admin, member (membro)
 
-### Invitation
-Pending request to join an account.
+### Invitation (Convite)
+Solicitação pendente para ingressar em uma conta.
 - **Schema**: `shared/schema.ts:378`
-- **States**: pending, accepted, cancelled
+- **Estados**: pending (pendente), accepted (aceito), cancelled (cancelado)
 
-## Billing & Usage
+## Faturamento e Uso
 
-### Invoice
-Billing document for an account.
+### Invoice (Fatura)
+Documento de cobrança para uma conta.
 - **Schema**: `shared/schema.ts:379`
 
-### UsageRecord
-Tracks resource consumption for billing.
+### UsageRecord (Registro de Uso)
+Rastreia o consumo de recursos para cobrança.
 - **Schema**: `shared/schema.ts:380`
 
-### QuotaRequest
-Request for increased storage/resource limits.
+### QuotaRequest (Solicitação de Quota)
+Solicitação para aumento de limites de armazenamento/recursos.
 - **Schema**: `shared/schema.ts:381`
-- **States**: pending, approved, rejected
+- **Estados**: pending (pendente), approved (aprovado), rejected (rejeitado)
 
-## Bucket Features
+## Funcionalidades de Bucket
 
-### LifecycleRule
-Automated data management policy for buckets.
+### LifecycleRule (Regra de Ciclo de Vida)
+Política automatizada de gerenciamento de dados para buckets.
 - **Schema**: `shared/schema.ts:357`
-- **Actions**: Transition, Expiration
+- **Ações**: Transição, Expiração
 
-### Versioning
-Bucket feature that maintains multiple versions of objects.
+### Versioning (Versionamento)
+Funcionalidade de bucket que mantém múltiplas versões de objetos.
 
-## System
+## Sistema
 
-### AuditLog
-Record of significant system actions for compliance and debugging.
+### AuditLog (Log de Auditoria)
+Registro de ações significativas do sistema para conformidade e depuração.
 - **Schema**: `shared/schema.ts:377`
-- **Tracks**: Action, User, Timestamp, Resource
+- **Rastreia**: Ação, Usuário, Timestamp, Recurso
 
-### Notification
-In-app message to users.
+### Notification (Notificação)
+Mensagem in-app para usuários.
 - **Schema**: `shared/schema.ts:376`
-- **States**: unread, read
+- **Estados**: unread (não lida), read (lida)
 
-### SftpCredential
-SFTP access credentials for bucket access.
+### SftpCredential (Credencial SFTP)
+Credenciais de acesso SFTP para acesso a buckets.
 - **Schema**: `shared/schema.ts:382`
 
-## Acronyms & Abbreviations
+## Acrônimos e Abreviações
 
-| Acronym | Expansion | Context |
-|---------|-----------|---------|
-| CPF | Cadastro de Pessoas Físicas | Brazilian individual tax ID |
-| CNPJ | Cadastro Nacional da Pessoa Jurídica | Brazilian company tax ID |
-| LGPD | Lei Geral de Proteção de Dados | Brazilian data protection law |
-| SFTP | SSH File Transfer Protocol | Secure file transfer |
-| OIDC | OpenID Connect | Authentication protocol |
-| RBAC | Role-Based Access Control | Authorization model |
+| Acrônimo | Expansão | Contexto |
+|----------|-----------|----------|
+| CPF | Cadastro de Pessoas Físicas | Identificação fiscal de pessoa física no Brasil |
+| CNPJ | Cadastro Nacional da Pessoa Jurídica | Identificação fiscal de empresa no Brasil |
+| LGPD | Lei Geral de Proteção de Dados | Lei brasileira de proteção de dados |
+| SFTP | SSH File Transfer Protocol | Transferência segura de arquivos |
+| OIDC | OpenID Connect | Protocolo de autenticação |
+| RBAC | Role-Based Access Control | Modelo de autorização |
 
-## Personas / Actors
+## Personas / Atores
 
-### End User
-- **Goal**: Manage cloud storage for their organization
-- **Workflows**: Create buckets, manage access keys, invite team members
-- **Pain Points**: Quota limits, access key management
+### Usuário Final
+- **Objetivo**: Gerenciar armazenamento em nuvem para sua organização
+- **Fluxos de Trabalho**: Criar buckets, gerenciar chaves de acesso, convidar membros da equipe
+- **Dores**: Limites de quota, gerenciamento de chaves de acesso
 
-### Account Administrator
-- **Goal**: Manage organization settings and team
-- **Workflows**: Invite members, assign roles, manage subscriptions
-- **Pain Points**: Member access control, billing management
+### Administrador da Conta
+- **Objetivo**: Gerenciar configurações da organização e equipe
+- **Fluxos de Trabalho**: Convidar membros, atribuir funções, gerenciar assinaturas
+- **Dores**: Controle de acesso de membros, gerenciamento de faturas
 
-### Platform Administrator
-- **Goal**: Manage the entire platform
-- **Workflows**: Approve accounts, adjust quotas, handle support
-- **Pain Points**: Scaling, abuse prevention
+### Administrador da Plataforma
+- **Objetivo**: Gerenciar toda a plataforma
+- **Fluxos de Trabalho**: Aprovar contas, ajustar quotas, lidar com suporte
+- **Dores**: Escalabilidade, prevenção de abuso
 
-## Domain Rules & Invariants
+## Regras de Domínio e Invariantes
 
-### Account Rules
-- Account must have at least one owner
-- Account status transitions: pending → approved → active/suspended
-- CNPJ must be valid Brazilian company number
+### Regras de Conta
+- Conta deve ter pelo menos um proprietário
+- Transições de status de conta: pending → approved → active/suspended
+- CNPJ deve ser um número de empresa brasileiro válido
 
-### Bucket Rules
-- Bucket names must be unique within an account
-- Lifecycle rules applied in order
-- Versioning cannot be disabled once enabled (only suspended)
+### Regras de Bucket
+- Nomes de bucket devem ser únicos dentro de uma conta
+- Regras de ciclo de vida aplicadas em ordem
+- Versionamento não pode ser desabilitado uma vez habilitado (apenas suspenso)
 
-### Access Key Rules
-- Maximum active keys per account (configurable)
-- Rotation preserves key ID but regenerates secret
-- Revoked keys cannot be reactivated
+### Regras de Chave de Acesso
+- Máximo de chaves ativas por conta (configurável)
+- Rotação preserva ID da chave mas regenera segredo
+- Chaves revogadas não podem ser reativadas
 
-### Brazilian Document Validation
-- CPF: 11 digits with check digits validation
-- CNPJ: 14 digits with check digits validation
-- Both support formatted and unformatted input
+### Validação de Documentos Brasileiros
+- CPF: 11 dígitos com validação de dígitos verificadores
+- CNPJ: 14 dígitos com validação de dígitos verificadores
+- Ambos suportam entrada formatada e não formatada
+```

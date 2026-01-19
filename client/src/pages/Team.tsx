@@ -23,7 +23,7 @@ export default function Team() {
   const { mutateAsync: removeMember } = useRemoveMember();
   const { mutate: updateRole } = useUpdateMemberRole();
   const { toast } = useToast();
-  
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<{ email: string; role: string }>({
     defaultValues: { email: "", role: "developer" }
@@ -35,32 +35,32 @@ export default function Team() {
       await createInvitation({ accountId: currentAccount.id, ...data });
       setIsDialogOpen(false);
       reset();
-      toast({ title: "Invitation sent", description: `An invitation has been sent to ${data.email}.` });
+      toast({ title: "Convite enviado", description: `Um convite foi enviado para ${data.email}.` });
     } catch (e: any) {
-      toast({ title: "Error", description: e.message || "Failed to send invitation.", variant: "destructive" });
+      toast({ title: "Erro", description: e.message || "Falha ao enviar convite.", variant: "destructive" });
     }
   };
 
   const onCancelInvitation = async (invitationId: number) => {
-    if (!currentAccount || !confirm("Are you sure you want to cancel this invitation?")) return;
+    if (!currentAccount || !confirm("Tem certeza que deseja cancelar este convite?")) return;
     try {
       await cancelInvitation({ accountId: currentAccount.id, invitationId });
-      toast({ title: "Invitation cancelled" });
+      toast({ title: "Convite cancelado" });
     } catch {
-      toast({ title: "Error", description: "Failed to cancel invitation.", variant: "destructive" });
+      toast({ title: "Erro", description: "Falha ao cancelar convite.", variant: "destructive" });
     }
   };
 
   const onRemove = async (memberId: number) => {
-    if (!currentAccount || !confirm("Are you sure you want to remove this member?")) return;
+    if (!currentAccount || !confirm("Tem certeza que deseja remover este membro?")) return;
     await removeMember({ accountId: currentAccount.id, memberId });
-    toast({ title: "Member removed" });
+    toast({ title: "Membro removido" });
   };
 
   const onChangeRole = (memberId: number, newRole: string) => {
     if (!currentAccount) return;
     updateRole({ accountId: currentAccount.id, memberId, role: newRole }, {
-      onSuccess: () => toast({ title: "Role updated" }),
+      onSuccess: () => toast({ title: "Função atualizada" }),
     });
   };
 
@@ -72,6 +72,15 @@ export default function Team() {
     }
   };
 
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'owner': return 'Proprietário';
+      case 'admin': return 'Administrador';
+      case 'developer': return 'Desenvolvedor';
+      default: return role;
+    }
+  };
+
   const pendingInvitations = invitations?.filter(inv => !inv.acceptedAt) || [];
 
   return (
@@ -80,49 +89,49 @@ export default function Team() {
       <main className="flex-1 ml-72 p-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold text-slate-900">Team Management</h1>
-            <p className="text-muted-foreground">Manage access to your organization.</p>
+            <h1 className="text-3xl font-display font-bold text-slate-900">Gestão de Equipe</h1>
+            <p className="text-muted-foreground">Gerencie o acesso à sua organização.</p>
           </div>
-          
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-invite-member">
-                <UserPlus className="mr-2 h-4 w-4" /> Invite Member
+                <UserPlus className="mr-2 h-4 w-4" /> Convidar Membro
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Invite Team Member</DialogTitle>
+                <DialogTitle>Convidar Membro da Equipe</DialogTitle>
                 <DialogDescription>
-                  Send an invitation to join your organization. They'll receive an email with a link to accept.
+                  Envie um convite para participar da sua organização. A pessoa receberá um e-mail com o link para aceitar.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit(onInviteMember)} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Email Address</label>
-                  <Input 
-                    {...register("email", { 
-                      required: "Email is required",
-                      pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Invalid email" }
-                    })} 
-                    placeholder="colleague@example.com"
+                  <label className="text-sm font-medium">Endereço de E-mail</label>
+                  <Input
+                    {...register("email", {
+                      required: "E-mail é obrigatório",
+                      pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "E-mail inválido" }
+                    })}
+                    placeholder="colega@empresa.com.br"
                     data-testid="input-invite-email"
                   />
                   {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Role</label>
+                  <label className="text-sm font-medium">Função</label>
                   <Controller
                     control={control}
                     name="role"
                     render={({ field }) => (
                       <Select value={field.value} onValueChange={field.onChange}>
                         <SelectTrigger data-testid="select-invite-role">
-                          <SelectValue placeholder="Select a role" />
+                          <SelectValue placeholder="Selecione uma função" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="developer">Developer</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="developer">Desenvolvedor</SelectItem>
+                          <SelectItem value="admin">Administrador</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
@@ -132,10 +141,10 @@ export default function Team() {
                   {isInviting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending...
+                      Enviando...
                     </>
                   ) : (
-                    "Send Invitation"
+                    "Enviar Convite"
                   )}
                 </Button>
               </form>
@@ -148,17 +157,17 @@ export default function Team() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Clock className="h-5 w-5 text-muted-foreground" />
-                Pending Invitations
+                Convites Pendentes
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b">
                   <tr>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Email</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Role</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Expires</th>
-                    <th className="text-right p-4 text-sm font-medium text-muted-foreground pr-6">Actions</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">E-mail</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Função</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Expira em</th>
+                    <th className="text-right p-4 text-sm font-medium text-muted-foreground pr-6">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -177,17 +186,17 @@ export default function Team() {
                       <td className="p-4">
                         <Badge variant="secondary" className="capitalize">
                           {getRoleIcon(invitation.role)}
-                          {invitation.role}
+                          {getRoleLabel(invitation.role)}
                         </Badge>
                       </td>
                       <td className="p-4 text-sm text-muted-foreground">
-                        {new Date(invitation.expiresAt).toLocaleDateString()}
+                        {new Date(invitation.expiresAt).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="p-4 text-right pr-6">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-muted-foreground hover:text-destructive" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive"
                           onClick={() => onCancelInvitation(invitation.id)}
                           data-testid={`button-cancel-invitation-${invitation.id}`}
                         >
@@ -204,7 +213,7 @@ export default function Team() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Team Members</CardTitle>
+            <CardTitle className="text-lg">Membros da Equipe</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
@@ -213,10 +222,10 @@ export default function Team() {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b">
                   <tr>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">User</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Role</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Joined</th>
-                    <th className="text-right p-4 text-sm font-medium text-muted-foreground pr-6">Actions</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Usuário</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Função</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Entrou em</th>
+                    <th className="text-right p-4 text-sm font-medium text-muted-foreground pr-6">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -225,10 +234,10 @@ export default function Team() {
                       <td className="p-4 pl-6">
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                             {member.user?.firstName?.[0] || member.user?.email?.[0] || "U"}
+                            {member.user?.firstName?.[0] || member.user?.email?.[0] || "U"}
                           </div>
                           <div>
-                            <div className="font-medium text-slate-900">{member.user?.firstName || "Unknown User"}</div>
+                            <div className="font-medium text-slate-900">{member.user?.firstName || "Usuário Desconhecido"}</div>
                             <div className="text-xs text-muted-foreground">{member.user?.email}</div>
                           </div>
                         </div>
@@ -237,7 +246,7 @@ export default function Team() {
                         {member.role === 'owner' ? (
                           <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100">
                             {getRoleIcon(member.role)}
-                            Owner
+                            Proprietário
                           </Badge>
                         ) : (
                           <Select
@@ -248,21 +257,21 @@ export default function Team() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="developer">Developer</SelectItem>
+                              <SelectItem value="admin">Administrador</SelectItem>
+                              <SelectItem value="developer">Desenvolvedor</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
                       </td>
                       <td className="p-4 text-sm text-muted-foreground">
-                        {new Date(member.joinedAt!).toLocaleDateString()}
+                        {new Date(member.joinedAt!).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="p-4 text-right pr-6">
                         {member.role !== 'owner' && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-muted-foreground hover:text-destructive" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive"
                             onClick={() => onRemove(member.id)}
                             data-testid={`button-remove-member-${member.id}`}
                           >

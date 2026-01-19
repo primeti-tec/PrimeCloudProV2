@@ -9,7 +9,12 @@
       "mcp__ai-context__getCodebaseMap",
       "mcp__ai-context__workflowStatus",
       "Bash(claude mcp add:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(node --loader tsx --test:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx vitest:*)"
     ]
   }
 }

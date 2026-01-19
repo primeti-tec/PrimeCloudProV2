@@ -1,7 +1,11 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import { clerkClient, clerkMiddleware, getAuth } from "@clerk/express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { authStorage } from "./replit_integrations/auth";
+import { startCronJobs } from "./cron/usage-collector";
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,6 +25,40 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+app.use(clerkMiddleware());
+
+app.use(async (req: any, _res, next) => {
+  const { userId } = getAuth(req);
+  if (!userId) {
+    return next();
+  }
+
+  try {
+    const existing = await authStorage.getUser(userId);
+    if (existing) {
+      req.currentUser = existing;
+      return next();
+    }
+
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const primaryEmail =
+      clerkUser.emailAddresses.find((email) => email.id === clerkUser.primaryEmailAddressId)
+        ?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress;
+
+    await authStorage.upsertUser({
+      id: clerkUser.id,
+      email: primaryEmail,
+      firstName: clerkUser.firstName ?? null,
+      lastName: clerkUser.lastName ?? null,
+      profileImageUrl: clerkUser.imageUrl ?? null,
+    });
+
+    req.currentUser = await authStorage.getUser(userId);
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -90,14 +128,10 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
+  httpServer.listen(port, "0.0.0.0", () => {
+    log(`serving on port ${port}`);
+
+    // Start background cron jobs
+    startCronJobs();
+  });
 })();

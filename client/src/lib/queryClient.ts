@@ -7,14 +7,26 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+async function getClerkToken(): Promise<string | null> {
+  const clerk = (window as any).Clerk;
+  if (!clerk?.session) {
+    return null;
+  }
+  return clerk.session.getToken();
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const token = await getClerkToken();
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...(data ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,7 +41,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const token = await getClerkToken();
     const res = await fetch(queryKey.join("/") as string, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
       credentials: "include",
     });
 

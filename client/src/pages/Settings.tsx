@@ -20,7 +20,7 @@ import { User, Building, Bell, Shield, Loader2 } from "lucide-react";
 import { validateDocument } from "@/lib/document-validation";
 
 const accountUpdateSchema = z.object({
-  name: z.string().min(2, "Organization name is required"),
+  name: z.string().min(2, "Nome da organização é obrigatório"),
   phone: z.string().optional(),
   document: z.string().optional(),
   documentType: z.enum(["cpf", "cnpj"]).optional(),
@@ -33,13 +33,13 @@ export default function Settings() {
   const { data: accounts, isLoading: accountsLoading } = useMyAccounts();
   const updateAccount = useUpdateAccount();
   const { toast } = useToast();
-  
+
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [emailDigest, setEmailDigest] = useState("daily");
-  
+
   const selectedAccount = accounts?.find(a => a.id === selectedAccountId);
-  
+
   useEffect(() => {
     if (accounts && accounts.length > 0 && !selectedAccountId) {
       setSelectedAccountId(accounts[0].id);
@@ -70,16 +70,16 @@ export default function Settings() {
   const documentValue = form.watch("document") || "";
   const documentType = form.watch("documentType") || "cnpj";
 
-  const documentValidation = documentValue 
+  const documentValidation = documentValue
     ? validateDocument(documentValue, documentType)
     : { valid: true };
 
   const onSubmit = async (data: AccountUpdateForm) => {
     if (!selectedAccountId) return;
-    
+
     if (data.document && !documentValidation.valid) {
       toast({
-        title: "Invalid Document",
+        title: "Documento Inválido",
         description: documentValidation.error,
         variant: "destructive",
       });
@@ -91,7 +91,7 @@ export default function Settings() {
       name: data.name,
       phone: data.phone,
     };
-    
+
     if (data.document && data.document.trim()) {
       payload.document = data.document;
       payload.documentType = data.documentType;
@@ -103,15 +103,24 @@ export default function Settings() {
         ...payload,
       });
       toast({
-        title: "Settings Saved",
-        description: "Your organization settings have been updated.",
+        title: "Configurações Salvas",
+        description: "As configurações da sua organização foram atualizadas.",
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update settings.",
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Falha ao atualizar configurações.",
         variant: "destructive",
       });
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'active': return 'Ativo';
+      case 'suspended': return 'Suspenso';
+      case 'pending': return 'Pendente';
+      default: return status;
     }
   };
 
@@ -132,8 +141,8 @@ export default function Settings() {
       <main className="flex-1 p-6 bg-background overflow-auto">
         <div className="max-w-4xl mx-auto space-y-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-            <p className="text-muted-foreground">Manage your profile and organization settings</p>
+            <h1 className="text-3xl font-bold text-foreground">Configurações</h1>
+            <p className="text-muted-foreground">Gerencie seu perfil e configurações da organização</p>
           </div>
 
           <div className="grid gap-6">
@@ -141,14 +150,14 @@ export default function Settings() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <User className="h-5 w-5 text-primary" />
-                  <CardTitle>Profile</CardTitle>
+                  <CardTitle>Perfil</CardTitle>
                 </div>
-                <CardDescription>Your personal account information from Replit</CardDescription>
+                <CardDescription>Informações da sua conta pessoal</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src={user?.profileImageUrl || ""} alt={user?.firstName || "User"} />
+                    <AvatarImage src={user?.profileImageUrl || ""} alt={user?.firstName || "Usuário"} />
                     <AvatarFallback className="bg-primary text-primary-foreground text-lg">
                       {user?.firstName?.charAt(0) || user?.email?.charAt(0) || "U"}
                     </AvatarFallback>
@@ -166,12 +175,12 @@ export default function Settings() {
                 <Separator />
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-muted-foreground text-xs">User ID</Label>
+                    <Label className="text-muted-foreground text-xs">ID do Usuário</Label>
                     <p className="text-sm font-mono" data-testid="text-user-id">{user?.id}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-xs">Auth Provider</Label>
-                    <p className="text-sm">Replit</p>
+                    <Label className="text-muted-foreground text-xs">Provedor de Autenticação</Label>
+                    <p className="text-sm">CloudStorage Pro</p>
                   </div>
                 </div>
               </CardContent>
@@ -183,15 +192,15 @@ export default function Settings() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Building className="h-5 w-5 text-primary" />
-                      <CardTitle>Organization Settings</CardTitle>
+                      <CardTitle>Configurações da Organização</CardTitle>
                     </div>
                     {accounts.length > 1 && (
-                      <Select 
-                        value={selectedAccountId?.toString()} 
+                      <Select
+                        value={selectedAccountId?.toString()}
                         onValueChange={(v) => setSelectedAccountId(parseInt(v))}
                       >
                         <SelectTrigger className="w-[200px]" data-testid="select-organization">
-                          <SelectValue placeholder="Select organization" />
+                          <SelectValue placeholder="Selecionar organização" />
                         </SelectTrigger>
                         <SelectContent>
                           {accounts.map((acc) => (
@@ -203,7 +212,7 @@ export default function Settings() {
                       </Select>
                     )}
                   </div>
-                  <CardDescription>Manage your organization details</CardDescription>
+                  <CardDescription>Gerencie os detalhes da sua organização</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Form {...form}>
@@ -213,11 +222,11 @@ export default function Settings() {
                         name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Organization Name</FormLabel>
+                            <FormLabel>Nome da Organização</FormLabel>
                             <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="My Company" 
+                              <Input
+                                {...field}
+                                placeholder="Minha Empresa"
                                 data-testid="input-org-name"
                               />
                             </FormControl>
@@ -225,39 +234,39 @@ export default function Settings() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="documentType"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Document Type</FormLabel>
+                              <FormLabel>Tipo de Documento</FormLabel>
                               <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                   <SelectTrigger data-testid="select-document-type">
-                                    <SelectValue placeholder="Select type" />
+                                    <SelectValue placeholder="Selecione o tipo" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="cpf">CPF (Individual)</SelectItem>
-                                  <SelectItem value="cnpj">CNPJ (Company)</SelectItem>
+                                  <SelectItem value="cpf">CPF (Pessoa Física)</SelectItem>
+                                  <SelectItem value="cnpj">CNPJ (Pessoa Jurídica)</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                        
+
                         <FormField
                           control={form.control}
                           name="document"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Document Number</FormLabel>
+                              <FormLabel>Número do Documento</FormLabel>
                               <FormControl>
-                                <Input 
-                                  {...field} 
+                                <Input
+                                  {...field}
                                   placeholder={documentType === "cpf" ? "000.000.000-00" : "00.000.000/0001-00"}
                                   data-testid="input-document"
                                 />
@@ -276,11 +285,11 @@ export default function Settings() {
                         name="phone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Phone Number</FormLabel>
+                            <FormLabel>Telefone</FormLabel>
                             <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="+55 11 99999-9999" 
+                              <Input
+                                {...field}
+                                placeholder="+55 11 99999-9999"
                                 data-testid="input-phone"
                               />
                             </FormControl>
@@ -291,18 +300,18 @@ export default function Settings() {
 
                       <div className="flex items-center gap-4 pt-2">
                         <div>
-                          <Label className="text-muted-foreground text-xs">Account Status</Label>
-                          <Badge 
+                          <Label className="text-muted-foreground text-xs">Status da Conta</Label>
+                          <Badge
                             className={
-                              selectedAccount?.status === "active" 
-                                ? "bg-green-500/10 text-green-600" 
+                              selectedAccount?.status === "active"
+                                ? "bg-green-500/10 text-green-600"
                                 : selectedAccount?.status === "suspended"
-                                ? "bg-red-500/10 text-red-600"
-                                : "bg-yellow-500/10 text-yellow-600"
+                                  ? "bg-red-500/10 text-red-600"
+                                  : "bg-yellow-500/10 text-yellow-600"
                             }
                             data-testid="badge-account-status"
                           >
-                            {selectedAccount?.status}
+                            {getStatusLabel(selectedAccount?.status || '')}
                           </Badge>
                         </div>
                         <div>
@@ -312,18 +321,18 @@ export default function Settings() {
                       </div>
 
                       <div className="flex justify-end pt-4">
-                        <Button 
-                          type="submit" 
+                        <Button
+                          type="submit"
                           disabled={updateAccount.isPending}
                           data-testid="button-save-settings"
                         >
                           {updateAccount.isPending ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Saving...
+                              Salvando...
                             </>
                           ) : (
-                            "Save Changes"
+                            "Salvar Alterações"
                           )}
                         </Button>
                       </div>
@@ -337,15 +346,15 @@ export default function Settings() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Bell className="h-5 w-5 text-primary" />
-                  <CardTitle>Notification Preferences</CardTitle>
+                  <CardTitle>Preferências de Notificação</CardTitle>
                 </div>
-                <CardDescription>Configure how you receive notifications</CardDescription>
+                <CardDescription>Configure como você recebe notificações</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="notifications">Email Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Receive important updates via email</p>
+                    <Label htmlFor="notifications">Notificações por E-mail</Label>
+                    <p className="text-sm text-muted-foreground">Receba atualizações importantes por e-mail</p>
                   </div>
                   <Switch
                     id="notifications"
@@ -356,20 +365,20 @@ export default function Settings() {
                 </div>
                 <Separator />
                 <div className="space-y-2">
-                  <Label>Email Digest Frequency</Label>
+                  <Label>Frequência do Resumo por E-mail</Label>
                   <Select value={emailDigest} onValueChange={setEmailDigest} disabled={!notificationsEnabled}>
                     <SelectTrigger data-testid="select-email-digest">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="realtime">Real-time</SelectItem>
-                      <SelectItem value="daily">Daily Summary</SelectItem>
-                      <SelectItem value="weekly">Weekly Summary</SelectItem>
-                      <SelectItem value="never">Never</SelectItem>
+                      <SelectItem value="realtime">Em tempo real</SelectItem>
+                      <SelectItem value="daily">Resumo diário</SelectItem>
+                      <SelectItem value="weekly">Resumo semanal</SelectItem>
+                      <SelectItem value="never">Nunca</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Note: Email preferences are saved locally for this MVP.
+                    Nota: As preferências de e-mail são salvas localmente para este MVP.
                   </p>
                 </div>
               </CardContent>
@@ -379,25 +388,19 @@ export default function Settings() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5 text-primary" />
-                  <CardTitle>Security</CardTitle>
+                  <CardTitle>Segurança</CardTitle>
                 </div>
-                <CardDescription>Authentication is managed through Replit</CardDescription>
+                <CardDescription>A autenticação é gerenciada através do seu provedor</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between p-4 rounded-md bg-muted/50">
                   <div>
-                    <p className="font-medium">Two-Factor Authentication</p>
-                    <p className="text-sm text-muted-foreground">Managed by your Replit account settings</p>
+                    <p className="font-medium">Autenticação de Dois Fatores</p>
+                    <p className="text-sm text-muted-foreground">Configure nas configurações da sua conta</p>
                   </div>
-                  <a 
-                    href="https://replit.com/account" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                  >
-                    <Button variant="outline" data-testid="button-manage-security">
-                      Manage on Replit
-                    </Button>
-                  </a>
+                  <Button variant="outline" data-testid="button-manage-security">
+                    Gerenciar Segurança
+                  </Button>
                 </div>
               </CardContent>
             </Card>

@@ -36,11 +36,8 @@ export function useRejectAccount() {
   return useMutation({
     mutationFn: async ({ id, reason }: { id: number; reason?: string }) => {
       const url = buildUrl(api.admin.rejectAccount.path, { id });
-      const res = await apiRequest(url, {
-        method: api.admin.rejectAccount.method,
-        body: JSON.stringify({ reason }),
-      });
-      return res;
+      const res = await apiRequest(api.admin.rejectAccount.method, url, { reason });
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });
@@ -53,11 +50,8 @@ export function useSuspendAccount() {
   return useMutation({
     mutationFn: async ({ id, reason }: { id: number; reason?: string }) => {
       const url = buildUrl(api.admin.suspendAccount.path, { id });
-      const res = await apiRequest(url, {
-        method: api.admin.suspendAccount.method,
-        body: JSON.stringify({ reason }),
-      });
-      return res;
+      const res = await apiRequest(api.admin.suspendAccount.method, url, { reason });
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });
@@ -70,10 +64,8 @@ export function useReactivateAccount() {
   return useMutation({
     mutationFn: async (id: number) => {
       const url = buildUrl(api.admin.reactivateAccount.path, { id });
-      const res = await apiRequest(url, {
-        method: api.admin.reactivateAccount.method,
-      });
-      return res;
+      const res = await apiRequest(api.admin.reactivateAccount.method, url);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });
@@ -86,11 +78,8 @@ export function useAdjustQuota() {
   return useMutation({
     mutationFn: async ({ id, quotaGB, reason }: { id: number; quotaGB: number; reason: string }) => {
       const url = buildUrl(api.admin.adjustQuota.path, { id });
-      const res = await apiRequest(url, {
-        method: api.admin.adjustQuota.method,
-        body: JSON.stringify({ quotaGB, reason }),
-      });
-      return res;
+      const res = await apiRequest(api.admin.adjustQuota.method, url, { quotaGB, reason });
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });

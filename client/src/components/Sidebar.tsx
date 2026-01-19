@@ -1,25 +1,26 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, FileText, HardDrive, ShoppingCart } from "lucide-react";
+import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, FileText, HardDrive, ShoppingCart, Save } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "./ui-custom";
 
 export function Sidebar() {
   const [location] = useLocation();
-  const { user } = useAuth();
-  
+  const { user, logout, isLoggingOut } = useAuth();
+
   // For demo purposes, assume email containing "admin" is super admin
   const isSuperAdmin = user?.email?.includes("admin");
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Storage", href: "/dashboard/storage", icon: Database },
-    { name: "SFTP Access", href: "/dashboard/sftp", icon: HardDrive },
-    { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
-    { name: "Team", href: "/dashboard/team", icon: Users },
-    { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
-    { name: "API Keys", href: "/dashboard/api-keys", icon: Key },
-    { name: "Activity", href: "/dashboard/audit-logs", icon: FileText },
-    { name: "Settings", href: "/dashboard/settings", icon: Settings },
+    { name: "Armazenamento", href: "/dashboard/storage", icon: Database },
+    { name: "Acesso SFTP", href: "/dashboard/sftp", icon: HardDrive },
+    { name: "Backup", href: "/dashboard/backup", icon: Save },
+    { name: "Pedidos", href: "/dashboard/orders", icon: ShoppingCart },
+    { name: "Equipe", href: "/dashboard/team", icon: Users },
+    { name: "Faturamento", href: "/dashboard/billing", icon: CreditCard },
+    { name: "Chaves de API", href: "/dashboard/api-keys", icon: Key },
+    { name: "Atividade", href: "/dashboard/audit-logs", icon: FileText },
+    { name: "Configurações", href: "/dashboard/settings", icon: Settings },
   ];
 
   if (isSuperAdmin) {
@@ -46,16 +47,14 @@ export function Sidebar() {
           return (
             <Link key={item.name} href={item.href}>
               <div
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer group ${
-                  isActive
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                }`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer group ${isActive
+                  ? "bg-primary/10 text-primary font-semibold"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
               >
                 <item.icon
-                  className={`h-5 w-5 transition-colors ${
-                    isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                  }`}
+                  className={`h-5 w-5 transition-colors ${isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                    }`}
                 />
                 {item.name}
               </div>
@@ -67,23 +66,28 @@ export function Sidebar() {
       <div className="p-4 border-t border-border/50 bg-accent/30">
         <div className="flex items-center gap-3 mb-4 px-2">
           {user?.profileImageUrl ? (
-            <img src={user.profileImageUrl} alt="Profile" className="h-10 w-10 rounded-full border-2 border-white shadow-sm" />
+            <img src={user.profileImageUrl} alt="Perfil" className="h-10 w-10 rounded-full border-2 border-white shadow-sm" />
           ) : (
             <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
               {user?.firstName?.[0] || user?.email?.[0] || "U"}
             </div>
           )}
           <div className="flex flex-col overflow-hidden">
-            <span className="text-sm font-semibold truncate">{user?.firstName || "User"}</span>
+            <span className="text-sm font-semibold truncate">{user?.firstName || "Usuário"}</span>
             <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
           </div>
         </div>
-        <a href="/api/logout">
-          <Button variant="outline" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/20" size="sm">
-            Log out
-          </Button>
-        </a>
+        <Button
+          variant="outline"
+          className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/20"
+          size="sm"
+          onClick={logout}
+          disabled={isLoggingOut}
+        >
+          Sair
+        </Button>
       </div>
     </div>
   );
 }
+
