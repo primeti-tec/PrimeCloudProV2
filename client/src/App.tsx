@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrandingProvider } from "@/components/branding-provider";
-import LandingPage from "@/pages/LandingPage";
+import LandingPage from "@/pages/LandingPage"; // Mantendo import caso queira reverter futuramente, mas não usando na rota
 import Dashboard from "@/pages/Dashboard";
 import CreateAccount from "@/pages/CreateAccount";
 import Storage from "@/pages/Storage";
@@ -44,10 +44,17 @@ function PrivateRoute({ component: Component, adminOnly = false }: { component: 
   return <Component />;
 }
 
+function HomeRedirect() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <div className="h-screen w-full flex items-center justify-center bg-background"><Loader2 className="animate-spin text-primary h-8 w-8" /></div>;
+  if (user) return <Redirect to="/dashboard" />;
+  return <Redirect to="/sign-in" />;
+}
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={LandingPage} />
+      <Route path="/" component={HomeRedirect} />
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/sign-in/*" component={SignInPage} />
       <Route path="/sign-up" component={SignUpPage} />
