@@ -18,9 +18,22 @@ export function useBuckets(accountId: number | undefined) {
 
 export function useCreateBucket(accountId: number | undefined) {
   return useMutation({
-    mutationFn: async (data: { name: string; region?: string; isPublic?: boolean }) => {
+    mutationFn: async (data: { name: string; region?: string; isPublic?: boolean; storageLimitGB?: number }) => {
       if (!accountId) throw new Error('No account');
       const res = await apiRequest('POST', buildUrl(api.buckets.create.path, { accountId }), data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets'] });
+    },
+  });
+}
+
+export function useUpdateBucketLimit(accountId: number | undefined) {
+  return useMutation({
+    mutationFn: async ({ bucketId, limit }: { bucketId: number; limit: number }) => {
+      if (!accountId) throw new Error('No account');
+      const res = await apiRequest('PATCH', buildUrl(api.buckets.updateLimit.path, { accountId, bucketId }), { limit });
       return res.json();
     },
     onSuccess: () => {

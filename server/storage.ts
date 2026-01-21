@@ -291,6 +291,14 @@ export class DatabaseStorage implements IStorage {
     return bucket;
   }
 
+  async updateBucketLimit(id: number, limit: number): Promise<Bucket> {
+    const [bucket] = await db.update(buckets)
+      .set({ storageLimitGB: limit })
+      .where(eq(buckets.id, id))
+      .returning();
+    return bucket;
+  }
+
   async getBucketLifecycle(id: number): Promise<any[]> {
     const bucket = await this.getBucket(id);
     return (bucket?.lifecycleRules as any[]) || [];
@@ -562,7 +570,8 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
-      return mockInvoices;
+      // REMOVED MOCK GENERATION FOR INVOICES - RETURN EMPTY IF NO REAL INVOICES
+      return existingInvoices || [];
     }
 
     return existingInvoices;
@@ -574,22 +583,19 @@ export class DatabaseStorage implements IStorage {
     bandwidthUsedGB: number;
     apiRequestsCount: number;
     projectedCost: number;
+    buckets: { name: string; sizeBytes: number; storageLimitGB: number }[];
   }> {
     const account = await this.getAccount(accountId);
     const subscription = await this.getSubscription(accountId);
 
-    let storageUsedGB = Math.round((account?.storageUsed || 0) / (1024 * 1024 * 1024) * 100) / 100;
+    // Get real storage usage from buckets
+    const bucketList = await this.getBuckets(accountId);
+    const totalSizeBytes = bucketList.reduce((sum, b) => sum + Number(b.sizeBytes || 0), 0);
+
+    let storageUsedGB = Math.round(totalSizeBytes / (1024 * 1024 * 1024) * 100) / 100;
     let bandwidthUsedGB = Math.round((account?.bandwidthUsed || 0) / (1024 * 1024 * 1024) * 100) / 100;
 
-    const bucketList = await this.getBuckets(accountId);
     let apiRequestsCount = bucketList.reduce((sum, b) => sum + (b.objectCount || 0), 0) * 10;
-
-    // Generate realistic mock data if no actual usage
-    if (storageUsedGB === 0 && bandwidthUsedGB === 0) {
-      storageUsedGB = 24.7;
-      bandwidthUsedGB = 156.3;
-      apiRequestsCount = 45230;
-    }
 
     const baseCost = subscription?.product?.price || 2900;
     const storageCost = Math.max(0, storageUsedGB - (subscription?.product?.storageLimit || 100)) * 2;
@@ -600,6 +606,11 @@ export class DatabaseStorage implements IStorage {
       bandwidthUsedGB,
       apiRequestsCount,
       projectedCost,
+      buckets: bucketList.map(b => ({
+        name: b.name,
+        sizeBytes: Number(b.sizeBytes || 0),
+        storageLimitGB: b.storageLimitGB || 50
+      }))
     };
   }
 

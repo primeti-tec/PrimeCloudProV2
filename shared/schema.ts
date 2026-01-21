@@ -64,6 +64,7 @@ export const buckets = pgTable("buckets", {
   isPublic: boolean("is_public").default(false),
   objectCount: integer("object_count").default(0),
   sizeBytes: bigint("size_bytes", { mode: "number" }).default(0),
+  storageLimitGB: integer("storage_limit_gb").default(50), // Individual bucket limit
   versioningEnabled: boolean("versioning_enabled").default(false),
   lifecycleRules: jsonb("lifecycle_rules").default([]),
   createdAt: timestamp("created_at").defaultNow(),

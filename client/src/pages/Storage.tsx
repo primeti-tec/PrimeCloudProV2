@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { useMyAccounts } from "@/hooks/use-accounts";
-import { useBuckets, useCreateBucket, useDeleteBucket, useUpdateBucketVersioning, useBucketLifecycle, useAddLifecycleRule, useDeleteLifecycleRule } from "@/hooks/use-buckets";
+import { useBuckets, useCreateBucket, useDeleteBucket, useUpdateBucketVersioning, useBucketLifecycle, useAddLifecycleRule, useDeleteLifecycleRule, useUpdateBucketLimit } from "@/hooks/use-buckets";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input, Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui-custom";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Database, Plus, Trash2, Globe, Lock, MapPin, Copy, Clock, Settings2 } from "lucide-react";
+import { Loader2, Database, Plus, Trash2, Globe, Lock, MapPin, Copy, Clock, Settings2, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Bucket, LifecycleRule } from "@shared/schema";
 
@@ -271,6 +271,67 @@ function DeleteConfirmDialog({
   );
 }
 
+function UpdateBucketLimitDialog({ bucket, accountId }: { bucket: Bucket; accountId: number }) {
+  const { mutate: updateLimit, isPending } = useUpdateBucketLimit(accountId);
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [limit, setLimit] = useState(bucket.storageLimitGB || 50);
+
+  const handleUpdate = () => {
+    updateLimit(
+      { bucketId: bucket.id, limit },
+      {
+        onSuccess: () => {
+          toast({ title: "Limite atualizado", description: `O limite do bucket ${bucket.name} foi alterado para ${limit} GB.` });
+          setOpen(false);
+        },
+        onError: () => {
+          toast({ title: "Erro", description: "Falha ao atualizar o limite.", variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="icon" variant="ghost" title="Editar Limite">
+          <Edit2 className="h-4 w-4 text-slate-500" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Editar Limite de Armazenamento</DialogTitle>
+          <DialogDescription>
+            Defina o limite máximo de armazenamento em GB para este bucket.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <label htmlFor="limit" className="text-right text-sm font-medium">
+              Limite (GB)
+            </label>
+            <Input
+              id="limit"
+              type="number"
+              value={limit}
+              onChange={(e) => setLimit(parseInt(e.target.value) || 0)}
+              className="col-span-3"
+              min={1}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={handleUpdate} disabled={isPending}>
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar Alterações
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Storage() {
   const { data: accounts } = useMyAccounts();
   const currentAccount = accounts?.[0];
@@ -284,15 +345,17 @@ export default function Storage() {
   const [bucketName, setBucketName] = useState("");
   const [region, setRegion] = useState("sa-east-1");
   const [isPublic, setIsPublic] = useState(false);
+  const [limit, setLimit] = useState(50);
 
   const handleCreate = () => {
     if (!bucketName.trim()) return;
     createBucket(
-      { name: bucketName, region, isPublic },
+      { name: bucketName, region, isPublic, storageLimitGB: limit },
       {
         onSuccess: () => {
           toast({ title: "Bucket criado!", description: `${bucketName} está disponível.` });
           setBucketName("");
+          setLimit(50);
           setDialogOpen(false);
         },
         onError: () => {
@@ -391,6 +454,19 @@ export default function Storage() {
                     ))}
                   </select>
                 </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Limite de Armazenamento (GB)</label>
+                  <Input
+                    type="number"
+                    value={limit}
+                    onChange={(e) => setLimit(parseInt(e.target.value) || 1)}
+                    min={1}
+                    className="mt-1"
+                    data-testid="input-bucket-limit"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Limite máximo de armazenamento para este bucket.</p>
+                </div>
                 <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -436,6 +512,7 @@ export default function Storage() {
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Região</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Objetos</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Tamanho</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Limite (GB)</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Acesso</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Versionamento</th>
                       <th className="text-right p-4 pr-6 text-sm font-medium text-muted-foreground">Ações</th>
@@ -458,6 +535,12 @@ export default function Storage() {
                         </td>
                         <td className="p-4 text-sm text-slate-600">{bucket.objectCount ?? 0} objetos</td>
                         <td className="p-4 text-sm text-slate-600">{formatBytes(bucket.sizeBytes ?? 0)}</td>
+                        <td className="p-4 text-sm text-slate-600">
+                          <div className="flex items-center gap-2">
+                            {bucket.storageLimitGB || 50} GB
+                            {currentAccount && <UpdateBucketLimitDialog bucket={bucket} accountId={currentAccount.id} />}
+                          </div>
+                        </td>
                         <td className="p-4">
                           {bucket.isPublic ? (
                             <Badge variant="secondary" className="bg-blue-100 text-blue-700">
@@ -509,7 +592,7 @@ export default function Storage() {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+      </main >
+    </div >
   );
 }

@@ -194,10 +194,19 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/accounts/:accountId/buckets',
-      input: insertBucketSchema.pick({ name: true, region: true, isPublic: true }),
+      input: insertBucketSchema.pick({ name: true, region: true, isPublic: true, storageLimitGB: true }),
       responses: {
         201: z.custom<typeof buckets.$inferSelect>(),
         400: errorSchemas.validation,
+        403: errorSchemas.forbidden,
+      },
+    },
+    updateLimit: {
+      method: 'PATCH' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/limit',
+      input: z.object({ limit: z.number().min(1) }),
+      responses: {
+        200: z.custom<typeof buckets.$inferSelect>(),
         403: errorSchemas.forbidden,
       },
     },
@@ -278,6 +287,11 @@ export const api = {
           bandwidthUsedGB: z.number(),
           apiRequestsCount: z.number(),
           projectedCost: z.number(),
+          buckets: z.array(z.object({
+            name: z.string(),
+            sizeBytes: z.number(),
+            storageLimitGB: z.number(),
+          })),
         }),
         403: errorSchemas.forbidden,
       },

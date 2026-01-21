@@ -103,6 +103,22 @@ export async function registerRoutes(
     res.json({ ...account, subscription });
   });
 
+  // Get Account Usage Summary
+  app.get("/api/accounts/:id/usage", requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.id);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    try {
+      const summary = await storage.getUsageSummary(accountId);
+      res.json(summary);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching usage summary" });
+    }
+  });
+
   // Update Account
   app.patch(api.accounts.update.path, requireAuth(), async (req: any, res) => {
     const { userId } = getAuth(req);
@@ -511,10 +527,11 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Forbidden: Admin access required" });
     }
     try {
+      const { userId } = getAuth(req);
       const input = api.admin.createProduct.input.parse(req.body);
       const product = await storage.createProduct(input);
       await storage.createAuditLog({
-        userId: req.user.claims.sub,
+        userId: userId!,
         action: 'PRODUCT_CREATED',
         resource: 'product',
         details: { productId: product.id, productName: product.name },
@@ -533,21 +550,57 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Forbidden: Admin access required" });
     }
     try {
+      const { userId } = getAuth(req);
       const productId = parseInt(req.params.id);
+
+      console.log(`[Admin] Gerenciamento de Produtos - Iniciando PATCH /api/admin/products/${productId}`);
+      console.log(`[Admin] Usuário ID: ${userId}`);
+      console.log(`[Admin] Corpo da Requisição:`, JSON.stringify(req.body));
+
       const input = api.admin.updateProduct.input.parse(req.body);
-      const product = await storage.updateProduct(productId, input);
-      await storage.createAuditLog({
-        userId: req.user.claims.sub,
-        action: 'PRODUCT_UPDATED',
-        resource: 'product',
-        details: { productId: product.id, productName: product.name, changes: input },
-      });
+
+      // Remove o campo id para evitar erro de chave primária no Drizzle
+      const { id, ...updateData } = input as any;
+
+      if (Object.keys(updateData).length === 0) {
+        console.log(`[Admin] Nada para atualizar.`);
+        const product = await storage.getProduct(productId);
+        return res.json(product);
+      }
+
+      const product = await storage.updateProduct(productId, updateData);
+
+      if (!product) {
+        console.warn(`[Admin] Produto ${productId} não encontrado.`);
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      console.log(`[Admin] Produto atualizado com sucesso: ${product.name}`);
+
+      // Log de auditoria (não-crítico)
+      try {
+        await storage.createAuditLog({
+          userId: userId || 'unknown',
+          action: 'PRODUCT_UPDATED',
+          resource: 'product',
+          details: { productId: product.id, productName: product.name, changes: updateData },
+        });
+      } catch (auditErr) {
+        console.error(`[Admin] Erro no log de auditoria:`, auditErr);
+      }
+
       res.json(product);
-    } catch (err) {
+    } catch (err: any) {
+      console.error("[Admin] ERRO FATAL no PATCH de produto:", err);
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      res.status(500).json({ message: "Internal Server Error" });
+      // Retorna o erro real para ajudar no diagnóstico
+      res.status(500).json({
+        message: "Internal Server Error",
+        detail: err.message,
+        error: String(err)
+      });
     }
   });
 
@@ -555,11 +608,12 @@ export async function registerRoutes(
     if (!isSuperAdmin(req.currentUser?.email)) {
       return res.status(403).json({ message: "Forbidden: Admin access required" });
     }
+    const { userId } = getAuth(req);
     const productId = parseInt(req.params.id);
     const product = await storage.getProduct(productId);
     await storage.deleteProduct(productId);
     await storage.createAuditLog({
-      userId: req.user.claims.sub,
+      userId: userId!,
       action: 'PRODUCT_DELETED',
       resource: 'product',
       details: { productId, productName: product?.name },
@@ -613,15 +667,30 @@ export async function registerRoutes(
   app.post(api.buckets.create.path, requireAuth(), async (req: any, res) => {
     const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
-    const { name, region, isPublic } = req.body;
+    const { name, region, isPublic, storageLimitGB } = req.body;
 
     const membership = await storage.getMembership(userId, accountId);
     if (!membership || !['owner', 'admin'].includes(membership.role)) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    const bucket = await storage.createBucket({ accountId, name, region, isPublic });
+    const bucket = await storage.createBucket({ accountId, name, region, isPublic, storageLimitGB });
     res.status(201).json(bucket);
+  });
+
+  app.patch(api.buckets.updateLimit.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const { limit } = req.body;
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const bucket = await storage.updateBucketLimit(bucketId, limit);
+    res.json(bucket);
   });
 
   app.delete(api.buckets.delete.path, requireAuth(), async (req: any, res) => {

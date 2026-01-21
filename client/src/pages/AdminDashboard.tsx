@@ -799,7 +799,7 @@ export default function AdminDashboard() {
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Documento</th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Telefone</th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Quota</th>
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Uso / Quota</th>
                     <th className="text-left p-4 text-sm font-medium text-muted-foreground">Criado em</th>
                   </tr>
                 </thead>
@@ -836,7 +836,26 @@ export default function AdminDashboard() {
                         )}
                       </td>
                       <td className="p-4 text-sm">
-                        <span className="font-medium">{account.storageQuotaGB || 100} GB</span>
+                        {(() => {
+                          const usedGB = ((account.storageUsed || 0) / (1024 * 1024 * 1024));
+                          const quotaGB = account.storageQuotaGB || 100;
+                          const percentage = Math.min(100, (usedGB / quotaGB) * 100);
+                          const isWarning = percentage >= 80;
+                          const isCritical = percentage >= 95;
+                          return (
+                            <div className="flex flex-col gap-1">
+                              <span className={`font-medium ${isCritical ? 'text-red-600' : isWarning ? 'text-yellow-600' : ''}`}>
+                                {usedGB.toFixed(2)} / {quotaGB} GB
+                              </span>
+                              <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${isCritical ? 'bg-red-500' : isWarning ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="p-4 text-sm text-muted-foreground">
                         {account.createdAt ? new Date(account.createdAt).toLocaleDateString('pt-BR') : 'N/A'}

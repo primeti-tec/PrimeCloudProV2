@@ -1,17 +1,19 @@
 import { Sidebar } from "@/components/Sidebar";
 import { useProducts } from "@/hooks/use-products";
-import { useMyAccounts } from "@/hooks/use-accounts";
+import { useMyAccounts, useAccount } from "@/hooks/use-accounts";
 import { useSubscribe } from "@/hooks/use-subscriptions";
 import { useQuotaRequests, useCreateQuotaRequest } from "@/hooks/use-quota-requests";
 import { useInvoices, useUsageSummary } from "@/hooks/use-billing";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui-custom";
-import { Check, Loader2, CreditCard, Download, FileText, HardDrive, Wifi, Activity, DollarSign, ArrowUp, ArrowDown, FileUp, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Check, Loader2, CreditCard, Download, FileText, HardDrive, Wifi, Activity, DollarSign, ArrowUp, FileUp, Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Invoice {
   id: number;
@@ -93,10 +95,16 @@ function getStatusLabel(status: string): string {
 export default function Billing() {
   const { data: products, isLoading: productsLoading } = useProducts();
   const { data: accounts } = useMyAccounts();
+
+  const currentAccountId = accounts?.[0]?.id;
+  const { data: fullAccount } = useAccount(currentAccountId);
+
+  // FIX: Removed fallback to products[0] to prevent showing incorrect plan
+  const currentProduct = products?.find(p => p.id === fullAccount?.subscription?.productId) || null;
+
   const { mutateAsync: subscribe, isPending: isSubscribing } = useSubscribe();
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState<'upgrade' | 'downgrade'>('upgrade');
   const { toast } = useToast();
 
   const currentAccount = accounts?.[0];
@@ -116,7 +124,32 @@ export default function Billing() {
     bandwidthUsedGB: 0,
     apiRequestsCount: 0,
     projectedCost: 0,
+    buckets: [],
   };
+
+  const currentQuota = currentProduct?.storageLimit || currentAccount?.storageQuotaGB || 100;
+  const usagePercent = Math.min((usageData.storageUsedGB / currentQuota) * 100, 100);
+  const isOverLimit = usageData.storageUsedGB > currentQuota;
+  const isCritical = usageData.storageUsedGB >= currentQuota * 0.95;
+  const isWarning = usageData.storageUsedGB >= currentQuota * 0.80;
+
+  let progressColor = "bg-primary";
+  let textColor = "text-slate-900 dark:text-slate-100";
+  let statusBadge = null;
+
+  if (isOverLimit) {
+    progressColor = "[&>div]:bg-destructive";
+    textColor = "text-destructive";
+    statusBadge = <Badge variant="destructive" className="animate-pulse">Quota Excedida</Badge>;
+  } else if (isCritical) {
+    progressColor = "[&>div]:bg-destructive";
+    textColor = "text-destructive";
+    statusBadge = <Badge variant="destructive">Crítico</Badge>;
+  } else if (isWarning) {
+    progressColor = "[&>div]:bg-amber-500";
+    textColor = "text-amber-600 dark:text-amber-500";
+    statusBadge = <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100">Atenção</Badge>;
+  }
 
   const handleSubscribe = async (productId: number) => {
     if (!currentAccount) return;
@@ -133,8 +166,7 @@ export default function Billing() {
     }
   };
 
-  const openPlanDialog = (mode: 'upgrade' | 'downgrade') => {
-    setDialogMode(mode);
+  const openPlanDialog = () => {
     setPlanDialogOpen(true);
   };
 
@@ -228,11 +260,85 @@ export default function Billing() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-4 mb-6">
-              <div className="text-3xl font-bold text-slate-900 dark:text-slate-100" data-testid="text-current-quota">
-                {currentAccount?.storageQuotaGB || 100} GB
+            <div className="flex flex-col gap-6 mb-6">
+              {/* Overall Usage Section */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`text-3xl font-bold ${textColor}`} data-testid="text-current-quota">
+                      {usageData.storageUsedGB} GB
+                    </div>
+                    <span className="text-muted-foreground">de {currentQuota} GB usados</span>
+                  </div>
+                  {statusBadge}
+                </div>
+
+                <Progress value={usagePercent} className={`h-3 ${progressColor}`} />
+
+                {isOverLimit && (
+                  <Alert variant="destructive" className="mt-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Atenção</AlertTitle>
+                    <AlertDescription>
+                      Você excedeu sua quota de armazenamento. Por favor, faça um upgrade no seu plano ou solicite um aumento de quota para evitar interrupções.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
-              <span className="text-muted-foreground">Quota Atual</span>
+
+              {/* Individual Client Limits Breakdown */}
+              {usageData.buckets && usageData.buckets.length > 0 && (
+                <div className="mt-4 pt-6 border-t">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <HardDrive className="h-4 w-4 text-primary" />
+                    Detalhamento por Cliente (Bucket)
+                  </h3>
+                  <div className="space-y-6">
+                    {usageData.buckets.map((bucket: any, index: number) => {
+                      // Calculate bucket specific metrics
+                      const bucketLimit = bucket.storageLimitGB || 50;
+                      // Convert sizeBytes to GB for display/calc
+                      const bucketSizeGB = Math.round(bucket.sizeBytes / (1024 * 1024 * 1024) * 100) / 100;
+                      const bucketPercent = Math.min((bucketSizeGB / bucketLimit) * 100, 100);
+
+                      const isBucketCritical = bucketSizeGB >= bucketLimit * 0.95;
+                      const isBucketWarning = bucketSizeGB >= bucketLimit * 0.80;
+                      const isBucketOverLimit = bucketSizeGB > bucketLimit;
+
+                      let bucketProgressColor = "bg-primary";
+                      let bucketTextColor = "text-slate-700 dark:text-slate-300";
+
+                      if (isBucketOverLimit || isBucketCritical) {
+                        bucketProgressColor = "[&>div]:bg-destructive";
+                        bucketTextColor = "text-destructive font-bold";
+                      } else if (isBucketWarning) {
+                        bucketProgressColor = "[&>div]:bg-amber-500";
+                        bucketTextColor = "text-amber-600 dark:text-amber-500 font-bold";
+                      }
+
+                      return (
+                        <div key={index} className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium text-slate-900 dark:text-slate-100">{bucket.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className={bucketTextColor}>
+                                {bucketSizeGB} GB
+                              </span>
+                              <span className="text-muted-foreground">
+                                / {bucketLimit} GB
+                              </span>
+                              {isBucketOverLimit && <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">Excedido</Badge>}
+                              {!isBucketOverLimit && isBucketCritical && <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">Crítico</Badge>}
+                              {!isBucketOverLimit && !isBucketCritical && isBucketWarning && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-amber-100 text-amber-800">Atenção</Badge>}
+                            </div>
+                          </div>
+                          <Progress value={bucketPercent} className={`h-2 ${bucketProgressColor}`} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {quotaRequests && quotaRequests.length > 0 && (
@@ -333,56 +439,71 @@ export default function Billing() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <h2 className="text-xl font-bold font-display">Plano Atual</h2>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => openPlanDialog('downgrade')} data-testid="button-downgrade-plan">
-              <ArrowDown className="h-4 w-4 mr-2" />
-              Fazer Downgrade
-            </Button>
-            <Button variant="primary" onClick={() => openPlanDialog('upgrade')} data-testid="button-upgrade-plan">
+            <Button variant="primary" onClick={() => openPlanDialog()} data-testid="button-upgrade-plan">
               <ArrowUp className="h-4 w-4 mr-2" />
-              Fazer Upgrade
+              Alterar Plano
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          {productsLoading ? <Loader2 className="animate-spin" /> : products?.map((product) => (
-            <Card key={product.id} className={`relative flex flex-col ${product.price > 0 && product.price < 15000 ? "border-primary shadow-lg ring-1 ring-primary/20" : ""}`} data-testid={`card-plan-${product.id}`}>
-              {product.price > 0 && product.price < 15000 && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                  Recomendado
+        <div className="mb-10">
+          {productsLoading ? (
+            <Loader2 className="animate-spin" />
+          ) : currentProduct ? (
+            <Card className="border-primary shadow-lg ring-1 ring-primary/20 overflow-hidden">
+              <div className="flex flex-col md:flex-row">
+                <div className="p-6 flex-1 bg-gradient-to-br from-primary/5 to-transparent">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="default" className="bg-primary/90 hover:bg-primary">Ativo</Badge>
+                        {currentProduct.price > 0 && currentProduct.price < 15000 && (
+                          <Badge variant="outline" className="border-primary text-primary">Recomendado</Badge>
+                        )}
+                      </div>
+                      <CardTitle className="text-2xl mb-2">{currentProduct.name}</CardTitle>
+                      <p className="text-muted-foreground">{currentProduct.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold">R$ {(currentProduct.price / 100).toFixed(0)}</div>
+                      <span className="text-xs text-muted-foreground">/mês</span>
+                    </div>
+                  </div>
                 </div>
-              )}
-              <CardHeader>
-                <CardTitle>{product.name}</CardTitle>
-                <div className="mt-2">
-                  <span className="text-3xl font-bold">R$ {(product.price / 100).toFixed(0)}</span>
-                  <span className="text-muted-foreground">/mês</span>
+
+                <div className="p-6 bg-card border-t md:border-t-0 md:border-l flex flex-col justify-center min-w-[300px]">
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-center text-sm">
+                      <Check className="h-4 w-4 text-green-500 mr-2" />
+                      <span className="font-medium">{currentProduct.storageLimit} GB</span> &nbsp;de Armazenamento
+                    </li>
+                    <li className="flex items-center text-sm">
+                      <Check className="h-4 w-4 text-green-500 mr-2" />
+                      <span className="font-medium">{currentProduct.transferLimit || "Ilimitado"} GB</span> &nbsp;Transferência
+                    </li>
+                    <li className="flex items-center text-sm">
+                      <Check className="h-4 w-4 text-green-500 mr-2" />
+                      Suporte Prioritário
+                    </li>
+                  </ul>
+
+                  <Button
+                    className="w-full"
+                    onClick={() => openPlanDialog()}
+                    data-testid="button-change-plan-wide"
+                  >
+                    <ArrowUp className="h-4 w-4 mr-2" />
+                    Alterar Plano
+                  </Button>
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">{product.description}</p>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col">
-                <ul className="space-y-3 mb-8 flex-1">
-                  <li className="flex items-center text-sm">
-                    <Check className="h-4 w-4 text-green-500 mr-2" />
-                    {product.storageLimit} GB de Armazenamento
-                  </li>
-                  <li className="flex items-center text-sm">
-                    <Check className="h-4 w-4 text-green-500 mr-2" />
-                    {product.transferLimit || "Ilimitado"} GB Transferência
-                  </li>
-                </ul>
-                <Button
-                  className="w-full"
-                  variant={product.price > 0 && product.price < 15000 ? "primary" : "outline"}
-                  disabled={isSubscribing || loadingId !== null}
-                  onClick={() => handleSubscribe(product.id)}
-                  data-testid={`button-select-plan-${product.id}`}
-                >
-                  {loadingId === product.id ? <Loader2 className="animate-spin" /> : "Selecionar Plano"}
-                </Button>
-              </CardContent>
+              </div>
             </Card>
-          ))}
+          ) : (
+            <div className="text-center p-8 border rounded-lg border-dashed">
+              <p className="text-muted-foreground">Nenhum plano identificado.</p>
+              <Button variant="ghost" onClick={() => openPlanDialog()}>Ver Planos Disponíveis</Button>
+            </div>
+          )}
         </div>
 
         {/* Invoices Section */}
@@ -391,81 +512,90 @@ export default function Billing() {
         </h2>
         <Card className="mb-8">
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fatura #</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((invoice) => (
-                  <TableRow key={invoice.id} data-testid={`row-invoice-${invoice.id}`}>
-                    <TableCell className="font-medium" data-testid={`text-invoice-number-${invoice.id}`}>{invoice.invoiceNumber}</TableCell>
-                    <TableCell data-testid={`text-invoice-date-${invoice.id}`}>{new Date(invoice.createdAt).toLocaleDateString('pt-BR')}</TableCell>
-                    <TableCell data-testid={`text-invoice-amount-${invoice.id}`}>R$ {(invoice.totalAmount / 100).toFixed(2).replace('.', ',')}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusBadgeVariant(invoice.status)} data-testid={`badge-invoice-status-${invoice.id}`}>
-                        {getStatusLabel(invoice.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => downloadInvoicePdf(invoice)}
-                        data-testid={`button-download-invoice-${invoice.id}`}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Baixar
-                      </Button>
-                    </TableCell>
+            {invoices.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                <p>Nenhuma fatura disponível no momento.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fatura #</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((invoice) => (
+                    <TableRow key={invoice.id} data-testid={`row-invoice-${invoice.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-invoice-number-${invoice.id}`}>{invoice.invoiceNumber}</TableCell>
+                      <TableCell data-testid={`text-invoice-date-${invoice.id}`}>{new Date(invoice.createdAt).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell data-testid={`text-invoice-amount-${invoice.id}`}>R$ {(invoice.totalAmount / 100).toFixed(2).replace('.', ',')}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusBadgeVariant(invoice.status)} data-testid={`badge-invoice-status-${invoice.id}`}>
+                          {getStatusLabel(invoice.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => downloadInvoicePdf(invoice)}
+                          data-testid={`button-download-invoice-${invoice.id}`}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Baixar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
         {/* Plan Change Dialog */}
         <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{dialogMode === 'upgrade' ? 'Fazer Upgrade do Plano' : 'Fazer Downgrade do Plano'}</DialogTitle>
+              <DialogTitle>Alterar Plano</DialogTitle>
               <DialogDescription>
-                {dialogMode === 'upgrade'
-                  ? 'Escolha um plano com mais recursos para expandir seu negócio.'
-                  : 'Selecione um plano menor se precisar de menos recursos. As alterações entram em vigor no próximo ciclo de cobrança.'
-                }
+                Escolha o plano ideal para suas necessidades. As alterações podem gerar cobranças proporcionais.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-6">
               {products?.map((product) => (
-                <Card key={product.id} className="flex flex-col" data-testid={`dialog-card-plan-${product.id}`}>
+                <Card key={product.id} className={`flex flex-col relative ${currentProduct?.id === product.id ? 'border-primary shadow-md ring-1 ring-primary/20' : ''}`} data-testid={`dialog-card-plan-${product.id}`}>
+                  {currentProduct?.id === product.id && (
+                    <div className="absolute top-2 right-2">
+                      <Badge>Atual</Badge>
+                    </div>
+                  )}
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">{product.name}</CardTitle>
-                    <div className="mt-1">
-                      <span className="text-2xl font-bold">R$ {(product.price / 100).toFixed(0)}</span>
+                    <CardTitle className="text-xl pr-8">{product.name}</CardTitle>
+                    <div className="mt-2">
+                      <span className="text-3xl font-bold">R$ {(product.price / 100).toFixed(0)}</span>
                       <span className="text-sm text-muted-foreground">/mês</span>
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col pt-2">
-                    <ul className="space-y-2 mb-4 flex-1 text-sm">
+                    <ul className="space-y-3 mb-6 flex-1 text-sm">
                       <li className="flex items-center">
-                        <Check className="h-3 w-3 text-green-500 mr-2" />
-                        {product.storageLimit} GB Armazenamento
+                        <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                        <span>{product.storageLimit} GB Armazenamento</span>
                       </li>
                       <li className="flex items-center">
-                        <Check className="h-3 w-3 text-green-500 mr-2" />
-                        {product.transferLimit || "Ilimitado"} Transferência
+                        <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                        <span>{product.transferLimit || "Ilimitado"} Transferência</span>
                       </li>
                       <li className="flex items-center">
-                        <Check className="h-3 w-3 text-green-500 mr-2" />
-                        Suporte 24/7
+                        <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                        <span>Suporte 24/7</span>
                       </li>
                     </ul>
                     <Button

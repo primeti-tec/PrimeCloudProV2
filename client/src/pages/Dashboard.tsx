@@ -9,6 +9,10 @@ import { NotificationsBell } from "@/components/NotificationsBell";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+import { useBuckets } from "@/hooks/use-buckets";
+import { useMembers } from "@/hooks/use-members";
+import { useUsageSummary } from "@/hooks/use-billing";
+
 const data = [
   { name: 'Jan', storage: 10, transfer: 24 },
   { name: 'Fev', storage: 15, transfer: 35 },
@@ -19,21 +23,16 @@ const data = [
   { name: 'Jul', storage: 75, transfer: 95 },
 ];
 
-const mockUsage = {
-  storageUsedGB: 75,
-  storageQuotaGB: 100,
-  bandwidthUsedGB: 124,
-  bandwidthQuotaGB: 500,
-};
-
-const storageCostPerGB = 0.15; // R$ per GB
-const bandwidthCostPerGB = 0.40; // R$ per GB
-
 export default function Dashboard() {
   const { data: accounts, isLoading: accountsLoading } = useMyAccounts();
   const [, setLocation] = useLocation();
   const currentAccount = accounts?.[0];
   const { data: accountDetails, isLoading: detailsLoading } = useAccount(currentAccount?.id);
+
+  // Real Data Hooks
+  const { data: usage, isLoading: usageLoading } = useUsageSummary(currentAccount?.id);
+  const { data: buckets } = useBuckets(currentAccount?.id);
+  const { data: members } = useMembers(currentAccount?.id);
 
   useEffect(() => {
     if (!accountsLoading && accounts && accounts.length === 0) {
@@ -41,7 +40,7 @@ export default function Dashboard() {
     }
   }, [accountsLoading, accounts, setLocation]);
 
-  if (accountsLoading || detailsLoading) {
+  if (accountsLoading || detailsLoading || usageLoading) {
     return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
 
@@ -49,15 +48,25 @@ export default function Dashboard() {
     return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
 
-  const storagePercentage = (mockUsage.storageUsedGB / mockUsage.storageQuotaGB) * 100;
-  const bandwidthPercentage = (mockUsage.bandwidthUsedGB / mockUsage.bandwidthQuotaGB) * 100;
+  const storageQuota = accountDetails?.subscription?.product?.storageLimit || 100;
+  const transferQuota = accountDetails?.subscription?.product?.transferLimit || 500;
 
-  const storageCost = mockUsage.storageUsedGB * storageCostPerGB;
-  const bandwidthCost = mockUsage.bandwidthUsedGB * bandwidthCostPerGB;
-  const totalEstimatedCost = storageCost + bandwidthCost;
+  const storagePercentage = ((usage?.storageUsedGB || 0) / storageQuota) * 100;
+  // Bandwidth calculation might be missing in UsageSummary if not fully implemented in backend yet, defaulting to 0 for safety
+  const bandwidthPercentage = ((usage?.bandwidthUsedGB || 0) / transferQuota) * 100;
+
+  const totalEstimatedCost = usage?.projectedCost || 0;
 
   const showCriticalBanner = storagePercentage > 95;
   const showWarningBanner = storagePercentage > 80 && storagePercentage <= 95;
+
+  const storageCostPerGB = 0.15; // R$ per GB
+  const bandwidthCostPerGB = 0.40; // R$ per GB
+
+  const storageCost = (usage?.storageUsedGB || 0) * storageCostPerGB;
+  const bandwidthCost = (usage?.bandwidthUsedGB || 0) * bandwidthCostPerGB;
+  // Use projectedCost from backend if available, otherwise sum manually
+  const displayTotalCost = usage?.projectedCost || (storageCost + bandwidthCost);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -104,37 +113,37 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCardWithProgress
             title="Armazenamento"
-            usedValue={mockUsage.storageUsedGB}
-            totalValue={mockUsage.storageQuotaGB}
+            usedValue={usage?.storageUsedGB || 0}
+            totalValue={storageQuota}
             unit="GB"
             icon={HardDrive}
-            trend="+12%"
+            trend={null} // Removed hardcoded trend
             color="text-blue-500"
             bgColor="bg-blue-500/10"
             progressColor="bg-blue-500"
           />
           <StatCardWithProgress
             title="Bandwidth"
-            usedValue={mockUsage.bandwidthUsedGB}
-            totalValue={mockUsage.bandwidthQuotaGB}
+            usedValue={usage?.bandwidthUsedGB || 0}
+            totalValue={transferQuota}
             unit="GB"
             icon={Activity}
-            trend="+5%"
+            trend={null}
             color="text-green-500"
             bgColor="bg-green-500/10"
             progressColor="bg-green-500"
           />
           <StatCard
             title="Buckets Ativos"
-            value="12"
-            subtitle="em 3 regiões"
+            value={buckets?.length || 0}
+            subtitle={`em ${usage?.apiRequestsCount ? 'uso ativo' : 'repouso'}`}
             icon={ArrowUpRight}
             color="text-orange-500"
             bgColor="bg-orange-500/10"
           />
           <StatCard
             title="Membros da Equipe"
-            value="8"
+            value={members?.length || 0}
             subtitle="usuários ativos"
             icon={Users}
             color="text-purple-500"
@@ -152,16 +161,16 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <h3 className="text-3xl font-bold text-foreground">R$ {totalEstimatedCost.toFixed(2)}</h3>
+                <h3 className="text-3xl font-bold text-foreground">R$ {displayTotalCost.toFixed(2)}</h3>
                 <p className="text-sm text-muted-foreground">Estimativa do mês atual</p>
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Armazenamento ({mockUsage.storageUsedGB} GB x R$ {storageCostPerGB})</span>
+                  <span className="text-muted-foreground">Armazenamento ({usage?.storageUsedGB || 0} GB x R$ {storageCostPerGB})</span>
                   <span className="font-medium">R$ {storageCost.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Bandwidth ({mockUsage.bandwidthUsedGB} GB x R$ {bandwidthCostPerGB})</span>
+                  <span className="text-muted-foreground">Bandwidth ({usage?.bandwidthUsedGB || 0} GB x R$ {bandwidthCostPerGB})</span>
                   <span className="font-medium">R$ {bandwidthCost.toFixed(2)}</span>
                 </div>
               </div>
