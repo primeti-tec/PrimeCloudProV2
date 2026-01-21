@@ -12,6 +12,8 @@ export const products = pgTable("products", {
   name: text("name").notNull(),
   description: text("description"),
   price: integer("price").notNull(), // in cents
+  pricePerStorageGB: integer("price_per_storage_gb").default(15), // in cents per GB
+  pricePerTransferGB: integer("price_per_transfer_gb").default(40), // in cents per GB
   storageLimit: integer("storage_limit_gb").notNull(),
   transferLimit: integer("transfer_limit_gb"),
   isPublic: boolean("is_public").default(true),

@@ -66,6 +66,8 @@ export default function AdminDashboard() {
     name: "",
     description: "",
     price: 0,
+    pricePerStorageGB: 15,
+    pricePerTransferGB: 40,
     storageLimit: 100,
     transferLimit: 0,
     isPublic: true,
@@ -155,6 +157,8 @@ export default function AdminDashboard() {
         name: product.name,
         description: product.description || "",
         price: product.price,
+        pricePerStorageGB: product.pricePerStorageGB || 15,
+        pricePerTransferGB: product.pricePerTransferGB || 40,
         storageLimit: product.storageLimit,
         transferLimit: product.transferLimit || 0,
         isPublic: product.isPublic ?? true,
@@ -165,6 +169,8 @@ export default function AdminDashboard() {
         name: "",
         description: "",
         price: 0,
+        pricePerStorageGB: 15,
+        pricePerTransferGB: 40,
         storageLimit: 100,
         transferLimit: 0,
         isPublic: true,
@@ -187,6 +193,8 @@ export default function AdminDashboard() {
       name: productForm.name.trim(),
       description: productForm.description.trim() || undefined,
       price: productForm.price,
+      pricePerStorageGB: productForm.pricePerStorageGB,
+      pricePerTransferGB: productForm.pricePerTransferGB,
       storageLimit: productForm.storageLimit,
       transferLimit: productForm.transferLimit || undefined,
       isPublic: productForm.isPublic,
@@ -1004,6 +1012,32 @@ export default function AdminDashboard() {
                 placeholder="Ex: 9900 para R$ 99,00"
                 data-testid="input-product-price"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="product-storage-price">Preço Extra Armazenamento (centavos)</Label>
+                <Input
+                  id="product-storage-price"
+                  type="number"
+                  min="0"
+                  value={productForm.pricePerStorageGB}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, pricePerStorageGB: parseInt(e.target.value) || 0 }))}
+                  placeholder="Ex: 15 para R$ 0,15"
+                  data-testid="input-product-storage-price"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="product-transfer-price">Preço Extra Transferência (centavos)</Label>
+                <Input
+                  id="product-transfer-price"
+                  type="number"
+                  min="0"
+                  value={productForm.pricePerTransferGB}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, pricePerTransferGB: parseInt(e.target.value) || 0 }))}
+                  placeholder="Ex: 40 para R$ 0,40"
+                  data-testid="input-product-transfer-price"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

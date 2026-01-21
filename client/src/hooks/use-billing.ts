@@ -15,6 +15,13 @@ interface UsageSummary {
   bandwidthUsedGB: number;
   apiRequestsCount: number;
   projectedCost: number;
+  pricePerStorageGB?: number;
+  pricePerTransferGB?: number;
+  buckets?: {
+    name: string;
+    sizeBytes: number;
+    storageLimitGB: number;
+  }[];
 }
 
 export function useInvoices(accountId: number | undefined) {

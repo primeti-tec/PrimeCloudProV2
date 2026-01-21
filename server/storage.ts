@@ -583,6 +583,8 @@ export class DatabaseStorage implements IStorage {
     bandwidthUsedGB: number;
     apiRequestsCount: number;
     projectedCost: number;
+    pricePerStorageGB?: number;
+    pricePerTransferGB?: number;
     buckets: { name: string; sizeBytes: number; storageLimitGB: number }[];
   }> {
     const account = await this.getAccount(accountId);
@@ -598,14 +600,35 @@ export class DatabaseStorage implements IStorage {
     let apiRequestsCount = bucketList.reduce((sum, b) => sum + (b.objectCount || 0), 0) * 10;
 
     const baseCost = subscription?.product?.price || 2900;
-    const storageCost = Math.max(0, storageUsedGB - (subscription?.product?.storageLimit || 100)) * 2;
-    const projectedCost = baseCost + storageCost * 100;
+
+    // Use product-specific price per GB or default to 15 cents (R$ 0.15)
+    // Note: The previous logic multiplied by 2 and then by 100 which seemed inconsistent.
+    // Assuming calculation: (Excess Storage GB) * (Price Per GB in cents) 
+    // Wait, the previous logic was: storageCost = (GB - Limit) * 2; projectedCost = baseCost + storageCost * 100;
+    // Use explicit pricing from product
+    const pricePerStorageGB = subscription?.product?.pricePerStorageGB || 15;
+    const pricePerTransferGB = subscription?.product?.pricePerTransferGB || 40;
+
+    const excessStorage = Math.max(0, storageUsedGB - (subscription?.product?.storageLimit || 100));
+    const storageCostCents = Math.ceil(excessStorage * pricePerStorageGB);
+
+    // Assuming transferLimit is nullable, if null = unlimited? Or 0? Schema says integer("transfer_limit_gb"), nullable.
+    // If not set, treat as 500GB default or unlimited? Let's use logic: if limit exists and used > limit, charge.
+    // If limit is null (unlimited), extra cost is 0. 
+    // If we want to charge for ALL usage (meaning no free tier in plan), limit should be 0.
+    const transferLimit = subscription?.product?.transferLimit ?? 500;
+    const excessTransfer = Math.max(0, bandwidthUsedGB - transferLimit);
+    const bandwidthCostCents = Math.ceil(excessTransfer * pricePerTransferGB);
+
+    const projectedCost = baseCost + storageCostCents + bandwidthCostCents;
 
     return {
       storageUsedGB,
       bandwidthUsedGB,
       apiRequestsCount,
       projectedCost,
+      pricePerStorageGB,
+      pricePerTransferGB,
       buckets: bucketList.map(b => ({
         name: b.name,
         sizeBytes: Number(b.sizeBytes || 0),

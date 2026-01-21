@@ -60,13 +60,20 @@ export default function Dashboard() {
   const showCriticalBanner = storagePercentage > 95;
   const showWarningBanner = storagePercentage > 80 && storagePercentage <= 95;
 
-  const storageCostPerGB = 0.15; // R$ per GB
-  const bandwidthCostPerGB = 0.40; // R$ per GB
+  // Calculate dynamic costs based on product settings or defaults
+  // Convert cents to R$ (divide by 100)
+  const storageCostPerGB = (usage?.pricePerStorageGB || 15) / 100;
+  const bandwidthCostPerGB = (usage?.pricePerTransferGB || 40) / 100;
 
   const storageCost = (usage?.storageUsedGB || 0) * storageCostPerGB;
   const bandwidthCost = (usage?.bandwidthUsedGB || 0) * bandwidthCostPerGB;
-  // Use projectedCost from backend if available, otherwise sum manually
-  const displayTotalCost = usage?.projectedCost || (storageCost + bandwidthCost);
+
+  // Convert projectedCost from cents to R$
+  const displayTotalCost = (usage?.projectedCost || 0) / 100;
+
+  // Calculate base plan cost as the difference between total and usage costs
+  // This ensures the sum displayed below matches the big number
+  const basePlanPrice = Math.max(0, displayTotalCost - storageCost - bandwidthCost);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -164,13 +171,17 @@ export default function Dashboard() {
                 <h3 className="text-3xl font-bold text-foreground">R$ {displayTotalCost.toFixed(2)}</h3>
                 <p className="text-sm text-muted-foreground">Estimativa do mês atual</p>
               </div>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-2 text-sm border-t pt-4">
+                <div className="flex justify-between items-center text-muted-foreground">
+                  <span>Mensalidade do Plano</span>
+                  <span className="font-medium text-foreground">R$ {basePlanPrice.toFixed(2)}</span>
+                </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Armazenamento ({usage?.storageUsedGB || 0} GB x R$ {storageCostPerGB})</span>
+                  <span className="text-muted-foreground">Armazenamento ({usage?.storageUsedGB || 0} GB x R$ {storageCostPerGB.toFixed(2)})</span>
                   <span className="font-medium">R$ {storageCost.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Bandwidth ({usage?.bandwidthUsedGB || 0} GB x R$ {bandwidthCostPerGB})</span>
+                  <span className="text-muted-foreground">Bandwidth ({usage?.bandwidthUsedGB || 0} GB x R$ {bandwidthCostPerGB.toFixed(2)})</span>
                   <span className="font-medium">R$ {bandwidthCost.toFixed(2)}</span>
                 </div>
               </div>

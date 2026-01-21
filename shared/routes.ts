@@ -287,6 +287,8 @@ export const api = {
           bandwidthUsedGB: z.number(),
           apiRequestsCount: z.number(),
           projectedCost: z.number(),
+          pricePerStorageGB: z.number().optional(),
+          pricePerTransferGB: z.number().optional(),
           buckets: z.array(z.object({
             name: z.string(),
             sizeBytes: z.number(),
