@@ -40,20 +40,20 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const token = await getClerkToken();
-    const res = await fetch(queryKey.join("/") as string, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: "include",
-    });
+    async ({ queryKey }) => {
+      const token = await getClerkToken();
+      const res = await fetch(queryKey.join("/") as string, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
-    }
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
 
-    await throwIfResNotOk(res);
-    return await res.json();
-  };
+      await throwIfResNotOk(res);
+      return await res.json();
+    };
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,8 +61,13 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes: data is considered fresh for 5 mins
+      gcTime: 15 * 60 * 1000,   // 15 minutes: keep data in cache for 15 mins
+      retry: (failureCount, error: any) => {
+        // Only retry on network errors or 5xx
+        if (error?.status === 401 || error?.status === 403 || error?.status === 404) return false;
+        return failureCount < 2;
+      },
     },
     mutations: {
       retry: false,

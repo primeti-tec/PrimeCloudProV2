@@ -8,6 +8,7 @@ const resolveCname = promisify(dns.resolveCname);
 export interface DomainVerificationResult {
   verified: boolean;
   recordType: "CNAME" | "TXT" | null;
+  method?: string | null;
   message: string;
 }
 
@@ -45,6 +46,7 @@ export async function verifyDomainOwnership(
           return {
             verified: true,
             recordType: "CNAME",
+            method: "CNAME",
             message: `CNAME record verified. ${cleanDomain} points to ${cnameRecords[0]}`,
           };
         }
@@ -68,6 +70,7 @@ export async function verifyDomainOwnership(
         return {
           verified: true,
           recordType: "TXT",
+          method: "TXT",
           message: `TXT record verified. Verification token found.`,
         };
       }

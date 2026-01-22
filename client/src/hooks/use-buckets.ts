@@ -150,10 +150,12 @@ export function useGetUploadUrl(accountId: number | undefined, bucketId: number 
 
 export function useGetDownloadUrl(accountId: number | undefined, bucketId: number | undefined) {
   return useMutation({
-    mutationFn: async (key: string) => {
+    mutationFn: async (payload: { key: string; download?: boolean }) => {
+      const { key, download } = typeof payload === 'string' ? { key: payload, download: false } : payload;
       if (!accountId || !bucketId) throw new Error('No account or bucket');
       const url = new URL(buildUrl(api.objects.getDownloadUrl.path, { accountId, bucketId }), window.location.origin);
       url.searchParams.set('key', key);
+      if (download) url.searchParams.set('download', 'true');
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error('Failed to get download URL');
       return res.json() as Promise<{ downloadUrl: string }>;

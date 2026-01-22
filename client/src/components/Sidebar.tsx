@@ -8,6 +8,8 @@ import { useMyAccounts } from "@/hooks/use-accounts";
 import { useBuckets } from "@/hooks/use-buckets";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui-custom";
+import { queryClient } from "@/lib/queryClient";
+import { buildUrl, api } from "@shared/routes";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -48,6 +50,19 @@ export function Sidebar() {
 
   const handleStorageClick = () => {
     setStorageExpanded(!storageExpanded);
+  };
+
+  const prefetchBucketObjects = (bucketId: number) => {
+    if (!currentAccount?.id) return;
+    queryClient.prefetchQuery({
+      queryKey: ['/api/accounts', currentAccount.id, 'buckets', bucketId, 'objects', ''],
+      queryFn: async () => {
+        const url = new URL(buildUrl(api.objects.list.path, { accountId: currentAccount.id, bucketId }), window.location.origin);
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error('Failed to fetch objects');
+        return res.json();
+      },
+    });
   };
 
   return (
@@ -121,28 +136,33 @@ export function Sidebar() {
           {/* Submenu */}
           {storageExpanded && (
             <div className="ml-4 mt-1 space-y-1 border-l-2 border-border/50 pl-2">
-              {/* Buckets Link */}
-              <Link href="/dashboard/storage">
-                <div
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer text-sm ${location === "/dashboard/storage"
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    }`}
-                >
-                  <Database className="h-4 w-4" />
-                  Todos os Buckets
-                </div>
-              </Link>
+              {/* Buckets Link - Only for internal staff */}
+              {!isExternalClient && (
+                <Link href="/dashboard/storage">
+                  <div
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer text-sm ${location === "/dashboard/storage"
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      }`}
+                  >
+                    <Database className="h-4 w-4" />
+                    Todos os Buckets
+                  </div>
+                </Link>
+              )}
 
               {/* Bucket quick access */}
               {buckets && buckets.length > 0 && (
                 <>
-                  <div className="text-xs text-muted-foreground px-3 py-1 mt-2">
-                    Acesso Rápido
-                  </div>
+                  {!isExternalClient && (
+                    <div className="text-xs text-muted-foreground px-3 py-1 mt-2 font-medium">
+                      Acesso Rápido
+                    </div>
+                  )}
                   {buckets.slice(0, 5).map(bucket => (
                     <Link key={bucket.id} href={`/dashboard/storage/${bucket.id}`}>
                       <div
+                        onMouseEnter={() => prefetchBucketObjects(bucket.id)}
                         className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer text-sm ${location === `/dashboard/storage/${bucket.id}`
                           ? "bg-primary/10 text-primary font-medium"
                           : "text-muted-foreground hover:bg-accent hover:text-foreground"

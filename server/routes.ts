@@ -812,11 +812,15 @@ export async function registerRoutes(
 
     // Check bucket permissions for external clients
     if (membership.role === 'external_client') {
+      console.log(`[Objects] Checking permissions for external client ${userId} on bucket ${bucketId}`);
       const permissions = await storage.getBucketPermissionsForMember(membership.id);
+      console.log(`[Objects] All member permissions:`, JSON.stringify(permissions));
       const bucketPerm = permissions.find(p => p.bucketId === bucketId);
       if (!bucketPerm || !['read', 'read-write'].includes(bucketPerm.permission)) {
+        console.log(`[Objects] Access denied. Perm found:`, JSON.stringify(bucketPerm));
         return res.status(403).json({ message: "No read permission for this bucket" });
       }
+      console.log(`[Objects] Permission granted: ${bucketPerm.permission}`);
     }
 
     // Get bucket info
@@ -830,7 +834,9 @@ export async function registerRoutes(
     const minioService = new MinioService(accountId.toString());
 
     try {
+      console.log(`[Objects] Listing objects for bucket: ${bucket.name}, account: ${accountId}, prefix: ${prefix || '(none)'}`);
       const result = await minioService.listObjectsWithPrefixes(bucket.name, prefix || undefined);
+      console.log(`[Objects] Listing result: ${result.objects.length} objects, ${result.prefixes.length} prefixes`);
       res.json({
         objects: result.objects.map((obj: any) => ({
           name: obj.name,
@@ -842,7 +848,7 @@ export async function registerRoutes(
         prefix: prefix || '',
       });
     } catch (error) {
-      console.error("Error listing objects:", error);
+      console.error("[Objects] Error listing objects:", error);
       res.status(500).json({ message: "Failed to list objects" });
     }
   });
@@ -916,7 +922,37 @@ export async function registerRoutes(
     const minioService = new MinioService(accountId.toString());
 
     try {
-      const downloadUrl = await minioService.presignedGetObject(bucket.name, key, 3600);
+      const extension = key.split('.').pop()?.toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        'pdf': 'application/pdf',
+        'txt': 'text/plain',
+        'md': 'text/markdown',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'svg': 'image/svg+xml',
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'mp3': 'audio/mpeg',
+        'wav': 'audio/wav',
+      };
+
+      const disposition = req.query.download === 'true' ? 'attachment' : 'inline';
+      const fileName = key.split('/').pop() || key;
+      const contentType = mimeTypes[extension || ''] || 'application/octet-stream';
+
+      const respHeaders: Record<string, string> = {
+        'response-content-disposition': `${disposition}; filename="${fileName}"`
+      };
+
+      // Always force content-type for preview to ensure browser handles it (PDF, TXT, etc)
+      if (req.query.download !== 'true') {
+        respHeaders['response-content-type'] = contentType;
+      }
+
+      const downloadUrl = await minioService.presignedGetObject(bucket.name, key, 3600, respHeaders);
       res.json({ downloadUrl });
     } catch (error) {
       console.error("Error generating download URL:", error);

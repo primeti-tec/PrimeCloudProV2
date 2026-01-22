@@ -2,6 +2,7 @@ import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { clerkClient, clerkMiddleware, getAuth } from "@clerk/express";
 import { registerRoutes } from "./routes";
+import compression from "compression";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { authStorage } from "./replit_integrations/auth";
@@ -23,6 +24,8 @@ app.use(
     },
   }),
 );
+
+app.use(compression());
 
 app.use(express.urlencoded({ extended: false }));
 app.use(clerkMiddleware());

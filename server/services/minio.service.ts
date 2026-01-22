@@ -405,7 +405,7 @@ export class MinioService {
     /**
      * Generate a presigned URL for downloading/viewing an object
      */
-    async presignedGetObject(bucketName: string, objectName: string, expirySeconds: number = 3600): Promise<string> {
+    async presignedGetObject(bucketName: string, objectName: string, expirySeconds: number = 3600, respHeaders?: Record<string, string>): Promise<string> {
         const fullBucketName = this.getTenantBucketName(bucketName);
 
         if (!isMinioAvailable) {
@@ -415,14 +415,14 @@ export class MinioService {
 
         // Try with tenant prefix first
         try {
-            const url = await minioClient.presignedGetObject(fullBucketName, objectName, expirySeconds);
+            const url = await minioClient.presignedGetObject(fullBucketName, objectName, expirySeconds, respHeaders);
             return url;
         } catch (error: any) {
             // Fallback: try without tenant prefix for legacy buckets
             if ((error.code === 'NoSuchBucket' || error.statusCode === 404) && this.tenantPrefix && bucketName !== fullBucketName) {
                 console.log(`[MINIO] Falling back to non-prefixed bucket for GET: ${bucketName}`);
                 try {
-                    return await minioClient.presignedGetObject(bucketName, objectName, expirySeconds);
+                    return await minioClient.presignedGetObject(bucketName, objectName, expirySeconds, respHeaders);
                 } catch (fallbackError) {
                     console.error(`❌ Fallback also failed for presigned GET URL:`, fallbackError);
                     throw fallbackError;
