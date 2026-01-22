@@ -41,6 +41,13 @@ async function collectUsageMetrics(): Promise<{ collected: number; errors: numbe
             try {
                 const minioService = new MinioService(String(account.id));
 
+                // IF MinIO is not available (mock mode), DO NOT reset the volumes to 0
+                // This prevents wiping out demo data if the service is temporarily down
+                if (!MinioService.isAvailable()) {
+                    console.log(`⚠️ MinIO not available for account ${account.id}, skipping usage update to preserve existing data.`);
+                    continue;
+                }
+
                 // Get buckets from DB to sync them specifically
                 const accountBuckets = await db
                     .select()

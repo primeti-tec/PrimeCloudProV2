@@ -7,7 +7,7 @@ import {
   type CreateAccountRequest, type CreateMemberRequest, type CreateBucketRequest, type CreateAccessKeyRequest,
   type CreateNotificationRequest, type CreateAuditLogRequest, type CreateQuotaRequestRequest, type CreateOrderRequest, type UpdateOrderRequest
 } from "@shared/schema";
-import { eq, and, desc, count, isNull, gt } from "drizzle-orm";
+import { eq, and, desc, count, isNull, gt, gte, lte, ilike, or } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface IStorage {
@@ -61,7 +61,7 @@ export interface IStorage {
 
   // Audit Logs
   createAuditLog(data: CreateAuditLogRequest): Promise<AuditLog>;
-  getAuditLogs(accountId: number, limit?: number): Promise<AuditLog[]>;
+  getAuditLogs(accountId: number, options?: { limit?: number; action?: string; severity?: string; search?: string; startDate?: Date; endDate?: Date }): Promise<any[]>;
 
   // Invitations
   createInvitation(accountId: number, email: string, role: string, invitedById: string | null): Promise<Invitation>;
@@ -425,15 +425,67 @@ export class DatabaseStorage implements IStorage {
     return log;
   }
 
-  async getAuditLogs(accountId: number, limit?: number): Promise<AuditLog[]> {
-    const query = db.select().from(auditLogs)
-      .where(eq(auditLogs.accountId, accountId))
-      .orderBy(desc(auditLogs.createdAt));
-
-    if (limit) {
-      return await query.limit(limit);
+  async getAuditLogs(
+    accountId: number,
+    options?: {
+      limit?: number;
+      action?: string;
+      severity?: string;
+      search?: string;
+      startDate?: Date;
+      endDate?: Date;
     }
-    return await query;
+  ): Promise<any[]> {
+    let conditions = [eq(auditLogs.accountId, accountId)];
+
+    if (options?.action) {
+      // Use ilike for partial matching (e.g., "bucket" matches "bucket.created")
+      conditions.push(ilike(auditLogs.action, `%${options.action}%`));
+    }
+    if (options?.severity) {
+      conditions.push(eq(auditLogs.severity, options.severity));
+    }
+    if (options?.search) {
+      // Search across action, resource, and details
+      conditions.push(
+        or(
+          ilike(auditLogs.action, `%${options.search}%`),
+          ilike(auditLogs.resource, `%${options.search}%`),
+          ilike(auditLogs.ipAddress, `%${options.search}%`)
+        )!
+      );
+    }
+    if (options?.startDate) {
+      conditions.push(gte(auditLogs.createdAt, options.startDate));
+    }
+    if (options?.endDate) {
+      conditions.push(lte(auditLogs.createdAt, options.endDate));
+    }
+
+    const logs = await db
+      .select({
+        id: auditLogs.id,
+        accountId: auditLogs.accountId,
+        userId: auditLogs.userId,
+        action: auditLogs.action,
+        resource: auditLogs.resource,
+        details: auditLogs.details,
+        severity: auditLogs.severity,
+        context: auditLogs.context,
+        ipAddress: auditLogs.ipAddress,
+        userAgent: auditLogs.userAgent,
+        createdAt: auditLogs.createdAt,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+        userEmail: users.email,
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .where(and(...conditions))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(options?.limit || 100);
+
+    return logs;
   }
 
   // Invitations

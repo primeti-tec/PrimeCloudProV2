@@ -355,7 +355,17 @@ export async function registerRoutes(
     if (!membership) return res.status(403).json({ message: "Forbidden" });
 
     const members = await storage.getMembers(accountId);
-    res.json(members);
+
+    // Enriquecer membros com buckets se for external_client
+    const enrichedMembers = await Promise.all(members.map(async (member) => {
+      if (member.role === 'external_client') {
+        const permissions = await storage.getBucketPermissionsForMember(member.id);
+        return { ...member, bucketPermissions: permissions };
+      }
+      return member;
+    }));
+
+    res.json(enrichedMembers);
   });
 
   // Add Member
@@ -1169,8 +1179,36 @@ export async function registerRoutes(
     const membership = await storage.getMembership(userId, accountId);
     if (!membership) return res.status(403).json({ message: "Forbidden" });
 
-    const logs = await storage.getAuditLogs(accountId, 100);
-    res.json(logs);
+    const { action, severity, search, startDate, endDate, limit } = req.query;
+
+    const logs = await storage.getAuditLogs(accountId, {
+      action: action as string | undefined,
+      severity: severity as string | undefined,
+      search: search as string | undefined,
+      startDate: startDate ? new Date(startDate as string) : undefined,
+      endDate: endDate ? new Date(endDate as string) : undefined,
+      limit: limit ? parseInt(limit as string) : 100,
+    });
+
+    // Format the logs for the frontend
+    const formattedLogs = logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      resource: log.resource,
+      resourceType: log.resource,
+      resourceName: (log.details as any)?.resourceName || (log.details as any)?.resourceId || log.resource,
+      details: log.details,
+      severity: log.severity,
+      context: log.context,
+      ipAddress: log.ipAddress || "N/A",
+      userAgent: log.userAgent,
+      timestamp: log.createdAt,
+      userId: log.userId,
+      userName: [log.userFirstName, log.userLastName].filter(Boolean).join(" ") || null,
+      userEmail: log.userEmail,
+    }));
+
+    res.json(formattedLogs);
   });
 
   // --- Invitations Routes ---

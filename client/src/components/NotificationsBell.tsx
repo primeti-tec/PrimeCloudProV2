@@ -10,6 +10,7 @@ import {
   useMarkAllRead,
 } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 interface NotificationsBellProps {
@@ -36,7 +37,7 @@ export function NotificationsBell({ accountId }: NotificationsBellProps) {
 
   const formatTimeAgo = (date: Date | string | null) => {
     if (!date) return "";
-    return formatDistanceToNow(new Date(date), { addSuffix: true });
+    return formatDistanceToNow(new Date(date), { addSuffix: true, locale: ptBR });
   };
 
   return (
@@ -61,7 +62,7 @@ export function NotificationsBell({ accountId }: NotificationsBellProps) {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0" data-testid="popover-notifications">
         <div className="flex items-center justify-between gap-2 p-4 border-b">
-          <h3 className="font-semibold">Notifications</h3>
+          <h3 className="font-semibold">Notificações</h3>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
@@ -72,18 +73,18 @@ export function NotificationsBell({ accountId }: NotificationsBellProps) {
               data-testid="button-mark-all-read"
             >
               <CheckCheck className="h-4 w-4 mr-1" />
-              Mark all read
+              Marcar todas como lidas
             </Button>
           )}
         </div>
         <ScrollArea className="h-80">
           {isLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground" data-testid="loading-notifications">
-              Loading...
+              Carregando...
             </div>
           ) : notifications.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground" data-testid="empty-notifications">
-              No notifications
+              Nenhuma notificação
             </div>
           ) : (
             <div className="divide-y">

@@ -107,7 +107,7 @@ export class MinioService {
     /**
      * Check if MinIO is available
      */
-    isAvailable(): boolean {
+    static isAvailable(): boolean {
         return isMinioAvailable;
     }
 
@@ -197,7 +197,7 @@ export class MinioService {
     /**
      * List objects in a bucket
      */
-    async listObjects(bucketName: string, prefix?: string): Promise<any[]> {
+    async listObjects(bucketName: string, prefix?: string, recursive: boolean = true): Promise<any[]> {
         const fullBucketName = this.getTenantBucketName(bucketName);
 
         if (!isMinioAvailable) {
@@ -208,7 +208,7 @@ export class MinioService {
         const fetchObjects = async (bName: string): Promise<any[]> => {
             try {
                 const objects: any[] = [];
-                const stream = minioClient.listObjects(bName, prefix || "", true);
+                const stream = minioClient.listObjectsV2(bName, prefix || "", recursive);
 
                 return new Promise((resolve, reject) => {
                     stream.on("data", (obj: any) => objects.push(obj));
@@ -240,15 +240,48 @@ export class MinioService {
     }
 
     /**
-     * Get bucket size and object count
+     * Get bucket size and object count (optimized for large buckets)
      */
     async getBucketStats(bucketName: string): Promise<{ sizeBytes: number; objectCount: number }> {
-        const objects = await this.listObjects(bucketName);
+        const fullBucketName = this.getTenantBucketName(bucketName);
 
-        return {
-            sizeBytes: objects.reduce((sum, obj) => sum + (obj.size || 0), 0),
-            objectCount: objects.length,
+        if (!isMinioAvailable) {
+            return { sizeBytes: 0, objectCount: 0 };
+        }
+
+        const calculateStats = async (bName: string): Promise<{ sizeBytes: number; objectCount: number }> => {
+            return new Promise((resolve, reject) => {
+                let sizeBytes = 0;
+                let objectCount = 0;
+                try {
+                    const stream = minioClient.listObjectsV2(bName, "", true);
+                    stream.on("data", (obj: any) => {
+                        objectCount++;
+                        sizeBytes += (obj.size || 0);
+                    });
+                    stream.on("error", (err: any) => {
+                        if (err.code === 'NoSuchBucket' || err.statusCode === 404) {
+                            resolve({ sizeBytes: 0, objectCount: 0 });
+                        } else {
+                            reject(err);
+                        }
+                    });
+                    stream.on("end", () => resolve({ sizeBytes, objectCount }));
+                } catch (err) {
+                    reject(err);
+                }
+            });
         };
+
+        let stats = await calculateStats(fullBucketName);
+
+        // Fallback: If no objects and we have a prefix, try WITHOUT prefix
+        if (stats.objectCount === 0 && this.tenantPrefix && bucketName !== fullBucketName) {
+            console.log(`[MINIO] Falling back to non-prefixed bucket for stats: ${bucketName}`);
+            stats = await calculateStats(bucketName);
+        }
+
+        return stats;
     }
 
     /**

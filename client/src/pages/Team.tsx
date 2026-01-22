@@ -4,16 +4,18 @@ import { useInvitations, useCreateInvitation, useCancelInvitation } from "@/hook
 import { useMyAccounts } from "@/hooks/use-accounts";
 import { useBuckets } from "@/hooks/use-buckets";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Trash2, UserPlus, Shield, Crown, Code, X, Clock, Mail, User, Database } from "lucide-react";
+import { Loader2, Trash2, UserPlus, Shield, Crown, Code, X, Clock, Mail, User, Database, ChevronRight, FolderOpen } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface BucketPermissionEntry {
   bucketId: number;
@@ -22,10 +24,28 @@ interface BucketPermissionEntry {
   permission: 'read' | 'write' | 'read-write';
 }
 
+interface EnrichedMember {
+  id: number;
+  role: string;
+  joinedAt?: string;
+  user?: {
+    firstName?: string;
+    email?: string;
+  };
+  bucketPermissions?: {
+    bucketId: number;
+    bucketName: string;
+    permission: string;
+  }[];
+}
+
 export default function Team() {
   const { data: accounts } = useMyAccounts();
   const currentAccount = accounts?.[0];
-  const { data: members, isLoading } = useMembers(currentAccount?.id);
+  const { data: rawMembers, isLoading } = useMembers(currentAccount?.id);
+  // Cast rawMembers to EnrichedMember[]
+  const members = rawMembers as unknown as EnrichedMember[] | undefined;
+
   const { data: invitations } = useInvitations(currentAccount?.id);
   const { data: buckets } = useBuckets(currentAccount?.id);
   const { mutateAsync: createInvitation, isPending: isInviting } = useCreateInvitation();
@@ -142,6 +162,118 @@ export default function Team() {
 
   const pendingInvitations = invitations?.filter(inv => !inv.acceptedAt) || [];
 
+  // Groups
+  const owners = members?.filter(m => m.role === 'owner') || [];
+  const admins = members?.filter(m => m.role === 'admin') || [];
+  const developers = members?.filter(m => m.role === 'developer') || [];
+  const guests = members?.filter(m => m.role === 'external_client') || [];
+
+  const MemberTable = ({ title, description, membersList, showPermissions = false }: { title: string, description: string, membersList: EnrichedMember[], showPermissions?: boolean }) => {
+    if (membersList.length === 0) return null;
+
+    return (
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg">{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <table className="w-full">
+            <thead className="bg-muted/50 border-b">
+              <tr>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Usuário</th>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Função</th>
+                {showPermissions && (
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">Acesso a Buckets</th>
+                )}
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Entrou em</th>
+                <th className="text-right p-4 text-sm font-medium text-muted-foreground pr-6">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y relative">
+              {membersList.map((member) => (
+                <tr key={member.id} className="group hover:bg-muted/50 transition-colors">
+                  <td className="p-4 pl-6 align-top">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                        {member.user?.firstName?.[0] || member.user?.email?.[0] || "U"}
+                      </div>
+                      <div>
+                        <div className="font-medium text-slate-900">{member.user?.firstName || "Usuário"}</div>
+                        <div className="text-xs text-muted-foreground">{member.user?.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-4 align-top">
+                    {member.role === 'owner' ? (
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+                        {getRoleIcon(member.role)}
+                        {getRoleLabel(member.role)}
+                      </Badge>
+                    ) : (
+                      <Select
+                        value={member.role}
+                        onValueChange={(value) => onChangeRole(member.id, value)}
+                      >
+                        <SelectTrigger className="w-36 h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Administrador</SelectItem>
+                          <SelectItem value="developer">Desenvolvedor</SelectItem>
+                          <SelectItem value="external_client">Cliente Externo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </td>
+
+                  {showPermissions && (
+                    <td className="p-4 align-top">
+                      <div className="space-y-1">
+                        {member.bucketPermissions && member.bucketPermissions.length > 0 ? (
+                          member.bucketPermissions.map(bp => (
+                            <div key={bp.bucketId} className="flex items-center gap-2 text-sm bg-muted/50 px-2 py-1 rounded-md border w-fit">
+                              <FolderOpen className="h-3 w-3 text-blue-500" />
+                              <span className="font-medium">{bp.bucketName}</span>
+                              <Badge variant="outline" className="text-[10px] h-4 px-1 py-0 ml-1 bg-background">
+                                {bp.permission === 'read-write' ? 'Full' : bp.permission === 'read' ? 'Leitura' : 'Escrita'}
+                              </Badge>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-sm text-yellow-600 flex items-center gap-1">
+                            <Database className="h-3 w-3" />
+                            Sem buckets
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  )}
+
+                  <td className="p-4 text-sm text-muted-foreground align-top">
+                    {member.joinedAt ? format(new Date(member.joinedAt), "dd/MM/yyyy", { locale: ptBR }) : "-"}
+                  </td>
+                  <td className="p-4 text-right pr-6 align-top">
+                    {member.role !== 'owner' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive h-8 w-8"
+                        onClick={() => onRemove(member.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
@@ -149,7 +281,7 @@ export default function Team() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">Gestão de Equipe</h1>
-            <p className="text-muted-foreground">Gerencie o acesso à sua organização.</p>
+            <p className="text-muted-foreground">Gerencie quem tem acesso à sua organização.</p>
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -160,23 +292,18 @@ export default function Team() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Convidar Membro da Equipe</DialogTitle>
+                <DialogTitle>Convidar Membro</DialogTitle>
                 <DialogDescription>
-                  Envie um convite para participar da sua organização. A pessoa receberá um e-mail com o link para aceitar.
+                  Envie um convite por e-mail para um novo membro.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit(onInviteMember)} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Endereço de E-mail</label>
+                  <label className="text-sm font-medium">E-mail</label>
                   <Input
-                    {...register("email", {
-                      required: "E-mail é obrigatório",
-                      pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "E-mail inválido" }
-                    })}
-                    placeholder="colega@empresa.com.br"
-                    data-testid="input-invite-email"
+                    {...register("email", { required: true })}
+                    placeholder="nome@empresa.com"
                   />
-                  {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Função</label>
@@ -185,76 +312,61 @@ export default function Team() {
                     name="role"
                     render={({ field }) => (
                       <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger data-testid="select-invite-role">
-                          <SelectValue placeholder="Selecione uma função" />
+                        <SelectTrigger>
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="developer">Desenvolvedor</SelectItem>
                           <SelectItem value="admin">Administrador</SelectItem>
-                          <SelectItem value="external_client">Cliente Externo (Apenas arquivos)</SelectItem>
+                          <SelectItem value="external_client">Cliente Externo</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
                   />
                 </div>
 
-                {/* Bucket Permissions - Only show for external_client */}
                 {selectedRole === 'external_client' && (
-                  <div className="space-y-3">
+                  <div className="space-y-3 pt-2">
                     <label className="text-sm font-medium flex items-center gap-2">
                       <Database className="h-4 w-4" />
-                      Permissões de Buckets
+                      Buckets Permitidos
                     </label>
-                    <p className="text-xs text-muted-foreground">
-                      Selecione os buckets que este cliente poderá acessar e defina as permissões.
-                    </p>
-                    {bucketPermissions.length === 0 ? (
-                      <p className="text-sm text-muted-foreground italic">Nenhum bucket disponível. Crie um bucket primeiro.</p>
-                    ) : (
-                      <div className="max-h-48 overflow-y-auto space-y-2 border rounded-lg p-3 bg-muted/30">
-                        {bucketPermissions.map((bp) => (
-                          <div key={bp.bucketId} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-background transition-colors">
+                    <div className="max-h-48 overflow-y-auto border rounded-md p-2">
+                      {buckets?.map(b => {
+                        const bp = bucketPermissions.find(p => p.bucketId === b.id);
+                        return (
+                          <div key={b.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded">
                             <div className="flex items-center gap-2">
                               <Checkbox
-                                id={`bucket-${bp.bucketId}`}
-                                checked={bp.selected}
-                                onCheckedChange={() => toggleBucketSelection(bp.bucketId)}
+                                checked={bp?.selected}
+                                onCheckedChange={() => bp && toggleBucketSelection(bp.bucketId)}
                               />
-                              <label htmlFor={`bucket-${bp.bucketId}`} className="text-sm font-medium cursor-pointer">
-                                {bp.bucketName}
-                              </label>
+                              <span className="text-sm">{b.name}</span>
                             </div>
-                            {bp.selected && (
+                            {bp?.selected && (
                               <Select
                                 value={bp.permission}
-                                onValueChange={(val: 'read' | 'write' | 'read-write') => updateBucketPermission(bp.bucketId, val)}
+                                onValueChange={(val: any) => updateBucketPermission(bp.bucketId, val)}
                               >
-                                <SelectTrigger className="w-32 h-8">
+                                <SelectTrigger className="w-24 h-7 text-xs">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="read">Somente Leitura</SelectItem>
-                                  <SelectItem value="write">Somente Escrita</SelectItem>
-                                  <SelectItem value="read-write">Leitura e Escrita</SelectItem>
+                                  <SelectItem value="read">Ler</SelectItem>
+                                  <SelectItem value="write">Escrever</SelectItem>
+                                  <SelectItem value="read-write">Full</SelectItem>
                                 </SelectContent>
                               </Select>
                             )}
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
-                <Button type="submit" className="w-full" disabled={isInviting} data-testid="button-send-invite">
-                  {isInviting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    "Enviar Convite"
-                  )}
+                <Button type="submit" className="w-full" disabled={isInviting}>
+                  {isInviting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : "Enviar Convite"}
                 </Button>
               </form>
             </DialogContent>
@@ -262,139 +374,62 @@ export default function Team() {
         </div>
 
         {pendingInvitations.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-                Convites Pendentes
+          <Card className="mb-8 border-dashed border-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" /> Convites Pendentes
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <table className="w-full">
-                <thead className="bg-muted/50 border-b">
-                  <tr>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">E-mail</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Função</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Expira em</th>
-                    <th className="text-right p-4 text-sm font-medium text-muted-foreground pr-6">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {pendingInvitations.map((invitation) => (
-                    <tr key={invitation.id} className="group hover:bg-muted/50 transition-colors" data-testid={`row-invitation-${invitation.id}`}>
-                      <td className="p-4 pl-6">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
-                            <Mail className="h-4 w-4" />
-                          </div>
-                          <span className="font-medium text-slate-900" data-testid={`text-invitation-email-${invitation.id}`}>
-                            {invitation.email}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <Badge variant="secondary" className="capitalize">
-                          {getRoleIcon(invitation.role)}
-                          {getRoleLabel(invitation.role)}
-                        </Badge>
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {new Date(invitation.expiresAt).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="p-4 text-right pr-6">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => onCancelInvitation(invitation.id)}
-                          data-testid={`button-cancel-invitation-${invitation.id}`}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pendingInvitations.map(inv => (
+                  <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                    <div className="flex flex-col overflow-hidden mr-2">
+                      <span className="font-medium truncate" title={inv.email}>{inv.email}</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        {getRoleLabel(inv.role)} • Expira em {format(new Date(inv.expiresAt), "dd/MM")}
+                      </span>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => onCancelInvitation(inv.id)} className="shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Membros da Equipe</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-muted/50 border-b">
-                  <tr>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Usuário</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Função</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Entrou em</th>
-                    <th className="text-right p-4 text-sm font-medium text-muted-foreground pr-6">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {members?.map((member) => (
-                    <tr key={member.id} className="group hover:bg-muted/50 transition-colors" data-testid={`row-member-${member.id}`}>
-                      <td className="p-4 pl-6">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                            {member.user?.firstName?.[0] || member.user?.email?.[0] || "U"}
-                          </div>
-                          <div>
-                            <div className="font-medium text-slate-900">{member.user?.firstName || "Usuário Desconhecido"}</div>
-                            <div className="text-xs text-muted-foreground">{member.user?.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        {member.role === 'owner' ? (
-                          <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100">
-                            {getRoleIcon(member.role)}
-                            Proprietário
-                          </Badge>
-                        ) : (
-                          <Select
-                            value={member.role}
-                            onValueChange={(value) => onChangeRole(member.id, value)}
-                          >
-                            <SelectTrigger className="w-32 h-8" data-testid={`select-role-${member.id}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">Administrador</SelectItem>
-                              <SelectItem value="developer">Desenvolvedor</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {new Date(member.joinedAt!).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="p-4 text-right pr-6">
-                        {member.role !== 'owner' && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-muted-foreground hover:text-destructive"
-                            onClick={() => onRemove(member.id)}
-                            data-testid={`button-remove-member-${member.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
+        {isLoading ? (
+          <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+        ) : (
+          <div className="space-y-8">
+            <MemberTable
+              title="Proprietário"
+              description="Acesso total e controle de faturamento."
+              membersList={owners}
+            />
+
+            <MemberTable
+              title="Administradores"
+              description="Podem gerenciar buckets, convidar membros e configurar o sistema."
+              membersList={admins}
+            />
+
+            <MemberTable
+              title="Desenvolvedores"
+              description="Acesso a buckets e chaves de API, sem configurações administrativas."
+              membersList={developers}
+            />
+
+            <MemberTable
+              title="Clientes Externos / Convidados"
+              description="Acesso restrito apenas aos buckets listados abaixo."
+              membersList={guests}
+              showPermissions={true}
+            />
+          </div>
+        )}
       </main>
     </div>
   );

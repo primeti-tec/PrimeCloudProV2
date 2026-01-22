@@ -106,8 +106,11 @@ export const auditLogs = pgTable("audit_logs", {
   userId: varchar("user_id").references(() => users.id),
   action: text("action").notNull(), // BUCKET_CREATED, KEY_REVOKED, MEMBER_ADDED, etc.
   resource: text("resource"),
-  details: jsonb("details"),
+  details: jsonb("details"), // { previous_state, current_state, context, resourceName, resourceId }
+  severity: text("severity").default("info"), // info, warning, error, critical
+  context: text("context"), // api, panel, system, cron
   ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

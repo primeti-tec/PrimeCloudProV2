@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { TopNavigation } from "@/components/TopNavigation";
 import { useAccount, useMyAccounts } from "@/hooks/use-accounts";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui-custom";
 import { useLocation } from "wouter";
 import { Loader2, HardDrive, ArrowUpRight, Activity, Users, DollarSign, Plus, Key, UserPlus, AlertTriangle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
-import { NotificationsBell } from "@/components/NotificationsBell";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -91,9 +91,11 @@ export default function Dashboard() {
             <p className="text-muted-foreground">Visão geral de <span className="font-semibold text-foreground">{currentAccount?.name}</span></p>
           </div>
           <div className="flex items-center gap-4">
-            {currentAccount && <NotificationsBell accountId={currentAccount.id} />}
-            <Button variant="outline" data-testid="button-view-docs">Documentação</Button>
-            <Button data-testid="button-create-bucket-header">Criar Bucket</Button>
+            <TopNavigation />
+            <Button onClick={() => setLocation("/dashboard/storage")} data-testid="button-create-bucket-header">
+              <Plus className="h-4 w-4 mr-2" />
+              Criar Bucket
+            </Button>
           </div>
         </header>
 
