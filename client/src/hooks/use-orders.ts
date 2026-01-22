@@ -73,3 +73,22 @@ export function useAdminOrders() {
     },
   });
 }
+
+
+export function useAdminUpdateOrder() {
+  return useMutation({
+    mutationFn: async ({ accountId, orderId, ...data }: {
+      accountId: number;
+      orderId: number;
+      status?: 'pending' | 'processing' | 'completed' | 'canceled' | 'refunded';
+      paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
+      notes?: string;
+    }) => {
+      const url = buildUrl(api.orders.update.path, { accountId, orderId });
+      return apiRequest('PATCH', url, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
+    },
+  });
+}

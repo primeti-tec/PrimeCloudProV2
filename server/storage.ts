@@ -862,17 +862,20 @@ export class DatabaseStorage implements IStorage {
     const results = await db.select({
       order: orders,
       account: accounts,
-      product: products
+      product: products,
+      vpsConfig: vpsConfigs,
     })
       .from(orders)
       .leftJoin(accounts, eq(orders.accountId, accounts.id))
       .leftJoin(products, eq(orders.productId, products.id))
+      .leftJoin(vpsConfigs, eq(orders.id, vpsConfigs.orderId))
       .orderBy(desc(orders.createdAt));
 
     return results.map(r => ({
       ...r.order,
       account: r.account || undefined,
-      product: r.product || undefined
+      product: r.product || undefined,
+      vpsConfig: r.vpsConfig || undefined,
     }));
   }
 

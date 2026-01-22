@@ -89,7 +89,27 @@ export async function handleTestSMTP(req: any, res: Response) {
         }
 
         // Send test email
-        const { sendEmail } = await import("../services/email");
+        const { sendEmail, createSmtpTransporter } = await import("../services/email");
+
+        // First verify connection
+        if (account.smtpEnabled && account.smtpHost) {
+            try {
+                const transporter = createSmtpTransporter({
+                    smtpEnabled: account.smtpEnabled,
+                    smtpHost: account.smtpHost,
+                    smtpPort: account.smtpPort,
+                    smtpUser: account.smtpUser,
+                    smtpPass: account.smtpPass,
+                    smtpEncryption: account.smtpEncryption,
+                });
+                await transporter.verify();
+            } catch (verifyError: any) {
+                console.error("[SMTP Test] Verify failed:", verifyError);
+                return res.status(400).json({
+                    message: `Falha na conexão SMTP: ${verifyError.message || 'Verifique suas credenciais'}`
+                });
+            }
+        }
 
         await sendEmail(
             {

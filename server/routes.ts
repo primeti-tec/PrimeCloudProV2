@@ -1741,7 +1741,7 @@ export async function registerRoutes(
       const orderId = parseInt(req.params.orderId);
 
       const membership = await storage.getMembership(userId, accountId);
-      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      if ((!membership || !['owner', 'admin'].includes(membership.role)) && !isSuperAdmin(req.currentUser?.email)) {
         return res.status(403).json({ message: "Forbidden" });
       }
 

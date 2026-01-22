@@ -89,7 +89,7 @@ export default function Settings() {
       setSmtpHost((selectedAccount as any).smtpHost || "");
       setSmtpPort((selectedAccount as any).smtpPort || 587);
       setSmtpUser((selectedAccount as any).smtpUser || "");
-      setSmtpPass(""); // Never load password for security
+      setSmtpPass((selectedAccount as any).smtpPass || "");
       setSmtpFromEmail((selectedAccount as any).smtpFromEmail || "");
       setSmtpFromName((selectedAccount as any).smtpFromName || "");
       setSmtpEncryption((selectedAccount as any).smtpEncryption || "tls");

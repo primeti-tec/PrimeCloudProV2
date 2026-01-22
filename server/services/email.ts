@@ -103,8 +103,11 @@ ${text || '(Nenhuma versão em texto disponível)'}
 
       console.log(`✅ [EmailService] Email enviado via SMTP customizado para ${to}`);
       return;
-    } catch (error) {
-      console.error(`❌ [EmailService] Falha ao enviar pelo SMTP customizado:`, error);
+    } catch (error: any) {
+      console.error(`❌ [EmailService] Falha ao enviar pelo SMTP customizado: ${error.message}`);
+      if (error.response) {
+        console.error(`❌ [EmailService] Resposta do servidor SMTP: ${error.response}`);
+      }
       console.log(`⚠️  [EmailService] Tentando fallback para SendGrid...`);
       // Fall through to SendGrid
     }
@@ -134,17 +137,22 @@ ${text || '(Nenhuma versão em texto disponível)'}
 /**
  * Create a nodemailer transporter from SMTP config
  */
-function createSmtpTransporter(config: AccountSmtpConfig) {
+export function createSmtpTransporter(config: AccountSmtpConfig) {
   // Sanitize host by trimming whitespace
   const host = (config.smtpHost || '').trim();
   const port = config.smtpPort || 587;
   const encryption = config.smtpEncryption || 'none';
 
   // Determine security settings based on encryption type and port
-  // Port 465 typically uses implicit SSL
-  // Port 587 typically uses STARTTLS
-  const secure = encryption === 'ssl' || port === 465;
-  const requireTLS = encryption === 'tls' || (port === 587 && encryption !== 'ssl');
+  // Port 465 typically uses implicit SSL (secure: true)
+  // Port 587 typically uses STARTTLS (secure: false)
+
+  // If user explicitly chose SSL, or uses port 465, we use secure: true
+  // BUT if port is 587, it is almost ALWAYS secure: false (STARTTLS)
+  let secure = encryption === 'ssl' || port === 465;
+  if (port === 587) secure = false;
+
+  const requireTLS = encryption === 'tls' || encryption === 'ssl' || port === 587;
 
   console.log(`📧 [SMTP Config] Host: ${host}, Port: ${port}, Encryption: ${encryption}`);
   console.log(`📧 [SMTP Config] Secure (SSL): ${secure}, RequireTLS: ${requireTLS}`);

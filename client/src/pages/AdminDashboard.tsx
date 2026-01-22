@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { Account, QuotaRequest, Product } from "@shared/schema";
 import { PricingManager } from "@/components/admin/PricingManager";
+import { OrdersManager } from "@/components/admin/OrdersManager";
 
 
 
@@ -791,6 +792,10 @@ export default function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+
+        <div className="mb-8">
+          <OrdersManager />
+        </div>
 
         {/* Pricing Management Section */}
         <div className="mb-8">
