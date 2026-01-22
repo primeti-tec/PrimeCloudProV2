@@ -13,6 +13,7 @@ import { Loader2, CheckCircle, Clock, Users, DollarSign, Building2, AlertCircle,
 import { useToast } from "@/hooks/use-toast";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { Account, QuotaRequest, Product } from "@shared/schema";
+import { PricingManager } from "@/components/admin/PricingManager";
 
 
 
@@ -790,6 +791,11 @@ export default function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Pricing Management Section */}
+        <div className="mb-8">
+          <PricingManager />
+        </div>
 
         <Card>
           <CardHeader>

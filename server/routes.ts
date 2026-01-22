@@ -635,6 +635,103 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // === PRICING MANAGEMENT (Admin Only) ===
+
+  // Get all pricing configs (public for frontend)
+  app.get('/api/pricing', async (req: any, res) => {
+    const category = req.query.category as string | undefined;
+    const configs = await storage.getPricingConfigs(category);
+    res.json(configs);
+  });
+
+  // Get all pricing configs (admin)
+  app.get('/api/admin/pricing', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    const category = req.query.category as string | undefined;
+    const configs = await storage.getPricingConfigs(category);
+    res.json(configs);
+  });
+
+  // Create pricing config
+  app.post('/api/admin/pricing', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const { userId } = getAuth(req);
+      const config = await storage.createPricingConfig(req.body);
+      await storage.createAuditLog({
+        userId: userId!,
+        action: 'PRICING_CREATED',
+        resource: 'pricing',
+        details: { configId: config.id, category: config.category, resourceKey: config.resourceKey },
+      });
+      res.status(201).json(config);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create pricing config" });
+    }
+  });
+
+  // Update pricing config
+  app.put('/api/admin/pricing/:id', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const { userId } = getAuth(req);
+      const configId = parseInt(req.params.id);
+      const { changeReason, ...data } = req.body;
+      const config = await storage.updatePricingConfig(configId, data, userId || 'unknown', changeReason);
+      await storage.createAuditLog({
+        userId: userId!,
+        action: 'PRICING_UPDATED',
+        resource: 'pricing',
+        details: { configId, updates: data, changeReason },
+      });
+      res.json(config);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update pricing config" });
+    }
+  });
+
+  // Delete (deactivate) pricing config
+  app.delete('/api/admin/pricing/:id', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    const { userId } = getAuth(req);
+    const configId = parseInt(req.params.id);
+    await storage.deletePricingConfig(configId);
+    await storage.createAuditLog({
+      userId: userId!,
+      action: 'PRICING_DELETED',
+      resource: 'pricing',
+      details: { configId },
+    });
+    res.json({ success: true });
+  });
+
+  // Get pricing history
+  app.get('/api/admin/pricing/history', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    const configId = req.query.configId ? parseInt(req.query.configId as string) : undefined;
+    const history = await storage.getPricingHistory(configId);
+    res.json(history);
+  });
+
+  // Seed pricing configs (admin utility)
+  app.post('/api/admin/pricing/seed', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    await storage.seedPricingConfigs();
+    res.json({ success: true, message: 'Pricing configs seeded' });
+  });
+
   // Remove Member
   app.delete(api.members.remove.path, requireAuth(), async (req: any, res) => {
     const { userId } = getAuth(req);
@@ -1724,6 +1821,118 @@ export async function registerRoutes(
     }
     const allOrders = await storage.getAllOrders();
     res.json(allOrders);
+  });
+
+  // Create VPS Order (new order type for VPS configuration)
+  app.post(api.orders.createVps.path, requireAuth(), async (req: any, res) => {
+    try {
+      const { userId } = getAuth(req);
+      const accountId = parseInt(req.params.accountId);
+
+      const membership = await storage.getMembership(userId, accountId);
+      if (!membership) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const input = api.orders.createVps.input.parse(req.body);
+
+      // Create VPS order with configuration
+      const result = await storage.createVpsOrder(
+        accountId,
+        input.vpsConfig,
+        input.notes,
+        input.paymentMethod
+      );
+
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'VPS_ORDER_CREATED',
+        resource: 'order',
+        details: {
+          orderId: result.order.id,
+          orderNumber: result.order.orderNumber,
+          vpsConfig: {
+            os: input.vpsConfig.os,
+            cpuCores: input.vpsConfig.cpuCores,
+            ramGB: input.vpsConfig.ramGB,
+            storageGB: input.vpsConfig.storageGB,
+            location: input.vpsConfig.location,
+          },
+          estimatedPrice: result.order.totalAmount,
+        },
+      });
+
+      // Create notification for admin
+      await storage.createNotification({
+        accountId,
+        type: 'vps_order_pending',
+        title: 'Nova Solicitação de VPS',
+        message: `Novo pedido de VPS #${result.order.orderNumber} aguardando orçamento.`,
+        metadata: { orderId: result.order.id },
+      });
+
+      res.status(201).json({
+        success: true,
+        order: result.order,
+        message: 'Solicitação de VPS criada com sucesso. Aguarde o contato de nossa equipe.',
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // Create Backup Order (for backup cloud and backup vps)
+  app.post('/api/accounts/:accountId/orders/backup', requireAuth(), async (req: any, res) => {
+    try {
+      const { userId } = getAuth(req);
+      const accountId = parseInt(req.params.accountId);
+
+      const membership = await storage.getMembership(userId, accountId);
+      if (!membership) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const { type, ...config } = req.body;
+
+      // Create backup order
+      const order = await storage.createBackupOrder(accountId, type, config);
+
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'BACKUP_ORDER_CREATED',
+        resource: 'order',
+        details: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          type,
+          config,
+        },
+      });
+
+      // Create notification for admin
+      await storage.createNotification({
+        accountId,
+        type: 'backup_order_pending',
+        title: type === 'backup-cloud' ? 'Nova Solicitação de Backup Cloud' : 'Nova Solicitação de Backup VPS',
+        message: `Novo pedido de backup #${order.orderNumber} aguardando orçamento.`,
+        metadata: { orderId: order.id },
+      });
+
+      res.status(201).json({
+        success: true,
+        order,
+        message: 'Solicitação de backup criada com sucesso. Aguarde o contato de nossa equipe.',
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   });
 
   // Seed Data

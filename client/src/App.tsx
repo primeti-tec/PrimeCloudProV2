@@ -15,6 +15,7 @@ import ApiKeys from "@/pages/ApiKeys";
 import AuditLogs from "@/pages/AuditLogs";
 import SftpAccess from "@/pages/SftpAccess";
 import Orders from "@/pages/Orders";
+import ContractService from "@/pages/ContractService";
 import Settings from "@/pages/Settings";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AcceptInvite from "@/pages/AcceptInvite";
@@ -112,6 +113,9 @@ function Router() {
       </Route>
       <Route path="/dashboard/orders">
         <PrivateRoute component={Orders} />
+      </Route>
+      <Route path="/dashboard/contract">
+        <PrivateRoute component={ContractService} />
       </Route>
       <Route path="/dashboard/settings">
         <PrivateRoute component={Settings} />

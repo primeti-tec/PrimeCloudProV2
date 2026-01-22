@@ -1,11 +1,11 @@
 import { db } from "./db";
 import { minioService } from "./services/minio.service";
 import {
-  users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs, invitations, sftpCredentials, invoices, usageRecords, quotaRequests, orders, bucketPermissions,
+  users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs, invitations, sftpCredentials, invoices, usageRecords, quotaRequests, orders, bucketPermissions, vpsConfigs, pricingConfigs, pricingHistory,
   type Account, type Product, type Subscription, type AccountMember, type Bucket, type AccessKey,
-  type Notification, type AuditLog, type Invitation, type SftpCredential, type Invoice, type QuotaRequest, type Order, type OrderWithDetails,
+  type Notification, type AuditLog, type Invitation, type SftpCredential, type Invoice, type QuotaRequest, type Order, type OrderWithDetails, type VpsConfig, type PricingConfig, type PricingHistory,
   type CreateAccountRequest, type CreateMemberRequest, type CreateBucketRequest, type CreateAccessKeyRequest,
-  type CreateNotificationRequest, type CreateAuditLogRequest, type CreateQuotaRequestRequest, type CreateOrderRequest, type UpdateOrderRequest
+  type CreateNotificationRequest, type CreateAuditLogRequest, type CreateQuotaRequestRequest, type CreateOrderRequest, type UpdateOrderRequest, type CreateVpsConfigRequest, type CreatePricingConfigRequest, type UpdatePricingConfigRequest
 } from "@shared/schema";
 import { eq, and, desc, count, isNull, gt, gte, lte, ilike, or } from "drizzle-orm";
 import crypto from "crypto";
@@ -918,6 +918,72 @@ export class DatabaseStorage implements IStorage {
     return order;
   }
 
+  async createVpsOrder(accountId: number, vpsConfig: CreateVpsConfigRequest, notes?: string, paymentMethod?: string): Promise<{ order: Order, vpsConfig: VpsConfig }> {
+    const orderNumber = this.generateOrderNumber();
+
+    // Calculate estimated price from vpsConfig
+    const estimatedPrice = vpsConfig.basePriceCents || 0;
+
+    // Create the order first
+    const [order] = await db.insert(orders).values({
+      accountId,
+      orderNumber,
+      orderType: 'vps',
+      status: 'pending', // Will be changed to 'quoting' by admin
+      unitPrice: estimatedPrice,
+      totalAmount: estimatedPrice,
+      notes: notes || null,
+      paymentMethod: paymentMethod || null,
+      // Set estimated delivery to 5 business days from now
+      estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    }).returning();
+
+    // Create the VPS configuration linked to this order
+    const [config] = await db.insert(vpsConfigs).values({
+      orderId: order.id,
+      os: vpsConfig.os,
+      osVersion: vpsConfig.osVersion || null,
+      location: vpsConfig.location,
+      locationCode: vpsConfig.locationCode || null,
+      cpuCores: vpsConfig.cpuCores,
+      ramGB: vpsConfig.ramGB,
+      storageGB: vpsConfig.storageGB,
+      storageType: vpsConfig.storageType || 'ssd',
+      bandwidth: vpsConfig.bandwidth || '50',
+      hasPublicIP: vpsConfig.hasPublicIP || false,
+      publicIPCount: vpsConfig.publicIPCount || 0,
+      hasBackup: vpsConfig.hasBackup || false,
+      backupFrequency: vpsConfig.backupFrequency || null,
+      internalNetworks: vpsConfig.internalNetworks || 0,
+      basePriceCents: vpsConfig.basePriceCents || 0,
+    }).returning();
+
+    return { order, vpsConfig: config };
+  }
+
+  async getVpsConfig(orderId: number): Promise<VpsConfig | undefined> {
+    const [config] = await db.select().from(vpsConfigs).where(eq(vpsConfigs.orderId, orderId));
+    return config;
+  }
+
+  async createBackupOrder(accountId: number, type: string, config: any): Promise<Order> {
+    const orderNumber = `BCK-${Date.now().toString(36).toUpperCase()}`;
+
+    const [order] = await db.insert(orders).values({
+      accountId,
+      orderNumber,
+      orderType: type, // 'backup-cloud' or 'backup-vps'
+      status: 'quoting',
+      unitPrice: config.estimatedPrice || 0,
+      totalAmount: config.estimatedPrice || 0,
+      notes: JSON.stringify(config),
+      paymentMethod: 'pix',
+      estimatedDelivery: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days
+    }).returning();
+
+    return order;
+  }
+
   async getAdminStats(): Promise<any> {
     const allAccounts = await this.getAllAccounts();
     const activeAccounts = allAccounts.filter(a => a.status === 'active');
@@ -979,6 +1045,104 @@ export class DatabaseStorage implements IStorage {
       mrrHistory,
       signupsHistory
     };
+  }
+
+  // === PRICING MANAGEMENT ===
+  async getPricingConfigs(category?: string): Promise<PricingConfig[]> {
+    if (category) {
+      return await db.select().from(pricingConfigs)
+        .where(and(eq(pricingConfigs.category, category), eq(pricingConfigs.isActive, true)))
+        .orderBy(pricingConfigs.sortOrder);
+    }
+    return await db.select().from(pricingConfigs)
+      .where(eq(pricingConfigs.isActive, true))
+      .orderBy(pricingConfigs.category, pricingConfigs.sortOrder);
+  }
+
+  async getPricingConfig(id: number): Promise<PricingConfig | undefined> {
+    const [config] = await db.select().from(pricingConfigs).where(eq(pricingConfigs.id, id));
+    return config;
+  }
+
+  async createPricingConfig(data: CreatePricingConfigRequest): Promise<PricingConfig> {
+    const [config] = await db.insert(pricingConfigs).values(data).returning();
+    return config;
+  }
+
+  async updatePricingConfig(id: number, data: UpdatePricingConfigRequest, changedBy: string, changeReason?: string): Promise<PricingConfig> {
+    // Get current config for history
+    const current = await this.getPricingConfig(id);
+    if (!current) throw new Error('Pricing config not found');
+
+    // Update the config
+    const [updated] = await db.update(pricingConfigs)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(pricingConfigs.id, id))
+      .returning();
+
+    // Record history if price changed
+    if (data.priceCents !== undefined && data.priceCents !== current.priceCents) {
+      await db.insert(pricingHistory).values({
+        pricingConfigId: id,
+        oldPriceCents: current.priceCents,
+        newPriceCents: data.priceCents,
+        changedBy,
+        changeReason,
+      });
+    }
+
+    return updated;
+  }
+
+  async deletePricingConfig(id: number): Promise<void> {
+    await db.update(pricingConfigs)
+      .set({ isActive: false })
+      .where(eq(pricingConfigs.id, id));
+  }
+
+  async getPricingHistory(configId?: number): Promise<PricingHistory[]> {
+    if (configId) {
+      return await db.select().from(pricingHistory)
+        .where(eq(pricingHistory.pricingConfigId, configId))
+        .orderBy(desc(pricingHistory.createdAt));
+    }
+    return await db.select().from(pricingHistory)
+      .orderBy(desc(pricingHistory.createdAt))
+      .limit(100);
+  }
+
+  async seedPricingConfigs(): Promise<void> {
+    const existing = await db.select().from(pricingConfigs).limit(1);
+    if (existing.length > 0) return; // Already seeded
+
+    const seedData: CreatePricingConfigRequest[] = [
+      // VPS Pricing
+      { category: 'vps', resourceKey: 'cpu_per_core', resourceLabel: 'CPU por Core', priceCents: 1500, unit: 'core', sortOrder: 1 },
+      { category: 'vps', resourceKey: 'ram_per_gb', resourceLabel: 'RAM por GB', priceCents: 800, unit: 'gb', sortOrder: 2 },
+      { category: 'vps', resourceKey: 'storage_per_gb', resourceLabel: 'SSD por GB', priceCents: 15, unit: 'gb', sortOrder: 3 },
+      { category: 'vps', resourceKey: 'bandwidth_per_mbps', resourceLabel: 'Banda por Mbps', priceCents: 20, unit: 'mbps', sortOrder: 4 },
+      { category: 'vps', resourceKey: 'public_ip', resourceLabel: 'IP Público', priceCents: 1500, unit: 'unit', sortOrder: 5 },
+      { category: 'vps', resourceKey: 'backup_base', resourceLabel: 'Backup Base', priceCents: 2000, unit: 'unit', sortOrder: 6 },
+      { category: 'vps', resourceKey: 'internal_network', resourceLabel: 'Rede Interna', priceCents: 500, unit: 'unit', sortOrder: 7 },
+      // Backup Cloud Pricing
+      { category: 'backup_cloud', resourceKey: 'storage_per_gb', resourceLabel: 'Armazenamento por GB', priceCents: 8, unit: 'gb', sortOrder: 1 },
+      { category: 'backup_cloud', resourceKey: 'daily_backup', resourceLabel: 'Backup Diário', priceCents: 2000, unit: 'unit', sortOrder: 2 },
+      { category: 'backup_cloud', resourceKey: 'weekly_backup', resourceLabel: 'Backup Semanal', priceCents: 1000, unit: 'unit', sortOrder: 3 },
+      { category: 'backup_cloud', resourceKey: 'monthly_backup', resourceLabel: 'Backup Mensal', priceCents: 500, unit: 'unit', sortOrder: 4 },
+      { category: 'backup_cloud', resourceKey: 'retention_per_day', resourceLabel: 'Retenção Extra por Dia', priceCents: 50, unit: 'day', sortOrder: 5 },
+      // Backup VPS Pricing
+      { category: 'backup_vps', resourceKey: 'snapshot_base', resourceLabel: 'Base Snapshot', priceCents: 5000, unit: 'unit', sortOrder: 1 },
+      { category: 'backup_vps', resourceKey: 'per_gb', resourceLabel: 'Por GB de VM', priceCents: 15, unit: 'gb', sortOrder: 2 },
+      { category: 'backup_vps', resourceKey: 'daily_multiplier', resourceLabel: 'Multiplicador Diário', priceCents: 150, unit: 'percent', sortOrder: 3 },
+      { category: 'backup_vps', resourceKey: 'weekly_multiplier', resourceLabel: 'Multiplicador Semanal', priceCents: 100, unit: 'percent', sortOrder: 4 },
+      { category: 'backup_vps', resourceKey: 'monthly_multiplier', resourceLabel: 'Multiplicador Mensal', priceCents: 50, unit: 'percent', sortOrder: 5 },
+      { category: 'backup_vps', resourceKey: 'retention_per_day', resourceLabel: 'Retenção por Dia', priceCents: 100, unit: 'day', sortOrder: 6 },
+      { category: 'backup_vps', resourceKey: 'database_addon', resourceLabel: 'Addon Databases', priceCents: 2000, unit: 'unit', sortOrder: 7 },
+    ];
+
+    for (const config of seedData) {
+      await db.insert(pricingConfigs).values(config);
+    }
   }
 }
 

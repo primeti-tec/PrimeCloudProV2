@@ -5,7 +5,7 @@ import { useSubscribe } from "@/hooks/use-subscriptions";
 import { useQuotaRequests, useCreateQuotaRequest } from "@/hooks/use-quota-requests";
 import { useInvoices, useUsageSummary } from "@/hooks/use-billing";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui-custom";
-import { Check, Loader2, CreditCard, Download, FileText, HardDrive, Wifi, Activity, DollarSign, ArrowUp, FileUp, Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { Check, Loader2, CreditCard, Download, FileText, HardDrive, Wifi, Activity, DollarSign, ArrowUp, FileUp, Clock, CheckCircle, XCircle, AlertTriangle, ShoppingCart, Package, RefreshCw, X } from "lucide-react";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useOrders, useUpdateOrder, useCancelOrder } from "@/hooks/use-orders";
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface Invoice {
   id: number;
@@ -118,6 +121,11 @@ export default function Billing() {
 
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices(currentAccount?.id);
   const { data: usage, isLoading: usageLoading } = useUsageSummary(currentAccount?.id);
+
+  // Orders
+  const { data: orders = [], isLoading: ordersLoading } = useOrders(currentAccount?.id || 0);
+  const updateOrder = useUpdateOrder(currentAccount?.id || 0);
+  const cancelOrder = useCancelOrder(currentAccount?.id || 0);
 
   const usageData = usage || {
     storageUsedGB: 0,
@@ -549,6 +557,92 @@ export default function Billing() {
                           <Download className="h-4 w-4 mr-1" />
                           Baixar
                         </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Orders Section */}
+        <h2 className="text-xl font-bold font-display mb-4 flex items-center gap-2">
+          <ShoppingCart className="h-5 w-5" /> Pedidos
+        </h2>
+        <Card className="mb-8">
+          <CardContent className="p-0">
+            {ordersLoading ? (
+              <div className="p-8 flex justify-center">
+                <Loader2 className="animate-spin h-6 w-6" />
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                <p>Nenhum pedido encontrado.</p>
+                <Button variant="ghost" className="mt-2" onClick={() => window.location.href = '/dashboard/contract'}>
+                  Contratar um Serviço
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Pedido #</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orders.slice(0, 10).map((order) => (
+                    <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
+                      <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                      <TableCell>
+                        {order.createdAt ? format(new Date(order.createdAt), "dd/MM/yyyy", { locale: ptBR }) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {order.orderType === 'vps' ? 'VPS' : order.product?.name || 'Produto'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>R$ {((order.totalAmount || 0) / 100).toFixed(2).replace('.', ',')}</TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          order.status === 'completed' ? 'success' :
+                            order.status === 'canceled' ? 'destructive' :
+                              order.status === 'pending' ? 'secondary' :
+                                'default'
+                        }>
+                          {order.status === 'pending' ? 'Pendente' :
+                            order.status === 'quoting' ? 'Em Orçamento' :
+                              order.status === 'approved' ? 'Aprovado' :
+                                order.status === 'provisioning' ? 'Provisionando' :
+                                  order.status === 'completed' ? 'Concluído' :
+                                    order.status === 'canceled' ? 'Cancelado' :
+                                      order.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {order.status !== 'canceled' && order.status !== 'completed' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => cancelOrder.mutate({ orderId: order.id })}
+                            disabled={cancelOrder.isPending}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Cancelar
+                          </Button>
+                        )}
+                        {order.status === 'completed' && (
+                          <Badge variant="outline" className="bg-green-50">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Concluído
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

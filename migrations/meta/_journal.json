@@ -15,6 +15,20 @@
       "when": 1769045024926,
       "tag": "0001_mighty_the_executioner",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769093451606,
+      "tag": "0002_tricky_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1769098318166,
+      "tag": "0003_ordinary_morlocks",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, HardDrive, ShoppingCart, Save, FolderOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, HardDrive, ShoppingCart, Save, FolderOpen, ChevronDown, ChevronRight, Server } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranding } from "./branding-provider";
 import { useCurrentRole } from "@/hooks/use-current-account";
@@ -41,9 +41,9 @@ export function Sidebar() {
   // Define all nav items, some conditionally visible
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: !isExternalClient },
+    { name: "Contratar Serviço", href: "/dashboard/contract", icon: Server, show: !isExternalClient },
     { name: "Acesso SFTP", href: "/dashboard/sftp", icon: HardDrive, show: !isExternalClient },
     { name: "Backup", href: "/dashboard/backup", icon: Save, show: !isExternalClient },
-    { name: "Pedidos", href: "/dashboard/orders", icon: ShoppingCart, show: !isExternalClient },
     { name: "Equipe", href: "/dashboard/team", icon: Users, show: canManageMembers },
     { name: "Faturamento", href: "/dashboard/billing", icon: CreditCard, show: canViewBilling },
     { name: "Chaves de API", href: "/dashboard/api-keys", icon: Key, show: !isExternalClient },

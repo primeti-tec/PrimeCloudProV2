@@ -173,68 +173,70 @@ export default function Orders() {
                 <ShoppingCart className="h-6 w-6" />
                 Pedidos
               </h1>
-              <p className="text-muted-foreground">Gerencie seus pedidos de assinatura de armazenamento</p>
+              <p className="text-muted-foreground">Gerencie seus pedidos e contratações de serviços</p>
             </div>
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-create-order">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Pedido
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Novo Pedido</DialogTitle>
-                  <DialogDescription>Selecione um produto e método de pagamento para criar um novo pedido.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Produto</Label>
-                    <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                      <SelectTrigger data-testid="select-product">
-                        <SelectValue placeholder="Selecione um produto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products?.map((product) => (
-                          <SelectItem key={product.id} value={product.id.toString()}>
-                            {product.name} - {formatCurrency(product.price)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Método de Pagamento</Label>
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger data-testid="select-payment-method">
-                        <SelectValue placeholder="Selecione o método de pagamento" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
-                        <SelectItem value="pix">PIX</SelectItem>
-                        <SelectItem value="boleto">Boleto</SelectItem>
-                        <SelectItem value="bank_transfer">Transferência Bancária</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Observações (opcional)</Label>
-                    <Textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Alguma observação adicional..."
-                      data-testid="input-order-notes"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setCreateDialogOpen(false)} data-testid="button-cancel-create-dialog">Cancelar</Button>
-                  <Button onClick={handleCreateOrder} disabled={createOrder.isPending} data-testid="button-submit-order">
-                    {createOrder.isPending ? 'Criando...' : 'Criar Pedido'}
+            <div className="flex gap-2">
+              <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-create-order">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo Pedido
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Criar Novo Pedido</DialogTitle>
+                    <DialogDescription>Selecione um produto e método de pagamento para criar um novo pedido.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Produto</Label>
+                      <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                        <SelectTrigger data-testid="select-product">
+                          <SelectValue placeholder="Selecione um produto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products?.map((product) => (
+                            <SelectItem key={product.id} value={product.id.toString()}>
+                              {product.name} - {formatCurrency(product.price)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Método de Pagamento</Label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger data-testid="select-payment-method">
+                          <SelectValue placeholder="Selecione o método de pagamento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                          <SelectItem value="pix">PIX</SelectItem>
+                          <SelectItem value="boleto">Boleto</SelectItem>
+                          <SelectItem value="bank_transfer">Transferência Bancária</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Observações (opcional)</Label>
+                      <Textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Alguma observação adicional..."
+                        data-testid="input-order-notes"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCreateDialogOpen(false)} data-testid="button-cancel-create-dialog">Cancelar</Button>
+                    <Button onClick={handleCreateOrder} disabled={createOrder.isPending} data-testid="button-submit-order">
+                      {createOrder.isPending ? 'Criando...' : 'Criar Pedido'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
 
           {orders && orders.length === 0 ? (

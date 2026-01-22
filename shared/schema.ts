@@ -224,7 +224,8 @@ export const orders = pgTable("orders", {
   accountId: integer("account_id").references(() => accounts.id),
   productId: integer("product_id").references(() => products.id),
   orderNumber: text("order_number").notNull().unique(),
-  status: text("status").default("pending"), // pending, processing, completed, canceled, refunded
+  orderType: text("order_type").default("product"), // product, vps, dedicated, storage
+  status: text("status").default("pending"), // pending, quoting, approved, provisioning, completed, canceled, refunded
   quantity: integer("quantity").default(1),
   unitPrice: integer("unit_price").notNull(), // cents
   totalAmount: integer("total_amount").notNull(), // cents
@@ -235,8 +236,76 @@ export const orders = pgTable("orders", {
   paidAt: timestamp("paid_at"),
   canceledAt: timestamp("canceled_at"),
   cancelReason: text("cancel_reason"),
+  adminNotes: text("admin_notes"), // Notas internas do admin
+  estimatedDelivery: timestamp("estimated_delivery"), // Data estimada de entrega
+  deliveredAt: timestamp("delivered_at"), // Data de entrega efetiva
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// === VPS CONFIGURATIONS (Linked to Orders) ===
+export const vpsConfigs = pgTable("vps_configs", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id).unique(),
+  // Sistema Operacional
+  os: text("os").notNull(), // Ubuntu 22.04, CentOS 8, Windows Server 2022
+  osVersion: text("os_version"), // Versão específica
+  // Localização
+  location: text("location").notNull(), // São Paulo, New York, Frankfurt
+  locationCode: text("location_code"), // sp, ny, fra
+  // Recursos de Hardware
+  cpuCores: integer("cpu_cores").notNull().default(1),
+  ramGB: integer("ram_gb").notNull().default(1),
+  storageGB: integer("storage_gb").notNull().default(25),
+  storageType: text("storage_type").default("ssd"), // ssd, nvme, hdd
+  bandwidth: text("bandwidth").default("50"), // Mbps
+  bandwidthUnlimited: boolean("bandwidth_unlimited").default(false),
+  // Recursos Adicionais
+  hasPublicIP: boolean("has_public_ip").default(false),
+  publicIPCount: integer("public_ip_count").default(0),
+  hasBackup: boolean("has_backup").default(false),
+  backupFrequency: text("backup_frequency"), // daily, weekly, monthly
+  backupRetention: integer("backup_retention"), // dias
+  internalNetworks: integer("internal_networks").default(0),
+  // Preços calculados (em centavos)
+  basePriceCents: integer("base_price_cents").default(0),
+  ipPriceCents: integer("ip_price_cents").default(0),
+  backupPriceCents: integer("backup_price_cents").default(0),
+  networkPriceCents: integer("network_price_cents").default(0),
+  // Dados de provisionamento
+  serverIP: text("server_ip"), // IP atribuído após provisionamento
+  serverHostname: text("server_hostname"),
+  accessCredentials: jsonb("access_credentials"), // { user, password } criptografado
+  provisionedAt: timestamp("provisioned_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === PRICING CONFIGURATIONS ===
+export const pricingConfigs = pgTable("pricing_configs", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(), // 'vps', 'backup_cloud', 'backup_vps', 'storage'
+  resourceKey: text("resource_key").notNull(), // 'cpu_per_core', 'ram_per_gb', etc.
+  resourceLabel: text("resource_label").notNull(), // 'CPU por Core', 'RAM por GB'
+  priceCents: integer("price_cents").notNull(), // Preço em centavos
+  unit: text("unit").notNull(), // 'core', 'gb', 'mbps', 'day', 'unit', 'percent'
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  minValue: integer("min_value").default(1),
+  maxValue: integer("max_value"), // null = ilimitado
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// === PRICING HISTORY (Audit Trail) ===
+export const pricingHistory = pgTable("pricing_history", {
+  id: serial("id").primaryKey(),
+  pricingConfigId: integer("pricing_config_id").references(() => pricingConfigs.id),
+  oldPriceCents: integer("old_price_cents"),
+  newPriceCents: integer("new_price_cents"),
+  changedBy: text("changed_by"), // User ID do admin
+  changeReason: text("change_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // === RELATIONS ===
@@ -253,6 +322,17 @@ export const ordersRelations = relations(orders, ({ one }) => ({
   product: one(products, {
     fields: [orders.productId],
     references: [products.id],
+  }),
+  vpsConfig: one(vpsConfigs, {
+    fields: [orders.id],
+    references: [vpsConfigs.orderId],
+  }),
+}));
+
+export const vpsConfigsRelations = relations(vpsConfigs, ({ one }) => ({
+  order: one(orders, {
+    fields: [vpsConfigs.orderId],
+    references: [orders.id],
   }),
 }));
 
@@ -411,11 +491,15 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true,
 export const insertUsageRecordSchema = createInsertSchema(usageRecords).omit({ id: true, recordedAt: true });
 export const insertQuotaRequestSchema = createInsertSchema(quotaRequests).omit({ id: true, createdAt: true, status: true, reviewedById: true, reviewNote: true, reviewedAt: true });
 export const insertSftpCredentialSchema = createInsertSchema(sftpCredentials).omit({ id: true, createdAt: true, lastLoginAt: true, lastLoginIp: true, loginCount: true });
-export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true, orderNumber: true, paidAt: true, canceledAt: true });
+export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true, orderNumber: true, paidAt: true, canceledAt: true, deliveredAt: true });
+export const insertVpsConfigSchema = createInsertSchema(vpsConfigs).omit({ id: true, createdAt: true, provisionedAt: true, serverIP: true, serverHostname: true, accessCredentials: true });
+export const insertPricingConfigSchema = createInsertSchema(pricingConfigs).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPricingHistorySchema = createInsertSchema(pricingHistory).omit({ id: true, createdAt: true });
 
 // === TYPES ===
 export type Product = typeof products.$inferSelect;
 export type Order = typeof orders.$inferSelect;
+export type VpsConfig = typeof vpsConfigs.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type AccountMember = typeof accountMembers.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
@@ -429,6 +513,8 @@ export type UsageRecord = typeof usageRecords.$inferSelect;
 export type QuotaRequest = typeof quotaRequests.$inferSelect;
 export type SftpCredential = typeof sftpCredentials.$inferSelect;
 export type BucketPermission = typeof bucketPermissions.$inferSelect;
+export type PricingConfig = typeof pricingConfigs.$inferSelect;
+export type PricingHistory = typeof pricingHistory.$inferSelect;
 
 export type CreateAccountRequest = z.infer<typeof insertAccountSchema>;
 export type UpdateAccountRequest = Partial<CreateAccountRequest>;
@@ -448,7 +534,19 @@ export type UpdateOrderRequest = Partial<Omit<CreateOrderRequest, 'accountId' | 
 export interface OrderWithDetails extends Order {
   account?: Account;
   product?: Product;
+  vpsConfig?: VpsConfig;
 }
+
+// VPS Order creation request (includes VPS config)
+export type CreateVpsOrderRequest = {
+  vpsConfig: z.infer<typeof insertVpsConfigSchema>;
+  notes?: string;
+  paymentMethod?: string;
+};
+
+export type CreateVpsConfigRequest = z.infer<typeof insertVpsConfigSchema>;
+export type CreatePricingConfigRequest = z.infer<typeof insertPricingConfigSchema>;
+export type UpdatePricingConfigRequest = Partial<Omit<CreatePricingConfigRequest, 'category' | 'resourceKey'>>;
 
 // Detailed types for frontend
 export interface AccountWithDetails extends Account {
