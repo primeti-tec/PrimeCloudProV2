@@ -22,11 +22,16 @@ export function useInvitations(accountId: number | undefined) {
 export function useCreateInvitation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ accountId, email, role }: { accountId: number; email: string; role: string }) => {
+    mutationFn: async ({ accountId, email, role, bucketPermissions }: {
+      accountId: number;
+      email: string;
+      role: string;
+      bucketPermissions?: Array<{ bucketId: number; permission: string }>;
+    }) => {
       const res = await fetch(`/api/accounts/${accountId}/invitations`, {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ email, role, bucketPermissions }),
         credentials: "include",
       });
       if (!res.ok) {

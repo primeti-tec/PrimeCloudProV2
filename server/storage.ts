@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { minioService } from "./services/minio.service";
 import {
-  users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs, invitations, sftpCredentials, invoices, usageRecords, quotaRequests, orders,
+  users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs, invitations, sftpCredentials, invoices, usageRecords, quotaRequests, orders, bucketPermissions,
   type Account, type Product, type Subscription, type AccountMember, type Bucket, type AccessKey,
   type Notification, type AuditLog, type Invitation, type SftpCredential, type Invoice, type QuotaRequest, type Order, type OrderWithDetails,
   type CreateAccountRequest, type CreateMemberRequest, type CreateBucketRequest, type CreateAccessKeyRequest,
@@ -101,6 +101,7 @@ export interface IStorage {
   getOrder(id: number): Promise<OrderWithDetails | undefined>;
   updateOrder(id: number, data: Partial<Order>): Promise<Order>;
   cancelOrder(id: number, reason?: string): Promise<Order>;
+  getAdminStats(): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -235,21 +236,18 @@ export class DatabaseStorage implements IStorage {
   // Buckets
   async createBucket(data: CreateBucketRequest): Promise<Bucket> {
     // 1. Create in MinIO first
-    console.log(`[STORAGE] Iniciando criação de bucket: ${data.name}`);
-    if (!minioService.isAvailable()) {
-      console.warn(`[STORAGE] ALERTA: Serviço MinIO reporta INDISPONÍVEL.`);
-    }
+    console.log(`[STORAGE] Iniciando criação de bucket: ${data.name} para tenant: ${data.accountId}`);
 
-    const result = await minioService.createBucket(data.name, data.region || "us-east-1");
+    const { MinioService: MinioServiceClass } = await import("./services/minio.service");
+    const tenantService = new MinioServiceClass(String(data.accountId));
+
+    const result = await tenantService.createBucket(data.name, data.region || "us-east-1");
     console.log(`[STORAGE] Resultado MinIO para bucket '${data.name}':`, result);
 
     if (!result.success) {
-      // If it fails because it already exists, we might still want to register it if we are importing
       if (result.error !== "Bucket already exists") {
         console.error(`[STORAGE] ERRO CRÍTICO ao criar bucket no MinIO: ${result.error}`);
         throw new Error(`Failed to create bucket in storage: ${result.error}`);
-      } else {
-        console.log(`[STORAGE] Bucket já existia no MinIO, prosseguindo para registro no DB.`);
       }
     }
 
@@ -270,10 +268,10 @@ export class DatabaseStorage implements IStorage {
   async deleteBucket(id: number): Promise<void> {
     const bucket = await this.getBucket(id);
     if (bucket) {
-      // 1. Remove from MinIO
-      // We don't throw if it fails to delete in MinIO (maybe it was already deleted manually), 
-      // but we log it.
-      const result = await minioService.deleteBucket(bucket.name);
+      const { MinioService: MinioServiceClass } = await import("./services/minio.service");
+      const tenantService = new MinioServiceClass(String(bucket.accountId));
+
+      const result = await tenantService.deleteBucket(bucket.name);
       if (!result.success) {
         console.warn(`Failed to delete bucket from MinIO: ${result.error}`);
       }
@@ -439,7 +437,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Invitations
-  async createInvitation(accountId: number, email: string, role: string, invitedById: string | null): Promise<Invitation> {
+  async createInvitation(accountId: number, email: string, role: string, invitedById: string | null, metadata?: any): Promise<Invitation> {
     const token = crypto.randomUUID();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -451,6 +449,7 @@ export class DatabaseStorage implements IStorage {
       token,
       invitedBy: invitedById,
       expiresAt,
+      metadata: metadata || {},
     }).returning();
     return invitation;
   }
@@ -488,12 +487,81 @@ export class DatabaseStorage implements IStorage {
     }
 
     const member = await this.addMember(invitation.accountId!, userId, invitation.role);
+    console.log(`[AcceptInvite] Created member ID: ${member.id}, role: ${invitation.role}`);
+    console.log(`[AcceptInvite] Invitation metadata:`, JSON.stringify(invitation.metadata));
+
+    // Create bucket permissions for external_client
+    if (invitation.role === 'external_client' && invitation.metadata) {
+      const metadata = invitation.metadata as { bucketPermissions?: Array<{ bucketId: number; permission: string }> };
+      console.log(`[AcceptInvite] Parsed bucket permissions:`, JSON.stringify(metadata.bucketPermissions));
+
+      if (metadata.bucketPermissions && Array.isArray(metadata.bucketPermissions)) {
+        for (const bp of metadata.bucketPermissions) {
+          console.log(`[AcceptInvite] Creating permission: member=${member.id}, bucket=${bp.bucketId}, perm=${bp.permission}`);
+          await db.insert(bucketPermissions).values({
+            accountMemberId: member.id,
+            bucketId: bp.bucketId,
+            permission: bp.permission,
+          });
+        }
+        console.log(`[AcceptInvite] Created ${metadata.bucketPermissions.length} bucket permissions`);
+      } else {
+        console.log(`[AcceptInvite] No bucket permissions to create`);
+      }
+    }
 
     await db.update(invitations)
       .set({ acceptedAt: new Date() })
       .where(eq(invitations.id, invitation.id));
 
     return member;
+  }
+
+  // Bucket Permissions
+  async getBucketPermissionsForMember(memberId: number): Promise<any[]> {
+    return await db.select({
+      id: bucketPermissions.id,
+      bucketId: bucketPermissions.bucketId,
+      permission: bucketPermissions.permission,
+      bucketName: buckets.name,
+    })
+      .from(bucketPermissions)
+      .innerJoin(buckets, eq(buckets.id, bucketPermissions.bucketId))
+      .where(eq(bucketPermissions.accountMemberId, memberId));
+  }
+
+  async getBucketPermissionForUser(userId: string, accountId: number, bucketId: number): Promise<string | null> {
+    const membership = await this.getMembership(userId, accountId);
+    if (!membership) return null;
+
+    // Non-external clients have full access
+    if (membership.role !== 'external_client') return 'read-write';
+
+    const [permission] = await db.select()
+      .from(bucketPermissions)
+      .where(and(
+        eq(bucketPermissions.accountMemberId, membership.id),
+        eq(bucketPermissions.bucketId, bucketId)
+      ));
+
+    return permission?.permission || null;
+  }
+
+  async getAccessibleBucketsForUser(userId: string, accountId: number): Promise<number[]> {
+    const membership = await this.getMembership(userId, accountId);
+    if (!membership) return [];
+
+    // Non-external clients have access to all buckets
+    if (membership.role !== 'external_client') {
+      const allBuckets = await this.getBuckets(accountId);
+      return allBuckets.map(b => b.id);
+    }
+
+    const permissions = await db.select({ bucketId: bucketPermissions.bucketId })
+      .from(bucketPermissions)
+      .where(eq(bucketPermissions.accountMemberId, membership.id));
+
+    return permissions.map(p => p.bucketId);
   }
 
   // SFTP Credentials
@@ -796,6 +864,69 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id))
       .returning();
     return order;
+  }
+
+  async getAdminStats(): Promise<any> {
+    const allAccounts = await this.getAllAccounts();
+    const activeAccounts = allAccounts.filter(a => a.status === 'active');
+    const pendingAccounts = allAccounts.filter(a => a.status === 'pending');
+    const suspendedAccounts = allAccounts.filter(a => a.status === 'suspended');
+
+    let totalMrr = 0;
+    let projectedRevenue = 0;
+
+    for (const account of activeAccounts) {
+      const summary = await this.getUsageSummary(account.id);
+      projectedRevenue += summary.projectedCost;
+
+      // MRR is based on the subscription base price
+      const sub = await this.getSubscription(account.id);
+      if (sub && sub.product) {
+        totalMrr += sub.product.price;
+      }
+    }
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const newSignupsThisMonth = allAccounts.filter(a => a.createdAt && new Date(a.createdAt) >= startOfMonth).length;
+
+    // History (Last 6 months)
+    const mrrHistory = [];
+    const signupsHistory = [];
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = months[d.getMonth()];
+
+      // For signups history, we can filter based on createdAt
+      const monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
+      const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+
+      const count = allAccounts.filter(a => {
+        const created = a.createdAt ? new Date(a.createdAt) : null;
+        return created && created >= monthStart && created <= monthEnd;
+      }).length;
+
+      signupsHistory.push({ name: monthName, signups: count });
+
+      // For MRR history, for now we return a growth curve based on current MRR
+      // In a real system we would query past invoices
+      const factor = 1 - (i * 0.15); // Simple mock de crescimento
+      mrrHistory.push({ name: monthName, mrr: Math.round(totalMrr * factor) });
+    }
+
+    return {
+      totalMrr,
+      projectedRevenue,
+      activeAccounts: activeAccounts.length,
+      pendingAccounts: pendingAccounts.length,
+      suspendedAccounts: suspendedAccounts.length,
+      totalAccounts: allAccounts.length,
+      newSignupsThisMonth,
+      mrrHistory,
+      signupsHistory
+    };
   }
 }
 

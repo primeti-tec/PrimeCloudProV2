@@ -181,6 +181,23 @@ export const api = {
         200: z.void(),
       },
     },
+    getStats: {
+      method: 'GET' as const,
+      path: '/api/admin/stats',
+      responses: {
+        200: z.object({
+          totalMrr: z.number(),
+          projectedRevenue: z.number(),
+          activeAccounts: z.number(),
+          pendingAccounts: z.number(),
+          suspendedAccounts: z.number(),
+          totalAccounts: z.number(),
+          newSignupsThisMonth: z.number(),
+          mrrHistory: z.array(z.object({ name: z.string(), mrr: z.number() })),
+          signupsHistory: z.array(z.object({ name: z.string(), signups: z.number() })),
+        }),
+      },
+    },
   },
   // Buckets
   buckets: {
@@ -216,6 +233,67 @@ export const api = {
       responses: {
         200: z.void(),
         403: errorSchemas.forbidden,
+      },
+    },
+  },
+  // Bucket Objects (File Management)
+  objects: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects',
+      responses: {
+        200: z.object({
+          objects: z.array(z.object({
+            name: z.string(),
+            size: z.number(),
+            lastModified: z.string(),
+            etag: z.string().optional(),
+          })),
+          prefixes: z.array(z.string()),
+          prefix: z.string().optional(),
+        }),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
+      },
+    },
+    getUploadUrl: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/upload-url',
+      input: z.object({
+        filename: z.string().min(1),
+        contentType: z.string().optional(),
+        prefix: z.string().optional(),
+      }),
+      responses: {
+        200: z.object({
+          uploadUrl: z.string(),
+          objectKey: z.string(),
+        }),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
+      },
+    },
+    getDownloadUrl: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/download-url',
+      responses: {
+        200: z.object({
+          downloadUrl: z.string(),
+        }),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects',
+      input: z.object({
+        key: z.string().min(1),
+      }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
       },
     },
   },

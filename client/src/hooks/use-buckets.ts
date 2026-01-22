@@ -107,3 +107,112 @@ export function useDeleteLifecycleRule(accountId: number | undefined) {
     },
   });
 }
+
+// ===== Bucket Objects (File Management) Hooks =====
+
+export interface BucketObject {
+  name: string;
+  size: number;
+  lastModified: string;
+  etag?: string;
+}
+
+export interface ListObjectsResponse {
+  objects: BucketObject[];
+  prefixes: string[];
+  prefix: string;
+}
+
+export function useBucketObjects(accountId: number | undefined, bucketId: number | undefined, prefix?: string) {
+  return useQuery<ListObjectsResponse>({
+    queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', prefix || ''],
+    queryFn: async () => {
+      if (!accountId || !bucketId) return { objects: [], prefixes: [], prefix: '' };
+      const url = new URL(buildUrl(api.objects.list.path, { accountId, bucketId }), window.location.origin);
+      if (prefix) url.searchParams.set('prefix', prefix);
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error('Failed to fetch objects');
+      return res.json();
+    },
+    enabled: !!accountId && !!bucketId,
+  });
+}
+
+export function useGetUploadUrl(accountId: number | undefined, bucketId: number | undefined) {
+  return useMutation({
+    mutationFn: async ({ filename, prefix }: { filename: string; prefix?: string }) => {
+      if (!accountId || !bucketId) throw new Error('No account or bucket');
+      const res = await apiRequest('POST', buildUrl(api.objects.getUploadUrl.path, { accountId, bucketId }), { filename, prefix });
+      return res.json() as Promise<{ uploadUrl: string; objectKey: string }>;
+    },
+  });
+}
+
+export function useGetDownloadUrl(accountId: number | undefined, bucketId: number | undefined) {
+  return useMutation({
+    mutationFn: async (key: string) => {
+      if (!accountId || !bucketId) throw new Error('No account or bucket');
+      const url = new URL(buildUrl(api.objects.getDownloadUrl.path, { accountId, bucketId }), window.location.origin);
+      url.searchParams.set('key', key);
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error('Failed to get download URL');
+      return res.json() as Promise<{ downloadUrl: string }>;
+    },
+  });
+}
+
+export function useDeleteObject(accountId: number | undefined, bucketId: number | undefined) {
+  return useMutation({
+    mutationFn: async (key: string) => {
+      if (!accountId || !bucketId) throw new Error('No account or bucket');
+      const url = new URL(buildUrl(api.objects.delete.path, { accountId, bucketId }), window.location.origin);
+      url.searchParams.set('key', key);
+      const res = await apiRequest('DELETE', url.pathname + url.search);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects'] });
+    },
+  });
+}
+
+export function useUploadFile(accountId: number | undefined, bucketId: number | undefined) {
+  const getUploadUrl = useGetUploadUrl(accountId, bucketId);
+
+  return useMutation({
+    mutationFn: async ({ file, prefix, onProgress }: { file: File; prefix?: string; onProgress?: (progress: number) => void }) => {
+      if (!accountId || !bucketId) throw new Error('No account or bucket');
+
+      // Get presigned upload URL
+      const { uploadUrl, objectKey } = await getUploadUrl.mutateAsync({ filename: file.name, prefix });
+
+      // Upload file directly to S3/MinIO
+      return new Promise<{ objectKey: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', uploadUrl, true);
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && onProgress) {
+            onProgress((event.loaded / event.total) * 100);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve({ objectKey });
+          } else {
+            reject(new Error(`Upload failed: ${xhr.statusText}`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Upload failed'));
+        xhr.send(file);
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets'] });
+    },
+  });
+}

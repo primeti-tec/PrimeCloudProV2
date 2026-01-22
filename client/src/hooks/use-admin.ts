@@ -86,3 +86,13 @@ export function useAdjustQuota() {
     },
   });
 }
+export function useAdminStats() {
+  return useQuery({
+    queryKey: [api.admin.getStats.path],
+    queryFn: async () => {
+      const res = await fetch(api.admin.getStats.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch admin statistics");
+      return api.admin.getStats.responses[200].parse(await res.json());
+    },
+  });
+}

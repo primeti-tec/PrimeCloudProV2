@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { useAdminAccounts, useApproveAccount, useRejectAccount, useSuspendAccount, useReactivateAccount, useAdjustQuota } from "@/hooks/use-admin";
+import { useAdminAccounts, useApproveAccount, useRejectAccount, useSuspendAccount, useReactivateAccount, useAdjustQuota, useAdminStats } from "@/hooks/use-admin";
 import { usePendingQuotaRequests, useApproveQuotaRequest, useRejectQuotaRequest } from "@/hooks/use-quota-requests";
 import { useAdminProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "@/hooks/use-products";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui-custom";
@@ -14,26 +14,11 @@ import { useToast } from "@/hooks/use-toast";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { Account, QuotaRequest, Product } from "@shared/schema";
 
-const mrrHistoryData = [
-  { name: 'Ago', mrr: 4200 },
-  { name: 'Set', mrr: 5100 },
-  { name: 'Out', mrr: 6300 },
-  { name: 'Nov', mrr: 7500 },
-  { name: 'Dez', mrr: 8900 },
-  { name: 'Jan', mrr: 9800 },
-];
 
-const signupsData = [
-  { name: 'Ago', signups: 12 },
-  { name: 'Set', signups: 18 },
-  { name: 'Out', signups: 24 },
-  { name: 'Nov', signups: 31 },
-  { name: 'Dez', signups: 28 },
-  { name: 'Jan', signups: 35 },
-];
 
 export default function AdminDashboard() {
   const { data: accounts, isLoading } = useAdminAccounts();
+  const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: products, isLoading: productsLoading } = useAdminProducts();
   const { mutate: approve, isPending: isApproving } = useApproveAccount();
   const { mutate: reject, isPending: isRejecting } = useRejectAccount();
@@ -140,9 +125,12 @@ export default function AdminDashboard() {
     });
   };
 
-  const formatBytes = (bytes: number | null) => {
-    if (!bytes) return "0 GB";
+  const formatBytes = (bytes: number | null | undefined) => {
+    if (!bytes || bytes === 0) return "0 GB";
     const gb = bytes / (1024 * 1024 * 1024);
+    if (gb < 0.01 && bytes > 0) {
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
     return `${gb.toFixed(2)} GB`;
   };
 
@@ -320,16 +308,30 @@ export default function AdminDashboard() {
                   <DollarSign className="h-6 w-6 text-primary" />
                 </div>
               </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">MRR</p>
+              <p className="text-sm font-medium text-muted-foreground mb-1">MRR Atual</p>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-mrr">
-                R$ {((activeAccounts.length * 99)).toLocaleString('pt-BR')}
+                {formatCurrency(stats?.totalMrr || 0)}
               </h3>
-              <p className="text-xs text-muted-foreground mt-1">Receita Recorrente Mensal</p>
+              <p className="text-xs text-muted-foreground mt-1">Soma dos planos base</p>
             </CardContent>
           </Card>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <Card className="shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-3 rounded-xl bg-teal-500/10">
+                  <TrendingDown className="h-6 w-6 text-teal-500" />
+                </div>
+              </div>
+              <p className="text-sm font-medium text-muted-foreground mb-1">Receita Projetada</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-projected-revenue">
+                {formatCurrency(stats?.projectedRevenue || 0)}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">Base + Uso excedente</p>
+            </CardContent>
+          </Card>
           <Card className="shadow-sm">
             <CardContent className="p-6">
               <div className="flex justify-between items-start mb-4">
@@ -339,7 +341,7 @@ export default function AdminDashboard() {
               </div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Taxa de Churn</p>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-churn-rate">
-                {totalAccounts > 0 ? ((suspendedAccounts.length / totalAccounts) * 100).toFixed(1) : 0}%
+                {stats && stats.totalAccounts > 0 ? ((stats.suspendedAccounts / stats.totalAccounts) * 100).toFixed(1) : 0}%
               </h3>
               <p className="text-xs text-muted-foreground mt-1">Últimos 30 dias</p>
             </CardContent>
@@ -380,7 +382,7 @@ export default function AdminDashboard() {
               </div>
               <p className="text-sm font-medium text-muted-foreground mb-1">ARPU</p>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-arpu">
-                R$ {activeAccounts.length > 0 ? Math.round((activeAccounts.length * 99) / activeAccounts.length) : 0}
+                {formatCurrency(stats && stats.activeAccounts > 0 ? Math.round(stats.totalMrr / stats.activeAccounts) : 0)}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">Receita Média por Usuário</p>
             </CardContent>
@@ -394,7 +396,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Novos Cadastros</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-new-signups">35</h3>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-new-signups">
+                {stats?.newSignupsThisMonth || 0}
+              </h3>
               <p className="text-xs text-muted-foreground mt-1">Este mês</p>
             </CardContent>
           </Card>
@@ -407,11 +411,11 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mrrHistoryData}>
+                <AreaChart data={stats?.mrrHistory || []}>
                   <defs>
                     <linearGradient id="colorMrr" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6300FF" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#6300FF" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
@@ -420,7 +424,7 @@ export default function AdminDashboard() {
                     contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                     formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'MRR']}
                   />
-                  <Area type="monotone" dataKey="mrr" stroke="#6300FF" strokeWidth={3} fillOpacity={1} fill="url(#colorMrr)" />
+                  <Area type="monotone" dataKey="mrr" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorMrr)" />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
@@ -432,7 +436,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={signupsData}>
+                <BarChart data={stats?.signupsHistory || []}>
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip

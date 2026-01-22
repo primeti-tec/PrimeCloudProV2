@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "wouter";
+import { useEffect } from "react";
 import { useInvitationByToken, useAcceptInvitation } from "@/hooks/use-invitations";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,16 @@ export default function AcceptInvite() {
   const { data: invitation, isLoading, error } = useInvitationByToken(token);
   const { mutate: acceptInvitation, isPending: isAccepting, isSuccess } = useAcceptInvitation();
 
+  // Clear pending token if we are on the invite page
+  useEffect(() => {
+    if (token) {
+      const pendingToken = sessionStorage.getItem('pending_invite_token');
+      if (pendingToken === token) {
+        sessionStorage.removeItem('pending_invite_token');
+      }
+    }
+  }, [token]);
+
   const handleAccept = () => {
     if (token) {
       acceptInvitation(token, {
@@ -31,9 +42,37 @@ export default function AcceptInvite() {
   };
 
   const handleLogin = () => {
+    // Save token to handle redirect after auth flow completes
+    if (token) sessionStorage.setItem('pending_invite_token', token);
+
     const redirectUrl = encodeURIComponent(`/invite/${token}`);
     window.location.href = `/sign-in?redirect_url=${redirectUrl}`;
   };
+
+  const handleSignUp = () => {
+    // Save token to handle redirect after auth flow completes
+    if (token) sessionStorage.setItem('pending_invite_token', token);
+
+    const redirectUrl = encodeURIComponent(`/invite/${token}`);
+    window.location.href = `/sign-up?redirect_url=${redirectUrl}`;
+  };
+
+  // Check success FIRST - this takes priority over any subsequent errors from refetch
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" data-testid="success-container">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <CardTitle className="text-xl">Bem-vindo à equipe!</CardTitle>
+            <CardDescription>
+              Você entrou na equipe com sucesso. Redirecionando para o dashboard...
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading || authLoading) {
     return (
@@ -43,7 +82,32 @@ export default function AcceptInvite() {
     );
   }
 
+  // Handle "already accepted" error differently - redirect to dashboard
   if (error) {
+    const isAlreadyAccepted = error.message?.includes("already accepted");
+
+    if (isAlreadyAccepted && user) {
+      // User is logged in and invite was already accepted - just go to dashboard
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-4" data-testid="already-accepted-container">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+              <CardTitle className="text-xl">Convite já aceito!</CardTitle>
+              <CardDescription>
+                Este convite já foi utilizado. Você já faz parte da equipe.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <Button onClick={() => setLocation("/dashboard")} data-testid="button-go-dashboard">
+                Ir para o Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4" data-testid="error-container">
         <Card className="w-full max-w-md">
@@ -57,22 +121,6 @@ export default function AcceptInvite() {
               Ir para o Início
             </Button>
           </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (isSuccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4" data-testid="success-container">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <CardTitle className="text-xl">Bem-vindo à {invitation?.account?.name}!</CardTitle>
-            <CardDescription>
-              Você entrou na equipe com sucesso. Redirecionando para o dashboard...
-            </CardDescription>
-          </CardHeader>
         </Card>
       </div>
     );
@@ -136,17 +184,27 @@ export default function AcceptInvite() {
               )}
             </Button>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <p className="text-sm text-center text-muted-foreground">
-                Faça login para aceitar este convite
+                Para aceitar este convite, você precisa ter uma conta.
               </p>
-              <Button
-                onClick={handleLogin}
-                className="w-full"
-                data-testid="button-login"
-              >
-                Fazer Login para Aceitar
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  onClick={handleLogin}
+                  className="w-full"
+                  data-testid="button-login"
+                >
+                  Já tenho conta - Fazer Login
+                </Button>
+                <Button
+                  onClick={handleSignUp}
+                  variant="outline"
+                  className="w-full"
+                  data-testid="button-signup"
+                >
+                  Criar nova conta
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

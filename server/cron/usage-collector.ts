@@ -11,7 +11,7 @@
  */
 
 import { db } from "../db";
-import { accounts, usageRecords, notifications } from "@shared/schema";
+import { accounts, usageRecords, notifications, buckets } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { MinioService } from "../services/minio.service";
 import { billingService } from "../services/billing.service";
@@ -41,29 +41,65 @@ async function collectUsageMetrics(): Promise<{ collected: number; errors: numbe
             try {
                 const minioService = new MinioService(String(account.id));
 
-                // Get current usage from MinIO
-                const usage = await minioService.getTenantUsageMetrics();
+                // Get buckets from DB to sync them specifically
+                const accountBuckets = await db
+                    .select()
+                    .from(buckets)
+                    .where(eq(buckets.accountId, account.id));
 
-                // Calculate bandwidth (simulated - in production, get from MinIO/Prometheus)
-                // For now, we'll estimate based on object count changes
-                const currentStorageBytes = usage.storageBytes;
-                const estimatedBandwidthIngress = Math.floor(currentStorageBytes * 0.1); // 10% churn estimate
-                const estimatedBandwidthEgress = Math.floor(currentStorageBytes * 0.05); // 5% download estimate
+                let totalStorageBytes = 0;
+                let totalObjectCount = 0;
 
-                // Record usage
+                for (const bucket of accountBuckets) {
+                    try {
+                        // Get stats for this specific bucket
+                        // MinioService.getBucketStats handles prefixing automatically
+                        const stats = await minioService.getBucketStats(bucket.name);
+
+                        // Update bucket in DB
+                        await db
+                            .update(buckets)
+                            .set({
+                                sizeBytes: stats.sizeBytes,
+                                objectCount: stats.objectCount,
+                            })
+                            .where(eq(buckets.id, bucket.id));
+
+                        totalStorageBytes += stats.sizeBytes;
+                        totalObjectCount += stats.objectCount;
+                    } catch (err) {
+                        console.error(`Failed to get stats for bucket ${bucket.name}:`, err);
+                        // Fallback: If it fails, maybe it's a legacy bucket without prefix?
+                        // We could try to check if the bucket exists without prefix if prefix check failed, 
+                        // but MinioService.getBucketStats uses listObjects which is prefix-aware.
+                    }
+                }
+
+                // If no buckets found via DB, try fallback to MinIO total (for auto-discovered buckets?)
+                if (accountBuckets.length === 0) {
+                    const usage = await minioService.getTenantUsageMetrics();
+                    totalStorageBytes = usage.storageBytes;
+                    totalObjectCount = usage.objectCount;
+                }
+
+                // Calculate bandwidth (simulated)
+                const estimatedBandwidthIngress = Math.floor(totalStorageBytes * 0.1);
+                const estimatedBandwidthEgress = Math.floor(totalStorageBytes * 0.05);
+
+                // Record usage history
                 await db.insert(usageRecords).values({
                     accountId: account.id,
-                    storageBytes: currentStorageBytes,
+                    storageBytes: totalStorageBytes,
                     bandwidthIngress: estimatedBandwidthIngress,
                     bandwidthEgress: estimatedBandwidthEgress,
-                    requestsCount: usage.objectCount * 10, // Estimate API calls
+                    requestsCount: totalObjectCount * 10,
                 });
 
                 // Update account's current usage
                 await db
                     .update(accounts)
                     .set({
-                        storageUsed: currentStorageBytes,
+                        storageUsed: totalStorageBytes,
                         bandwidthUsed: Number(account.bandwidthUsed || 0) + estimatedBandwidthIngress + estimatedBandwidthEgress,
                     })
                     .where(eq(accounts.id, account.id));

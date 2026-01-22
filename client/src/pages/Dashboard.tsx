@@ -36,7 +36,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!accountsLoading && accounts && accounts.length === 0) {
-      setLocation("/create-account");
+      // Check for pending invite token before redirecting to create account
+      const pendingToken = sessionStorage.getItem('pending_invite_token');
+      if (pendingToken) {
+        setLocation(`/invite/${pendingToken}`);
+      } else {
+        setLocation("/create-account");
+      }
     }
   }, [accountsLoading, accounts, setLocation]);
 
@@ -221,8 +227,8 @@ export default function Dashboard() {
                 <AreaChart data={data}>
                   <defs>
                     <linearGradient id="colorStorage" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6300FF" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#6300FF" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
@@ -230,7 +236,7 @@ export default function Dashboard() {
                   <Tooltip
                     contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                   />
-                  <Area type="monotone" dataKey="storage" stroke="#6300FF" strokeWidth={3} fillOpacity={1} fill="url(#colorStorage)" />
+                  <Area type="monotone" dataKey="storage" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorStorage)" />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>

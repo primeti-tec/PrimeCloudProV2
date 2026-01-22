@@ -421,10 +421,14 @@ export async function registerRoutes(
 
   app.get(api.admin.listAccounts.path, requireAuth(), async (req: any, res) => {
     // if (!isSuperAdmin(req.currentUser?.email)) return res.status(403).json({ message: "Forbidden" });
-    // Relaxed for MVP demo: allow any authenticated user to see admin for now? No.
-    // I'll just allow it for now so the user can test.
     const accounts = await storage.getAllAccounts();
     res.json(accounts);
+  });
+
+  app.get(api.admin.getStats.path, requireAuth(), async (req: any, res) => {
+    // if (!isSuperAdmin(req.currentUser?.email)) return res.status(403).json({ message: "Forbidden" });
+    const stats = await storage.getAdminStats();
+    res.json(stats);
   });
 
   app.post(api.admin.approveAccount.path, requireAuth(), async (req: any, res) => {
@@ -660,7 +664,36 @@ export async function registerRoutes(
     const membership = await storage.getMembership(userId, accountId);
     if (!membership) return res.status(403).json({ message: "Forbidden" });
 
-    const bucketList = await storage.getBuckets(accountId);
+    let bucketList = await storage.getBuckets(accountId);
+
+    // Debug logs
+    console.log(`[Buckets] User: ${userId}, Account: ${accountId}, Role: ${membership.role}, Member ID: ${membership.id}`);
+    console.log(`[Buckets] Total buckets in account: ${bucketList.length}`);
+
+    // Filter buckets for external_client based on permissions
+    if (membership.role === 'external_client') {
+      const accessibleBucketIds = await storage.getAccessibleBucketsForUser(userId!, accountId);
+      console.log(`[Buckets] Accessible bucket IDs for external client: ${JSON.stringify(accessibleBucketIds)}`);
+
+      bucketList = bucketList.filter(b => accessibleBucketIds.includes(b.id));
+      console.log(`[Buckets] Filtered bucket count: ${bucketList.length}`);
+
+      // Add permission info to each bucket
+      const permissions = await storage.getBucketPermissionsForMember(membership.id);
+      console.log(`[Buckets] Member permissions: ${JSON.stringify(permissions)}`);
+
+      bucketList = bucketList.map(bucket => ({
+        ...bucket,
+        userPermission: permissions.find(p => p.bucketId === bucket.id)?.permission || 'read'
+      }));
+    } else {
+      // Non-external clients have full access
+      bucketList = bucketList.map(bucket => ({
+        ...bucket,
+        userPermission: 'read-write'
+      }));
+    }
+
     res.json(bucketList);
   });
 
@@ -764,6 +797,182 @@ export async function registerRoutes(
 
     const bucket = await storage.deleteLifecycleRule(bucketId, ruleId);
     res.json(bucket);
+  });
+
+  // --- Bucket Objects (File Management) Routes ---
+  // List objects in a bucket
+  app.get(api.objects.list.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const prefix = req.query.prefix as string | undefined;
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    // Check bucket permissions for external clients
+    if (membership.role === 'external_client') {
+      const permissions = await storage.getBucketPermissionsForMember(membership.id);
+      const bucketPerm = permissions.find(p => p.bucketId === bucketId);
+      if (!bucketPerm || !['read', 'read-write'].includes(bucketPerm.permission)) {
+        return res.status(403).json({ message: "No read permission for this bucket" });
+      }
+    }
+
+    // Get bucket info
+    const bucket = await storage.getBucket(bucketId);
+    if (!bucket || bucket.accountId !== accountId) {
+      return res.status(404).json({ message: "Bucket not found" });
+    }
+
+    // Initialize MinIO service and list objects
+    const { MinioService } = await import("./services/minio.service");
+    const minioService = new MinioService(accountId.toString());
+
+    try {
+      const result = await minioService.listObjectsWithPrefixes(bucket.name, prefix || undefined);
+      res.json({
+        objects: result.objects.map((obj: any) => ({
+          name: obj.name,
+          size: obj.size,
+          lastModified: obj.lastModified?.toISOString() || new Date().toISOString(),
+          etag: obj.etag,
+        })),
+        prefixes: result.prefixes,
+        prefix: prefix || '',
+      });
+    } catch (error) {
+      console.error("Error listing objects:", error);
+      res.status(500).json({ message: "Failed to list objects" });
+    }
+  });
+
+  // Get presigned upload URL
+  app.post(api.objects.getUploadUrl.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const { filename, prefix } = req.body;
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    // Check bucket permissions for external clients
+    if (membership.role === 'external_client') {
+      const permissions = await storage.getBucketPermissionsForMember(membership.id);
+      const bucketPerm = permissions.find(p => p.bucketId === bucketId);
+      if (!bucketPerm || !['write', 'read-write'].includes(bucketPerm.permission)) {
+        return res.status(403).json({ message: "No write permission for this bucket" });
+      }
+    }
+
+    const bucket = await storage.getBucket(bucketId);
+    if (!bucket || bucket.accountId !== accountId) {
+      return res.status(404).json({ message: "Bucket not found" });
+    }
+
+    const { MinioService } = await import("./services/minio.service");
+    const minioService = new MinioService(accountId.toString());
+
+    try {
+      const objectKey = prefix ? `${prefix}${filename}` : filename;
+      const uploadUrl = await minioService.presignedPutObject(bucket.name, objectKey, 3600);
+      res.json({ uploadUrl, objectKey });
+    } catch (error) {
+      console.error("Error generating upload URL:", error);
+      res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
+  // Get presigned download URL
+  app.get(api.objects.getDownloadUrl.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const key = req.query.key as string;
+
+    if (!key) {
+      return res.status(400).json({ message: "Object key is required" });
+    }
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    // Check bucket permissions for external clients
+    if (membership.role === 'external_client') {
+      const permissions = await storage.getBucketPermissionsForMember(membership.id);
+      const bucketPerm = permissions.find(p => p.bucketId === bucketId);
+      if (!bucketPerm || !['read', 'read-write'].includes(bucketPerm.permission)) {
+        return res.status(403).json({ message: "No read permission for this bucket" });
+      }
+    }
+
+    const bucket = await storage.getBucket(bucketId);
+    if (!bucket || bucket.accountId !== accountId) {
+      return res.status(404).json({ message: "Bucket not found" });
+    }
+
+    const { MinioService } = await import("./services/minio.service");
+    const minioService = new MinioService(accountId.toString());
+
+    try {
+      const downloadUrl = await minioService.presignedGetObject(bucket.name, key, 3600);
+      res.json({ downloadUrl });
+    } catch (error) {
+      console.error("Error generating download URL:", error);
+      res.status(500).json({ message: "Failed to generate download URL" });
+    }
+  });
+
+  // Delete object
+  app.delete(api.objects.delete.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const key = req.query.key as string;
+
+    if (!key) {
+      return res.status(400).json({ message: "Object key is required" });
+    }
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    // Check bucket permissions for external clients
+    if (membership.role === 'external_client') {
+      const permissions = await storage.getBucketPermissionsForMember(membership.id);
+      const bucketPerm = permissions.find(p => p.bucketId === bucketId);
+      if (!bucketPerm || !['write', 'read-write'].includes(bucketPerm.permission)) {
+        return res.status(403).json({ message: "No write permission for this bucket" });
+      }
+    }
+
+    const bucket = await storage.getBucket(bucketId);
+    if (!bucket || bucket.accountId !== accountId) {
+      return res.status(404).json({ message: "Bucket not found" });
+    }
+
+    const { MinioService } = await import("./services/minio.service");
+    const minioService = new MinioService(accountId.toString());
+
+    try {
+      const result = await minioService.removeObject(bucket.name, key);
+      if (result.success) {
+        await storage.createAuditLog({
+          accountId,
+          userId,
+          action: 'OBJECT_DELETED',
+          resource: 'object',
+          details: { bucketId, bucketName: bucket.name, objectKey: key },
+        });
+        res.json({ success: true });
+      } else {
+        res.status(500).json({ message: result.error || "Failed to delete object" });
+      }
+    } catch (error) {
+      console.error("Error deleting object:", error);
+      res.status(500).json({ message: "Failed to delete object" });
+    }
   });
 
   // --- Access Keys Routes ---
@@ -932,7 +1141,7 @@ export async function registerRoutes(
   app.post('/api/accounts/:accountId/invitations', requireAuth(), async (req: any, res) => {
     const { userId } = getAuth(req);
     const accountId = parseInt(req.params.accountId);
-    const { email, role } = req.body;
+    const { email, role, bucketPermissions: bpList } = req.body;
 
     if (!email || !role) {
       return res.status(400).json({ message: "Email and role are required" });
@@ -944,14 +1153,18 @@ export async function registerRoutes(
     }
 
     try {
-      const invitation = await storage.createInvitation(accountId, email, role, userId);
+      // Build metadata with bucket permissions for external_client
+      const metadata = role === 'external_client' && bpList ? { bucketPermissions: bpList } : {};
+      console.log(`[Invite] Creating invite for ${email}, role: ${role}, bucketPermissions:`, JSON.stringify(bpList));
+      console.log(`[Invite] Metadata being saved:`, JSON.stringify(metadata));
+      const invitation = await storage.createInvitation(accountId, email, role, userId, metadata);
 
       // Get account and inviter info for the email
       const account = await storage.getAccount(accountId);
       const inviter = userId ? await authStorage.getUser(userId) : null;
 
       // Build invite URL
-      const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
       const inviteUrl = `${baseUrl}/invite/${invitation.token}`;
 
       // Get account's SMTP config

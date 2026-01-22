@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, FileText, HardDrive, ShoppingCart, Save } from "lucide-react";
+import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, FileText, HardDrive, ShoppingCart, Save, FolderOpen, ChevronDown, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranding } from "./branding-provider";
+import { useCurrentRole } from "@/hooks/use-current-account";
+import { useMyAccounts } from "@/hooks/use-accounts";
+import { useBuckets } from "@/hooks/use-buckets";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui-custom";
 
@@ -9,26 +13,42 @@ export function Sidebar() {
   const [location] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
   const branding = useBranding();
+  const { isExternalClient, canViewBilling, canViewSettings, canManageMembers } = useCurrentRole();
+
+  // Get buckets for submenu
+  const { data: accounts } = useMyAccounts();
+  const currentAccount = accounts?.[0];
+  const { data: buckets } = useBuckets(currentAccount?.id);
+
+  // Storage submenu expanded state
+  const [storageExpanded, setStorageExpanded] = useState(location.startsWith("/dashboard/storage"));
 
   // For demo purposes, assume email containing "admin" is super admin
   const isSuperAdmin = user?.email?.includes("admin");
 
+  // Check if we're in storage section
+  const isInStorageSection = location.startsWith("/dashboard/storage");
+
+  // Define all nav items, some conditionally visible
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Armazenamento", href: "/dashboard/storage", icon: Database },
-    { name: "Acesso SFTP", href: "/dashboard/sftp", icon: HardDrive },
-    { name: "Backup", href: "/dashboard/backup", icon: Save },
-    { name: "Pedidos", href: "/dashboard/orders", icon: ShoppingCart },
-    { name: "Equipe", href: "/dashboard/team", icon: Users },
-    { name: "Faturamento", href: "/dashboard/billing", icon: CreditCard },
-    { name: "Chaves de API", href: "/dashboard/api-keys", icon: Key },
-    { name: "Atividade", href: "/dashboard/audit-logs", icon: FileText },
-    { name: "Configurações", href: "/dashboard/settings", icon: Settings },
-  ];
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: !isExternalClient },
+    { name: "Acesso SFTP", href: "/dashboard/sftp", icon: HardDrive, show: !isExternalClient },
+    { name: "Backup", href: "/dashboard/backup", icon: Save, show: !isExternalClient },
+    { name: "Pedidos", href: "/dashboard/orders", icon: ShoppingCart, show: !isExternalClient },
+    { name: "Equipe", href: "/dashboard/team", icon: Users, show: canManageMembers },
+    { name: "Faturamento", href: "/dashboard/billing", icon: CreditCard, show: canViewBilling },
+    { name: "Chaves de API", href: "/dashboard/api-keys", icon: Key, show: !isExternalClient },
+    { name: "Atividade", href: "/dashboard/audit-logs", icon: FileText, show: !isExternalClient },
+    { name: "Configurações", href: "/dashboard/settings", icon: Settings, show: canViewSettings },
+  ].filter(item => item.show);
 
   if (isSuperAdmin) {
-    navItems.push({ name: "Admin Portal", href: "/admin", icon: Shield });
+    navItems.push({ name: "Admin Portal", href: "/admin", icon: Shield, show: true });
   }
+
+  const handleStorageClick = () => {
+    setStorageExpanded(!storageExpanded);
+  };
 
   return (
     <div className="h-screen w-72 bg-card border-r border-border flex flex-col fixed left-0 top-0 z-20">
@@ -56,7 +76,96 @@ export function Sidebar() {
         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 px-4 mt-4">
           Menu
         </div>
-        {navItems.map((item) => {
+
+        {/* Dashboard - only for non-external clients */}
+        {!isExternalClient && (
+          <Link href="/dashboard">
+            <div
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer group ${location === "/dashboard"
+                ? "bg-primary/10 text-primary font-semibold"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+            >
+              <LayoutDashboard
+                className={`h-5 w-5 transition-colors ${location === "/dashboard" ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                  }`}
+              />
+              Dashboard
+            </div>
+          </Link>
+        )}
+
+        {/* Storage Section with Submenu */}
+        <div>
+          <div
+            onClick={handleStorageClick}
+            className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer group ${isInStorageSection
+              ? "bg-primary/10 text-primary font-semibold"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+          >
+            <div className="flex items-center gap-3">
+              <Database
+                className={`h-5 w-5 transition-colors ${isInStorageSection ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                  }`}
+              />
+              Armazenamento
+            </div>
+            {storageExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </div>
+
+          {/* Submenu */}
+          {storageExpanded && (
+            <div className="ml-4 mt-1 space-y-1 border-l-2 border-border/50 pl-2">
+              {/* Buckets Link */}
+              <Link href="/dashboard/storage">
+                <div
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer text-sm ${location === "/dashboard/storage"
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    }`}
+                >
+                  <Database className="h-4 w-4" />
+                  Todos os Buckets
+                </div>
+              </Link>
+
+              {/* Bucket quick access */}
+              {buckets && buckets.length > 0 && (
+                <>
+                  <div className="text-xs text-muted-foreground px-3 py-1 mt-2">
+                    Acesso Rápido
+                  </div>
+                  {buckets.slice(0, 5).map(bucket => (
+                    <Link key={bucket.id} href={`/dashboard/storage/${bucket.id}`}>
+                      <div
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer text-sm ${location === `/dashboard/storage/${bucket.id}`
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                          }`}
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                        <span className="truncate">{bucket.name}</span>
+                      </div>
+                    </Link>
+                  ))}
+                  {buckets.length > 5 && (
+                    <div className="text-xs text-muted-foreground px-3 py-1">
+                      +{buckets.length - 5} mais...
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Other nav items */}
+        {navItems.filter(item => item.name !== "Dashboard").map((item) => {
           const isActive = location === item.href;
           return (
             <Link key={item.name} href={item.href}>
@@ -107,4 +216,3 @@ export function Sidebar() {
     </div>
   );
 }
-

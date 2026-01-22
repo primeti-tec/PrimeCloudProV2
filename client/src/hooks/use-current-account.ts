@@ -30,6 +30,20 @@ export function useCurrentAccount() {
   return { account, switchAccount, accounts };
 }
 
+export function useCurrentRole() {
+  const { account } = useCurrentAccount();
+  const role = account?.role || 'developer';
+
+  const isExternalClient = role === 'external_client';
+  const isOwner = role === 'owner';
+  const isAdmin = role === 'admin' || role === 'owner';
+  const canManageMembers = isAdmin || isOwner;
+  const canViewBilling = !isExternalClient;
+  const canViewSettings = !isExternalClient;
+
+  return { role, isExternalClient, isOwner, isAdmin, canManageMembers, canViewBilling, canViewSettings };
+}
+
 export function useUpdateBranding() {
   const queryClient = useQueryClient();
 

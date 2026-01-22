@@ -1,14 +1,21 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
 import { useMyAccounts } from "@/hooks/use-accounts";
+import { useCurrentRole } from "@/hooks/use-current-account";
 import { useBuckets, useCreateBucket, useDeleteBucket, useUpdateBucketVersioning, useBucketLifecycle, useAddLifecycleRule, useDeleteLifecycleRule, useUpdateBucketLimit } from "@/hooks/use-buckets";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input, Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui-custom";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Database, Plus, Trash2, Globe, Lock, MapPin, Copy, Clock, Settings2, Edit2 } from "lucide-react";
+import { Loader2, Database, Plus, Trash2, Globe, Lock, MapPin, Copy, Clock, Settings2, Edit2, Eye, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Bucket, LifecycleRule } from "@shared/schema";
+
+// Extended bucket type with user permission
+interface BucketWithPermission extends Bucket {
+  userPermission?: 'read' | 'write' | 'read-write';
+}
 
 const REGIONS = [
   { value: "sa-east-1", label: "Brasil (São Paulo)" },
@@ -333,13 +340,24 @@ function UpdateBucketLimitDialog({ bucket, accountId }: { bucket: Bucket; accoun
 }
 
 export default function Storage() {
+  const [, setLocation] = useLocation();
   const { data: accounts } = useMyAccounts();
   const currentAccount = accounts?.[0];
-  const { data: buckets, isLoading } = useBuckets(currentAccount?.id);
+  const { isExternalClient } = useCurrentRole();
+  const { data: buckets, isLoading } = useBuckets(currentAccount?.id) as { data: BucketWithPermission[] | undefined, isLoading: boolean };
   const { mutate: createBucket, isPending: isCreating } = useCreateBucket(currentAccount?.id);
   const { mutate: deleteBucket, isPending: isDeleting } = useDeleteBucket(currentAccount?.id);
   const { mutate: updateVersioning } = useUpdateBucketVersioning(currentAccount?.id);
   const { toast } = useToast();
+
+  // Helper to check if user can write to a bucket
+  const canWriteToBucket = (bucket: BucketWithPermission) => {
+    if (!isExternalClient) return true;
+    return bucket.userPermission === 'write' || bucket.userPermission === 'read-write';
+  };
+
+  // Helper to check if user can manage (delete, modify settings)
+  const canManageBucket = () => !isExternalClient;
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bucketName, setBucketName] = useState("");
@@ -417,76 +435,78 @@ export default function Storage() {
             </h1>
             <p className="text-muted-foreground">Gerencie seus buckets de armazenamento S3-compatible.</p>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-bucket">
-                <Plus className="mr-2 h-4 w-4" /> Criar Bucket
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Criar Novo Bucket</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div>
-                  <label className="text-sm font-medium text-slate-700">Nome do Bucket</label>
-                  <Input
-                    value={bucketName}
-                    onChange={(e) => setBucketName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                    placeholder="meu-bucket"
-                    className="mt-1 font-mono"
-                    data-testid="input-bucket-name"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Apenas letras minúsculas, números e hífens</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700">Região</label>
-                  <select
-                    value={region}
-                    onChange={(e) => setRegion(e.target.value)}
-                    className="mt-1 w-full h-11 rounded-lg border border-input bg-background px-3 text-sm"
-                    data-testid="select-region"
-                  >
-                    {REGIONS.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-slate-700">Limite de Armazenamento (GB)</label>
-                  <Input
-                    type="number"
-                    value={limit}
-                    onChange={(e) => setLimit(parseInt(e.target.value) || 1)}
-                    min={1}
-                    className="mt-1"
-                    data-testid="input-bucket-limit"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Limite máximo de armazenamento para este bucket.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="public"
-                    checked={isPublic}
-                    onChange={(e) => setIsPublic(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                    data-testid="checkbox-public"
-                  />
-                  <label htmlFor="public" className="text-sm text-slate-700">
-                    Tornar bucket público
-                  </label>
-                </div>
-                <Button onClick={handleCreate} disabled={!bucketName || isCreating} className="w-full" data-testid="button-confirm-create">
-                  {isCreating ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
-                  Criar Bucket
+          {canManageBucket() && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-bucket">
+                  <Plus className="mr-2 h-4 w-4" /> Criar Bucket
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Criar Novo Bucket</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Nome do Bucket</label>
+                    <Input
+                      value={bucketName}
+                      onChange={(e) => setBucketName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                      placeholder="meu-bucket"
+                      className="mt-1 font-mono"
+                      data-testid="input-bucket-name"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Apenas letras minúsculas, números e hífens</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Região</label>
+                    <select
+                      value={region}
+                      onChange={(e) => setRegion(e.target.value)}
+                      className="mt-1 w-full h-11 rounded-lg border border-input bg-background px-3 text-sm"
+                      data-testid="select-region"
+                    >
+                      {REGIONS.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Limite de Armazenamento (GB)</label>
+                    <Input
+                      type="number"
+                      value={limit}
+                      onChange={(e) => setLimit(parseInt(e.target.value) || 1)}
+                      min={1}
+                      className="mt-1"
+                      data-testid="input-bucket-limit"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Limite máximo de armazenamento para este bucket.</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="public"
+                      checked={isPublic}
+                      onChange={(e) => setIsPublic(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                      data-testid="checkbox-public"
+                    />
+                    <label htmlFor="public" className="text-sm text-slate-700">
+                      Tornar bucket público
+                    </label>
+                  </div>
+                  <Button onClick={handleCreate} disabled={!bucketName || isCreating} className="w-full" data-testid="button-confirm-create">
+                    {isCreating ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
+                    Criar Bucket
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </header>
 
         <Card>
@@ -512,9 +532,10 @@ export default function Storage() {
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Região</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Objetos</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Tamanho</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Limite (GB)</th>
+                      {!isExternalClient && <th className="text-left p-4 text-sm font-medium text-muted-foreground">Limite (GB)</th>}
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Acesso</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Versionamento</th>
+                      {isExternalClient && <th className="text-left p-4 text-sm font-medium text-muted-foreground">Sua Permissão</th>}
+                      {!isExternalClient && <th className="text-left p-4 text-sm font-medium text-muted-foreground">Versionamento</th>}
                       <th className="text-right p-4 pr-6 text-sm font-medium text-muted-foreground">Ações</th>
                     </tr>
                   </thead>
@@ -522,9 +543,12 @@ export default function Storage() {
                     {buckets?.map((bucket) => (
                       <tr key={bucket.id} className="hover:bg-muted/50 transition-colors" data-testid={`row-bucket-${bucket.id}`}>
                         <td className="p-4 pl-6">
-                          <div className="flex items-center gap-3">
+                          <div
+                            className="flex items-center gap-3 cursor-pointer hover:text-primary transition-colors"
+                            onClick={() => setLocation(`/dashboard/storage/${bucket.id}`)}
+                          >
                             <Database className="h-5 w-5 text-blue-500" />
-                            <span className="font-medium font-mono">{bucket.name}</span>
+                            <span className="font-medium font-mono hover:underline">{bucket.name}</span>
                           </div>
                         </td>
                         <td className="p-4 text-sm">
@@ -535,12 +559,14 @@ export default function Storage() {
                         </td>
                         <td className="p-4 text-sm text-slate-600">{bucket.objectCount ?? 0} objetos</td>
                         <td className="p-4 text-sm text-slate-600">{formatBytes(bucket.sizeBytes ?? 0)}</td>
-                        <td className="p-4 text-sm text-slate-600">
-                          <div className="flex items-center gap-2">
-                            {bucket.storageLimitGB || 50} GB
-                            {currentAccount && <UpdateBucketLimitDialog bucket={bucket} accountId={currentAccount.id} />}
-                          </div>
-                        </td>
+                        {!isExternalClient && (
+                          <td className="p-4 text-sm text-slate-600">
+                            <div className="flex items-center gap-2">
+                              {bucket.storageLimitGB || 50} GB
+                              {currentAccount && <UpdateBucketLimitDialog bucket={bucket} accountId={currentAccount.id} />}
+                            </div>
+                          </td>
+                        )}
                         <td className="p-4">
                           {bucket.isPublic ? (
                             <Badge variant="secondary" className="bg-blue-100 text-blue-700">
@@ -552,20 +578,47 @@ export default function Storage() {
                             </Badge>
                           )}
                         </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={bucket.versioningEnabled ?? false}
-                              onCheckedChange={(checked) => handleVersioningToggle(bucket.id, checked)}
-                              data-testid={`switch-versioning-${bucket.id}`}
-                            />
-                            <span className="text-xs text-muted-foreground">
-                              {bucket.versioningEnabled ? "Ativo" : "Inativo"}
-                            </span>
-                          </div>
-                        </td>
+                        {isExternalClient && (
+                          <td className="p-4">
+                            {bucket.userPermission === 'read-write' ? (
+                              <Badge variant="secondary" className="bg-green-100 text-green-700">
+                                <Upload className="h-3 w-3 mr-1" /> Leitura e Escrita
+                              </Badge>
+                            ) : bucket.userPermission === 'write' ? (
+                              <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                                <Upload className="h-3 w-3 mr-1" /> Somente Escrita
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-slate-100 text-slate-700">
+                                <Eye className="h-3 w-3 mr-1" /> Somente Leitura
+                              </Badge>
+                            )}
+                          </td>
+                        )}
+                        {!isExternalClient && (
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={bucket.versioningEnabled ?? false}
+                                onCheckedChange={(checked) => handleVersioningToggle(bucket.id, checked)}
+                                data-testid={`switch-versioning-${bucket.id}`}
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                {bucket.versioningEnabled ? "Ativo" : "Inativo"}
+                              </span>
+                            </div>
+                          </td>
+                        )}
                         <td className="p-4 pr-6">
                           <div className="flex items-center justify-end gap-2 flex-wrap">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => setLocation(`/dashboard/storage/${bucket.id}`)}
+                              data-testid={`button-browse-${bucket.id}`}
+                            >
+                              <Eye className="h-4 w-4 mr-1" /> Navegar
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
@@ -574,14 +627,16 @@ export default function Storage() {
                             >
                               <Copy className="h-4 w-4 mr-1" /> Copiar URL
                             </Button>
-                            {currentAccount && (
+                            {!isExternalClient && currentAccount && (
                               <LifecyclePolicyDialog bucket={bucket} accountId={currentAccount.id} />
                             )}
-                            <DeleteConfirmDialog
-                              bucket={bucket}
-                              onConfirm={() => handleDelete(bucket.id, bucket.name)}
-                              isDeleting={isDeleting}
-                            />
+                            {!isExternalClient && (
+                              <DeleteConfirmDialog
+                                bucket={bucket}
+                                onConfirm={() => handleDelete(bucket.id, bucket.name)}
+                                isDeleting={isDeleting}
+                              />
+                            )}
                           </div>
                         </td>
                       </tr>

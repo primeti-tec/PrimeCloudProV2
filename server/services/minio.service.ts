@@ -205,19 +205,38 @@ export class MinioService {
             return [];
         }
 
-        try {
-            const objects: any[] = [];
-            const stream = minioClient.listObjects(fullBucketName, prefix || "", true);
+        const fetchObjects = async (bName: string): Promise<any[]> => {
+            try {
+                const objects: any[] = [];
+                const stream = minioClient.listObjects(bName, prefix || "", true);
 
-            return new Promise((resolve, reject) => {
-                stream.on("data", (obj: any) => objects.push(obj));
-                stream.on("error", reject);
-                stream.on("end", () => resolve(objects));
-            });
-        } catch (error) {
-            console.error(`❌ Failed to list objects in bucket: ${fullBucketName}`, error);
-            return [];
+                return new Promise((resolve, reject) => {
+                    stream.on("data", (obj: any) => objects.push(obj));
+                    stream.on("error", (err: any) => {
+                        // S3 Error 404 (NoSuchBucket)
+                        if (err.code === 'NoSuchBucket' || err.statusCode === 404) {
+                            resolve([]);
+                        } else {
+                            reject(err);
+                        }
+                    });
+                    stream.on("end", () => resolve(objects));
+                });
+            } catch (error) {
+                console.error(`❌ Failed to list objects in bucket: ${bName}`, error);
+                return [];
+            }
+        };
+
+        let result = await fetchObjects(fullBucketName);
+
+        // Fallback: If no objects and we have a prefix, try WITHOUT prefix (for legacy buckets)
+        if (result.length === 0 && this.tenantPrefix && bucketName !== fullBucketName) {
+            console.log(`[MINIO] Falling back to non-prefixed bucket: ${bucketName}`);
+            result = await fetchObjects(bucketName);
         }
+
+        return result;
     }
 
     /**
@@ -381,6 +400,168 @@ export class MinioService {
                 message: `Connection failed: ${(error as Error).message}`
             };
         }
+    }
+
+    /**
+     * Generate a presigned URL for downloading/viewing an object
+     */
+    async presignedGetObject(bucketName: string, objectName: string, expirySeconds: number = 3600): Promise<string> {
+        const fullBucketName = this.getTenantBucketName(bucketName);
+
+        if (!isMinioAvailable) {
+            console.log(`[MOCK] Generating presigned GET URL for: ${fullBucketName}/${objectName}`);
+            return `https://mock-s3.example.com/${fullBucketName}/${objectName}?expires=${expirySeconds}`;
+        }
+
+        // Try with tenant prefix first
+        try {
+            const url = await minioClient.presignedGetObject(fullBucketName, objectName, expirySeconds);
+            return url;
+        } catch (error: any) {
+            // Fallback: try without tenant prefix for legacy buckets
+            if ((error.code === 'NoSuchBucket' || error.statusCode === 404) && this.tenantPrefix && bucketName !== fullBucketName) {
+                console.log(`[MINIO] Falling back to non-prefixed bucket for GET: ${bucketName}`);
+                try {
+                    return await minioClient.presignedGetObject(bucketName, objectName, expirySeconds);
+                } catch (fallbackError) {
+                    console.error(`❌ Fallback also failed for presigned GET URL:`, fallbackError);
+                    throw fallbackError;
+                }
+            }
+            console.error(`❌ Failed to generate presigned GET URL:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Generate a presigned URL for uploading an object
+     */
+    async presignedPutObject(bucketName: string, objectName: string, expirySeconds: number = 3600): Promise<string> {
+        const fullBucketName = this.getTenantBucketName(bucketName);
+
+        if (!isMinioAvailable) {
+            console.log(`[MOCK] Generating presigned PUT URL for: ${fullBucketName}/${objectName}`);
+            return `https://mock-s3.example.com/${fullBucketName}/${objectName}?upload=true&expires=${expirySeconds}`;
+        }
+
+        // Try with tenant prefix first
+        try {
+            const url = await minioClient.presignedPutObject(fullBucketName, objectName, expirySeconds);
+            return url;
+        } catch (error: any) {
+            // Fallback: try without tenant prefix for legacy buckets
+            if ((error.code === 'NoSuchBucket' || error.statusCode === 404) && this.tenantPrefix && bucketName !== fullBucketName) {
+                console.log(`[MINIO] Falling back to non-prefixed bucket for PUT: ${bucketName}`);
+                try {
+                    return await minioClient.presignedPutObject(bucketName, objectName, expirySeconds);
+                } catch (fallbackError) {
+                    console.error(`❌ Fallback also failed for presigned PUT URL:`, fallbackError);
+                    throw fallbackError;
+                }
+            }
+            console.error(`❌ Failed to generate presigned PUT URL:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Remove an object from a bucket
+     */
+    async removeObject(bucketName: string, objectName: string): Promise<{ success: boolean; error?: string }> {
+        const fullBucketName = this.getTenantBucketName(bucketName);
+
+        if (!isMinioAvailable) {
+            console.log(`[MOCK] Removing object: ${fullBucketName}/${objectName}`);
+            return { success: true };
+        }
+
+        // Try with tenant prefix first
+        try {
+            await minioClient.removeObject(fullBucketName, objectName);
+            console.log(`✅ Object removed: ${fullBucketName}/${objectName}`);
+            return { success: true };
+        } catch (error: any) {
+            // Fallback: try without tenant prefix for legacy buckets
+            if ((error.code === 'NoSuchBucket' || error.statusCode === 404) && this.tenantPrefix && bucketName !== fullBucketName) {
+                console.log(`[MINIO] Falling back to non-prefixed bucket for DELETE: ${bucketName}`);
+                try {
+                    await minioClient.removeObject(bucketName, objectName);
+                    console.log(`✅ Object removed (fallback): ${bucketName}/${objectName}`);
+                    return { success: true };
+                } catch (fallbackError) {
+                    console.error(`❌ Fallback also failed for remove object:`, fallbackError);
+                    return { success: false, error: (fallbackError as Error).message };
+                }
+            }
+            console.error(`❌ Failed to remove object: ${fullBucketName}/${objectName}`, error);
+            return { success: false, error: (error as Error).message };
+        }
+    }
+
+    /**
+     * List objects in a bucket with optional prefix (for folder navigation)
+     * Returns objects and common prefixes (virtual folders)
+     */
+    async listObjectsWithPrefixes(bucketName: string, prefix?: string, delimiter: string = '/'): Promise<{
+        objects: any[];
+        prefixes: string[];
+    }> {
+        const fullBucketName = this.getTenantBucketName(bucketName);
+
+        if (!isMinioAvailable) {
+            console.log(`[MOCK] Listing objects with prefixes in bucket: ${fullBucketName}, prefix: ${prefix}`);
+            return { objects: [], prefixes: [] };
+        }
+
+        const fetchObjectsWithPrefixes = async (bName: string): Promise<{ objects: any[]; prefixes: string[]; found: boolean }> => {
+            try {
+                const objects: any[] = [];
+                const prefixesSet = new Set<string>();
+
+                console.log(`[MINIO] Listing objects in bucket: ${bName}, prefix: ${prefix || '(root)'}`);
+                const stream = minioClient.listObjectsV2(bName, prefix || '', false, delimiter);
+
+                return new Promise((resolve, reject) => {
+                    stream.on("data", (obj: any) => {
+                        if (obj.prefix) {
+                            prefixesSet.add(obj.prefix);
+                        } else {
+                            objects.push(obj);
+                        }
+                    });
+                    stream.on("error", (err: any) => {
+                        console.log(`[MINIO] Error listing bucket ${bName}:`, err.code || err.message);
+                        if (err.code === 'NoSuchBucket' || err.statusCode === 404) {
+                            resolve({ objects: [], prefixes: [], found: false });
+                        } else {
+                            reject(err);
+                        }
+                    });
+                    stream.on("end", () => {
+                        console.log(`[MINIO] Found ${objects.length} objects and ${prefixesSet.size} prefixes in ${bName}`);
+                        resolve({
+                            objects,
+                            prefixes: Array.from(prefixesSet),
+                            found: true
+                        });
+                    });
+                });
+            } catch (error) {
+                console.error(`❌ Failed to list objects with prefixes in bucket: ${bName}`, error);
+                return { objects: [], prefixes: [], found: false };
+            }
+        };
+
+        // Try with tenant prefix first
+        let result = await fetchObjectsWithPrefixes(fullBucketName);
+
+        // Fallback: If bucket not found and we have a tenant prefix, try WITHOUT prefix (for legacy buckets)
+        if (!result.found && this.tenantPrefix && bucketName !== fullBucketName) {
+            console.log(`[MINIO] Falling back to non-prefixed bucket: ${bucketName}`);
+            result = await fetchObjectsWithPrefixes(bucketName);
+        }
+
+        return { objects: result.objects, prefixes: result.prefixes };
     }
 
     /**

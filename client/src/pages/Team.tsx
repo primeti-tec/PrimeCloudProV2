@@ -2,22 +2,32 @@ import { Sidebar } from "@/components/Sidebar";
 import { useMembers, useRemoveMember, useUpdateMemberRole } from "@/hooks/use-members";
 import { useInvitations, useCreateInvitation, useCancelInvitation } from "@/hooks/use-invitations";
 import { useMyAccounts } from "@/hooks/use-accounts";
+import { useBuckets } from "@/hooks/use-buckets";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Trash2, UserPlus, Shield, Crown, Code, X, Clock, Mail } from "lucide-react";
-import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Trash2, UserPlus, Shield, Crown, Code, X, Clock, Mail, User, Database } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
+
+interface BucketPermissionEntry {
+  bucketId: number;
+  bucketName: string;
+  selected: boolean;
+  permission: 'read' | 'write' | 'read-write';
+}
 
 export default function Team() {
   const { data: accounts } = useMyAccounts();
   const currentAccount = accounts?.[0];
   const { data: members, isLoading } = useMembers(currentAccount?.id);
   const { data: invitations } = useInvitations(currentAccount?.id);
+  const { data: buckets } = useBuckets(currentAccount?.id);
   const { mutateAsync: createInvitation, isPending: isInviting } = useCreateInvitation();
   const { mutateAsync: cancelInvitation } = useCancelInvitation();
   const { mutateAsync: removeMember } = useRemoveMember();
@@ -25,16 +35,63 @@ export default function Team() {
   const { toast } = useToast();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<{ email: string; role: string }>({
+  const [bucketPermissions, setBucketPermissions] = useState<BucketPermissionEntry[]>([]);
+  const { register, handleSubmit, reset, control, watch, formState: { errors } } = useForm<{ email: string; role: string }>({
     defaultValues: { email: "", role: "developer" }
   });
 
+  const selectedRole = watch("role");
+
+  // Initialize bucket permissions when buckets load or dialog opens
+  useEffect(() => {
+    if (buckets && isDialogOpen) {
+      setBucketPermissions(buckets.map(b => ({
+        bucketId: b.id,
+        bucketName: b.name,
+        selected: false,
+        permission: 'read' as const
+      })));
+    }
+  }, [buckets, isDialogOpen]);
+
+  const toggleBucketSelection = (bucketId: number) => {
+    setBucketPermissions(prev => prev.map(bp =>
+      bp.bucketId === bucketId ? { ...bp, selected: !bp.selected } : bp
+    ));
+  };
+
+  const updateBucketPermission = (bucketId: number, permission: 'read' | 'write' | 'read-write') => {
+    setBucketPermissions(prev => prev.map(bp =>
+      bp.bucketId === bucketId ? { ...bp, permission } : bp
+    ));
+  };
+
   const onInviteMember = async (data: { email: string; role: string }) => {
     if (!currentAccount) return;
+
+    // For external clients, require at least one bucket selected
+    if (data.role === 'external_client') {
+      const selectedBuckets = bucketPermissions.filter(bp => bp.selected);
+      if (selectedBuckets.length === 0) {
+        toast({ title: "Erro", description: "Selecione pelo menos um bucket para o cliente externo.", variant: "destructive" });
+        return;
+      }
+    }
+
     try {
-      await createInvitation({ accountId: currentAccount.id, ...data });
+      const inviteData: any = { accountId: currentAccount.id, ...data };
+
+      // Include bucket permissions for external clients
+      if (data.role === 'external_client') {
+        inviteData.bucketPermissions = bucketPermissions
+          .filter(bp => bp.selected)
+          .map(bp => ({ bucketId: bp.bucketId, permission: bp.permission }));
+      }
+
+      await createInvitation(inviteData);
       setIsDialogOpen(false);
       reset();
+      setBucketPermissions([]);
       toast({ title: "Convite enviado", description: `Um convite foi enviado para ${data.email}.` });
     } catch (e: any) {
       toast({ title: "Erro", description: e.message || "Falha ao enviar convite.", variant: "destructive" });
@@ -68,6 +125,7 @@ export default function Team() {
     switch (role) {
       case 'owner': return <Crown className="w-3 h-3 mr-1" />;
       case 'admin': return <Shield className="w-3 h-3 mr-1" />;
+      case 'external_client': return <User className="w-3 h-3 mr-1" />;
       default: return <Code className="w-3 h-3 mr-1" />;
     }
   };
@@ -77,6 +135,7 @@ export default function Team() {
       case 'owner': return 'Proprietário';
       case 'admin': return 'Administrador';
       case 'developer': return 'Desenvolvedor';
+      case 'external_client': return 'Cliente Externo';
       default: return role;
     }
   };
@@ -132,11 +191,61 @@ export default function Team() {
                         <SelectContent>
                           <SelectItem value="developer">Desenvolvedor</SelectItem>
                           <SelectItem value="admin">Administrador</SelectItem>
+                          <SelectItem value="external_client">Cliente Externo (Apenas arquivos)</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
                   />
                 </div>
+
+                {/* Bucket Permissions - Only show for external_client */}
+                {selectedRole === 'external_client' && (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      Permissões de Buckets
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Selecione os buckets que este cliente poderá acessar e defina as permissões.
+                    </p>
+                    {bucketPermissions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground italic">Nenhum bucket disponível. Crie um bucket primeiro.</p>
+                    ) : (
+                      <div className="max-h-48 overflow-y-auto space-y-2 border rounded-lg p-3 bg-muted/30">
+                        {bucketPermissions.map((bp) => (
+                          <div key={bp.bucketId} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-background transition-colors">
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                id={`bucket-${bp.bucketId}`}
+                                checked={bp.selected}
+                                onCheckedChange={() => toggleBucketSelection(bp.bucketId)}
+                              />
+                              <label htmlFor={`bucket-${bp.bucketId}`} className="text-sm font-medium cursor-pointer">
+                                {bp.bucketName}
+                              </label>
+                            </div>
+                            {bp.selected && (
+                              <Select
+                                value={bp.permission}
+                                onValueChange={(val: 'read' | 'write' | 'read-write') => updateBucketPermission(bp.bucketId, val)}
+                              >
+                                <SelectTrigger className="w-32 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="read">Somente Leitura</SelectItem>
+                                  <SelectItem value="write">Somente Escrita</SelectItem>
+                                  <SelectItem value="read-write">Leitura e Escrita</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Button type="submit" className="w-full" disabled={isInviting} data-testid="button-send-invite">
                   {isInviting ? (
                     <>

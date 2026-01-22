@@ -121,6 +121,7 @@ export const invitations = pgTable("invitations", {
   invitedBy: varchar("invited_by").references(() => users.id),
   expiresAt: timestamp("expires_at").notNull(),
   acceptedAt: timestamp("accepted_at"),
+  metadata: jsonb("metadata").default({}), // For storing bucket permissions for external_client
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -189,9 +190,19 @@ export const accountMembers = pgTable("account_members", {
   id: serial("id").primaryKey(),
   accountId: integer("account_id").references(() => accounts.id),
   userId: varchar("user_id").references(() => users.id),
-  role: text("role").notNull().default("developer"), // owner, admin, developer
+  role: text("role").notNull().default("developer"), // owner, admin, developer, external_client
   joinedAt: timestamp("joined_at").defaultNow(),
 });
+
+// === BUCKET PERMISSIONS (For External Clients) ===
+export const bucketPermissions = pgTable("bucket_permissions", {
+  id: serial("id").primaryKey(),
+  accountMemberId: integer("account_member_id").references(() => accountMembers.id).notNull(),
+  bucketId: integer("bucket_id").references(() => buckets.id).notNull(),
+  permission: text("permission").notNull().default("read"), // read, write, read-write
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 
 // === SUBSCRIPTIONS ===
 export const subscriptions = pgTable("subscriptions", {
@@ -360,12 +371,24 @@ export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
   }),
 }));
 
+export const bucketPermissionsRelations = relations(bucketPermissions, ({ one }) => ({
+  member: one(accountMembers, {
+    fields: [bucketPermissions.accountMemberId],
+    references: [accountMembers.id],
+  }),
+  bucket: one(buckets, {
+    fields: [bucketPermissions.bucketId],
+    references: [buckets.id],
+  }),
+}));
+
 // === ZOD SCHEMAS ===
 export const insertProductSchema = createInsertSchema(products);
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true, status: true, storageUsed: true, bandwidthUsed: true });
 export const insertMemberSchema = createInsertSchema(accountMembers).omit({ id: true, joinedAt: true });
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true });
 export const insertBucketSchema = createInsertSchema(buckets).omit({ id: true, createdAt: true, objectCount: true, sizeBytes: true, versioningEnabled: true, lifecycleRules: true });
+export const insertBucketPermissionSchema = createInsertSchema(bucketPermissions).omit({ id: true, createdAt: true });
 
 export const lifecycleRuleSchema = z.object({
   id: z.string(),
@@ -402,6 +425,7 @@ export type Invoice = typeof invoices.$inferSelect;
 export type UsageRecord = typeof usageRecords.$inferSelect;
 export type QuotaRequest = typeof quotaRequests.$inferSelect;
 export type SftpCredential = typeof sftpCredentials.$inferSelect;
+export type BucketPermission = typeof bucketPermissions.$inferSelect;
 
 export type CreateAccountRequest = z.infer<typeof insertAccountSchema>;
 export type UpdateAccountRequest = Partial<CreateAccountRequest>;
