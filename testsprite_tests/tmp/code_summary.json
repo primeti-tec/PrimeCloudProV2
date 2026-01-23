@@ -1,0 +1,582 @@
+{
+  "tech_stack": [
+    "TypeScript",
+    "React 18",
+    "Vite 7",
+    "Express 5",
+    "PostgreSQL",
+    "Drizzle ORM",
+    "Clerk Authentication",
+    "MinIO (S3-compatible storage)",
+    "TailwindCSS",
+    "React Query",
+    "Wouter (routing)",
+    "Zod (validation)",
+    "Radix UI"
+  ],
+  "features": [
+    {
+      "name": "Authentication",
+      "description": "User authentication using Clerk with sign-in, sign-up, and session management",
+      "files": [
+        "client/src/pages/SignIn.tsx",
+        "client/src/pages/SignUp.tsx",
+        "client/src/hooks/use-auth.ts",
+        "server/replit_integrations/auth/index.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/auth/user": {
+            "get": {
+              "summary": "Get current authenticated user",
+              "security": [{"bearerAuth": []}],
+              "responses": {
+                "200": {"description": "User object or null"}
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Accounts Management",
+      "description": "Multi-tenant account management with custom domains, branding, and team organization",
+      "files": [
+        "client/src/pages/Dashboard.tsx",
+        "client/src/pages/CreateAccount.tsx",
+        "client/src/hooks/use-accounts.ts",
+        "server/routes.ts",
+        "server/storage.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/my-accounts": {
+            "get": {
+              "summary": "List user's accounts",
+              "security": [{"bearerAuth": []}],
+              "responses": {"200": {"description": "Array of accounts"}}
+            }
+          },
+          "/api/accounts": {
+            "post": {
+              "summary": "Create new account",
+              "security": [{"bearerAuth": []}],
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "name": {"type": "string"},
+                        "document": {"type": "string"},
+                        "documentType": {"type": "string", "enum": ["cpf", "cnpj"]}
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": {"201": {"description": "Created account"}}
+            }
+          },
+          "/api/accounts/{id}": {
+            "get": {
+              "summary": "Get account details",
+              "parameters": [{"name": "id", "in": "path", "required": true}],
+              "responses": {"200": {"description": "Account with subscription"}}
+            },
+            "patch": {
+              "summary": "Update account",
+              "parameters": [{"name": "id", "in": "path", "required": true}],
+              "responses": {"200": {"description": "Updated account"}}
+            }
+          },
+          "/api/accounts/{id}/branding": {
+            "patch": {
+              "summary": "Update account branding (logo, colors)",
+              "parameters": [{"name": "id", "in": "path", "required": true}],
+              "responses": {"200": {"description": "Updated account"}}
+            }
+          },
+          "/api/accounts/{id}/domain": {
+            "patch": {
+              "summary": "Configure custom domain",
+              "responses": {"200": {"description": "Domain configuration with verification instructions"}}
+            },
+            "delete": {
+              "summary": "Remove custom domain",
+              "responses": {"200": {"description": "Success"}}
+            }
+          },
+          "/api/accounts/{id}/domain/verify": {
+            "post": {
+              "summary": "Verify custom domain DNS",
+              "responses": {"200": {"description": "Verification result"}}
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Team/Members Management",
+      "description": "Manage team members with roles (owner, admin, member, external_client) and permissions",
+      "files": [
+        "client/src/pages/Team.tsx",
+        "client/src/hooks/use-members.ts",
+        "server/routes.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/members": {
+            "get": {
+              "summary": "List account members",
+              "responses": {"200": {"description": "Array of members"}}
+            },
+            "post": {
+              "summary": "Add member to account",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "properties": {
+                        "email": {"type": "string"},
+                        "role": {"type": "string", "enum": ["owner", "admin", "member", "external_client"]}
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": {"201": {"description": "Created member"}}
+            }
+          },
+          "/api/accounts/{accountId}/members/{memberId}": {
+            "patch": {
+              "summary": "Update member role",
+              "responses": {"200": {"description": "Updated member"}}
+            },
+            "delete": {
+              "summary": "Remove member",
+              "responses": {"200": {"description": "Success"}}
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Storage Buckets",
+      "description": "S3-compatible bucket management with versioning, lifecycle rules, and storage limits",
+      "files": [
+        "client/src/pages/Storage.tsx",
+        "client/src/hooks/use-buckets.ts",
+        "server/routes.ts",
+        "server/services/minio.service.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/buckets": {
+            "get": {
+              "summary": "List buckets",
+              "responses": {"200": {"description": "Array of buckets"}}
+            },
+            "post": {
+              "summary": "Create bucket",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "properties": {
+                        "name": {"type": "string"},
+                        "region": {"type": "string"},
+                        "isPublic": {"type": "boolean"},
+                        "storageLimitGB": {"type": "number"}
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": {"201": {"description": "Created bucket"}}
+            }
+          },
+          "/api/accounts/{accountId}/buckets/{bucketId}": {
+            "delete": {
+              "summary": "Delete bucket",
+              "responses": {"200": {"description": "Success"}}
+            }
+          },
+          "/api/accounts/{accountId}/buckets/{bucketId}/versioning": {
+            "put": {
+              "summary": "Enable/disable versioning",
+              "responses": {"200": {"description": "Updated bucket"}}
+            }
+          },
+          "/api/accounts/{accountId}/buckets/{bucketId}/lifecycle": {
+            "get": {"summary": "Get lifecycle rules"},
+            "post": {"summary": "Add lifecycle rule"},
+            "delete": {"summary": "Delete lifecycle rule"}
+          }
+        }
+      }
+    },
+    {
+      "name": "Object/File Management",
+      "description": "Upload, download, list, and delete objects in buckets with presigned URLs",
+      "files": [
+        "client/src/pages/BucketBrowser.tsx",
+        "server/routes.ts",
+        "server/services/minio.service.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/buckets/{bucketId}/objects": {
+            "get": {
+              "summary": "List objects in bucket",
+              "parameters": [{"name": "prefix", "in": "query", "required": false}],
+              "responses": {"200": {"description": "Objects and prefixes"}}
+            },
+            "delete": {
+              "summary": "Delete object",
+              "parameters": [{"name": "key", "in": "query", "required": true}],
+              "responses": {"200": {"description": "Success"}}
+            }
+          },
+          "/api/accounts/{accountId}/buckets/{bucketId}/objects/upload-url": {
+            "post": {
+              "summary": "Get presigned upload URL",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "properties": {
+                        "filename": {"type": "string"},
+                        "prefix": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": {"200": {"description": "Upload URL and object key"}}
+            }
+          },
+          "/api/accounts/{accountId}/buckets/{bucketId}/objects/download-url": {
+            "get": {
+              "summary": "Get presigned download URL",
+              "parameters": [{"name": "key", "in": "query", "required": true}],
+              "responses": {"200": {"description": "Download URL"}}
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Access Keys",
+      "description": "Manage S3-compatible access keys for programmatic API access",
+      "files": [
+        "client/src/pages/ApiKeys.tsx",
+        "client/src/hooks/use-access-keys.ts",
+        "server/routes.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/access-keys": {
+            "get": {"summary": "List access keys"},
+            "post": {"summary": "Create access key"}
+          },
+          "/api/accounts/{accountId}/access-keys/{keyId}": {
+            "delete": {"summary": "Revoke access key"}
+          },
+          "/api/accounts/{accountId}/access-keys/{keyId}/rotate": {
+            "post": {"summary": "Rotate access key secret"}
+          },
+          "/api/accounts/{accountId}/access-keys/{keyId}/toggle": {
+            "post": {"summary": "Enable/disable access key"}
+          }
+        }
+      }
+    },
+    {
+      "name": "Notifications",
+      "description": "In-app notification system with read/unread status",
+      "files": [
+        "client/src/components/NotificationsBell.tsx",
+        "client/src/hooks/use-notifications.ts",
+        "server/routes.ts",
+        "server/services/notification.service.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/notifications": {
+            "get": {"summary": "List notifications"}
+          },
+          "/api/accounts/{accountId}/notifications/unread-count": {
+            "get": {"summary": "Get unread notification count"}
+          },
+          "/api/accounts/{accountId}/notifications/{id}/read": {
+            "patch": {"summary": "Mark notification as read"}
+          },
+          "/api/accounts/{accountId}/notifications/read-all": {
+            "patch": {"summary": "Mark all notifications as read"}
+          }
+        }
+      }
+    },
+    {
+      "name": "Audit Logs",
+      "description": "Track all account activities with filtering and search",
+      "files": [
+        "client/src/pages/AuditLogs.tsx",
+        "client/src/hooks/use-audit-logs.ts",
+        "server/routes.ts",
+        "server/services/audit.service.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/audit-logs": {
+            "get": {
+              "summary": "Get audit logs",
+              "parameters": [
+                {"name": "action", "in": "query"},
+                {"name": "severity", "in": "query"},
+                {"name": "search", "in": "query"},
+                {"name": "startDate", "in": "query"},
+                {"name": "endDate", "in": "query"},
+                {"name": "limit", "in": "query"}
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Invitations",
+      "description": "Invite users to join accounts via email with role assignment",
+      "files": [
+        "client/src/pages/AcceptInvite.tsx",
+        "client/src/hooks/use-invitations.ts",
+        "server/routes.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/invitations": {
+            "get": {"summary": "List invitations"},
+            "post": {
+              "summary": "Create invitation",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "properties": {
+                        "email": {"type": "string"},
+                        "role": {"type": "string"},
+                        "bucketPermissions": {"type": "array"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/api/invitations/{token}": {
+            "get": {"summary": "Get invitation by token"}
+          },
+          "/api/invitations/{token}/accept": {
+            "post": {"summary": "Accept invitation"}
+          }
+        }
+      }
+    },
+    {
+      "name": "SFTP Access",
+      "description": "SFTP credentials management for secure file transfer",
+      "files": [
+        "client/src/pages/SftpAccess.tsx",
+        "server/routes.ts",
+        "server/services/sftpgo.service.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/sftp": {
+            "get": {"summary": "Get SFTP credentials"},
+            "post": {"summary": "Create SFTP credentials"}
+          },
+          "/api/accounts/{accountId}/sftp/reset-password": {
+            "post": {"summary": "Reset SFTP password"}
+          }
+        }
+      }
+    },
+    {
+      "name": "Billing & Invoices",
+      "description": "Subscription management, invoices, and usage tracking",
+      "files": [
+        "client/src/pages/Billing.tsx",
+        "client/src/hooks/use-billing.ts",
+        "server/routes.ts",
+        "server/services/billing.service.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/invoices": {
+            "get": {"summary": "List invoices"}
+          },
+          "/api/accounts/{accountId}/usage": {
+            "get": {"summary": "Get usage summary"}
+          },
+          "/api/accounts/{accountId}/subscriptions": {
+            "post": {"summary": "Subscribe to a product"}
+          }
+        }
+      }
+    },
+    {
+      "name": "Orders (VPS & Backup)",
+      "description": "Create and manage orders for VPS and backup services",
+      "files": [
+        "client/src/pages/Orders.tsx",
+        "client/src/pages/ContractService.tsx",
+        "client/src/pages/BackupConfig.tsx",
+        "client/src/hooks/use-vps-order.ts",
+        "client/src/hooks/use-backup-order.ts",
+        "server/routes.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/orders": {
+            "get": {"summary": "List orders"},
+            "post": {"summary": "Create order"}
+          },
+          "/api/accounts/{accountId}/orders/vps": {
+            "post": {"summary": "Create VPS order with configuration"}
+          },
+          "/api/accounts/{accountId}/orders/backup": {
+            "post": {"summary": "Create backup order"}
+          },
+          "/api/accounts/{accountId}/orders/{orderId}": {
+            "get": {"summary": "Get order details"},
+            "patch": {"summary": "Update order status"}
+          },
+          "/api/accounts/{accountId}/orders/{orderId}/cancel": {
+            "post": {"summary": "Cancel order"}
+          }
+        }
+      }
+    },
+    {
+      "name": "Quota Requests",
+      "description": "Request storage quota increases with admin approval workflow",
+      "files": [
+        "client/src/hooks/use-quota-requests.ts",
+        "server/routes.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{accountId}/quota-requests": {
+            "get": {"summary": "List quota requests"},
+            "post": {"summary": "Create quota request"}
+          },
+          "/api/admin/quota-requests/pending": {
+            "get": {"summary": "List all pending quota requests (admin)"}
+          },
+          "/api/admin/quota-requests/{id}/approve": {
+            "post": {"summary": "Approve quota request"}
+          },
+          "/api/admin/quota-requests/{id}/reject": {
+            "post": {"summary": "Reject quota request"}
+          }
+        }
+      }
+    },
+    {
+      "name": "Admin Dashboard",
+      "description": "Administrative functions: account management, stats, products, pricing",
+      "files": [
+        "client/src/pages/AdminDashboard.tsx",
+        "client/src/hooks/use-admin.ts",
+        "client/src/components/admin/PricingManager.tsx",
+        "server/routes.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/admin/accounts": {
+            "get": {"summary": "List all accounts"}
+          },
+          "/api/admin/stats": {
+            "get": {"summary": "Get admin statistics"}
+          },
+          "/api/admin/accounts/{id}/approve": {
+            "post": {"summary": "Approve account"}
+          },
+          "/api/admin/accounts/{id}/suspend": {
+            "post": {"summary": "Suspend account"}
+          },
+          "/api/admin/accounts/{id}/quota": {
+            "post": {"summary": "Adjust account quota"}
+          },
+          "/api/admin/products": {
+            "get": {"summary": "List products"},
+            "post": {"summary": "Create product"}
+          },
+          "/api/admin/products/{id}": {
+            "patch": {"summary": "Update product"},
+            "delete": {"summary": "Delete product"}
+          },
+          "/api/admin/pricing": {
+            "get": {"summary": "List pricing configs"},
+            "post": {"summary": "Create pricing config"}
+          },
+          "/api/admin/pricing/{id}": {
+            "put": {"summary": "Update pricing config"},
+            "delete": {"summary": "Delete pricing config"}
+          }
+        }
+      }
+    },
+    {
+      "name": "SMTP Email Configuration",
+      "description": "Configure custom SMTP settings for account email notifications",
+      "files": [
+        "server/routes/smtp.ts",
+        "server/services/email.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/accounts/{id}/email-config": {
+            "patch": {"summary": "Configure SMTP settings"}
+          },
+          "/api/accounts/{id}/email-test": {
+            "post": {"summary": "Test SMTP configuration"}
+          }
+        }
+      }
+    },
+    {
+      "name": "Products",
+      "description": "Product catalog management for subscription plans",
+      "files": [
+        "client/src/hooks/use-products.ts",
+        "server/routes.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "paths": {
+          "/api/products": {
+            "get": {"summary": "List available products"}
+          }
+        }
+      }
+    }
+  ]
+}

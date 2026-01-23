@@ -1,0 +1,673 @@
+[
+  {
+    "id": "TC001",
+    "title": "User Registration and Login Success",
+    "description": "Verify that users can register and log in successfully with valid credentials using Clerk authentication.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the user registration page."
+      },
+      {
+        "type": "action",
+        "description": "Input valid user data for registration."
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form."
+      },
+      {
+        "type": "assertion",
+        "description": "Assert that registration completes successfully and user is redirected to login."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to login page."
+      },
+      {
+        "type": "action",
+        "description": "Input the registered username/email and password."
+      },
+      {
+        "type": "action",
+        "description": "Click the login button."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that login is successful and user is granted access to tenant resources."
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "User Login Failure with Invalid Credentials",
+    "description": "Verify login fails with invalid username/password combinations and appropriate error messages are displayed.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to login page."
+      },
+      {
+        "type": "action",
+        "description": "Input invalid username/email and/or password."
+      },
+      {
+        "type": "action",
+        "description": "Click login button."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify login is rejected and error message about invalid credentials is shown."
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Multi-Tenant Account Creation With Branding",
+    "description": "Ensure users can create new tenant accounts with isolated data and configure initial branding with custom logos and colors.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a user with permissions to create tenant accounts."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to account creation page."
+      },
+      {
+        "type": "action",
+        "description": "Fill in required tenant details and upload branding elements (logo, color scheme)."
+      },
+      {
+        "type": "action",
+        "description": "Submit account creation form."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify tenant account is created with isolated data storage."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify branding is applied correctly to UI components."
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Custom Domain Configuration with DNS Verification",
+    "description": "Test setting up a custom domain for a tenant and perform DNS verification successfully.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as tenant admin."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to domain management settings."
+      },
+      {
+        "type": "action",
+        "description": "Add a new custom domain and trigger DNS verification."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify DNS verification process completes successfully and domain is assigned."
+      },
+      {
+        "type": "assertion",
+        "description": "Check UI reflects the custom domain in tenant branding."
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Bucket CRUD Operations with Versioning and Lifecycle Policies",
+    "description": "Validate creating, reading, updating, and deleting storage buckets including enabling versioning and setting lifecycle policies.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as tenant user with bucket management permissions."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to bucket management page."
+      },
+      {
+        "type": "action",
+        "description": "Create a new bucket with valid parameters."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the bucket is created and listed."
+      },
+      {
+        "type": "action",
+        "description": "Enable versioning on the bucket."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm versioning status is updated."
+      },
+      {
+        "type": "action",
+        "description": "Define and apply lifecycle policies for data expiration or transition."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify lifecycle policies are saved and enforced."
+      },
+      {
+        "type": "action",
+        "description": "Update bucket metadata such as name or access policies."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure updates are persisted correctly."
+      },
+      {
+        "type": "action",
+        "description": "Delete the bucket."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the bucket is removed and no longer accessible."
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Access Key Management: Creation, Rotation, Revocation, and Permissions",
+    "description": "Test creation, rotation, revocation, and permission changes of S3-compatible access keys ensuring correct enforcement and logging.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a user with access key management rights."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to access keys page."
+      },
+      {
+        "type": "action",
+        "description": "Create a new access key with specific permission sets."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new key is generated and permissions are correct."
+      },
+      {
+        "type": "action",
+        "description": "Rotate the secret of an existing access key."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the key's secret has changed and old secret is invalid."
+      },
+      {
+        "type": "action",
+        "description": "Revoke an access key."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the key is disabled and cannot be used for authentication."
+      },
+      {
+        "type": "action",
+        "description": "Update permissions on an existing key."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure the permission updates are enforced correctly during API access."
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Team Member Invitation, Role Assignment, and Permission Controls",
+    "description": "Verify inviting team members, assigning roles (owner, admin, developer), and enforcing permission restrictions accordingly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as tenant owner or admin."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to team management page."
+      },
+      {
+        "type": "action",
+        "description": "Send an invitation to a new user via email."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the invitation is sent and recorded."
+      },
+      {
+        "type": "action",
+        "description": "New user accepts the invitation and joins the team."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify new team member appears in the list with the correct default role."
+      },
+      {
+        "type": "action",
+        "description": "Change the role of existing team members to admin or developer."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that role changes update permissions correctly."
+      },
+      {
+        "type": "assertion",
+        "description": "Attempt actions restricted for current role to ensure access control enforcement."
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Billing Workflow: Plan Selection, Subscription, Invoice Generation and Payment",
+    "description": "Test the full billing lifecycle including selecting plans, managing subscription states, invoice creation, and payment tracking.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a tenant billing manager."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to billing page and select a product plan."
+      },
+      {
+        "type": "action",
+        "description": "Subscribe to selected plan."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify subscription is active with correct plan details."
+      },
+      {
+        "type": "action",
+        "description": "Trigger invoice generation for billing cycle."
+      },
+      {
+        "type": "assertion",
+        "description": "Check invoice is generated with accurate amounts and details."
+      },
+      {
+        "type": "action",
+        "description": "Simulate payment of invoice."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm payment is recorded and subscription state is updated."
+      },
+      {
+        "type": "action",
+        "description": "Cancel subscription and verify billing state updates appropriately."
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Quota Request and Approval Workflow",
+    "description": "Verify users can request storage quota increases, administrators can approve or reject requests, and status is updated accordingly.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Tenant user submits a quota increase request with justification."
+      },
+      {
+        "type": "assertion",
+        "description": "Check the request appears in admin dashboard for review."
+      },
+      {
+        "type": "action",
+        "description": "Admin reviews and approves the quota request."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify quota is increased for tenant and user is notified."
+      },
+      {
+        "type": "action",
+        "description": "Admin rejects a quota request and provides reason."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm tenant user receives rejection notification with reason."
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "SFTP Credential Creation and Password Reset",
+    "description": "Test creation of SFTP credentials per tenant, password reset flows, and logging of usage events.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as tenant user with SFTP credential management rights."
+      },
+      {
+        "type": "action",
+        "description": "Create new SFTP credentials assigned to specific tenant."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify credentials are created and stored securely."
+      },
+      {
+        "type": "action",
+        "description": "Reset password for existing SFTP credential."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm password reset is processed and updated."
+      },
+      {
+        "type": "assertion",
+        "description": "Check audit logs include creation and reset events with user and timestamp."
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Notification System Delivery and User Interaction",
+    "description": "Validate that in-app notifications are delivered correctly, support different types, and read/unread statuses update on user interaction.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger notifications of various types (quota alerts, payment reminders, activity alerts) for a tenant user."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify notifications appear in the bell icon dropdown."
+      },
+      {
+        "type": "action",
+        "description": "Mark certain notifications as read."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure read/unread status updates persist and UI reflects changes."
+      },
+      {
+        "type": "action",
+        "description": "Dismiss notifications and confirm they are removed from view."
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Audit Logs Capture and Review by Authorized Users",
+    "description": "Ensure that all critical system and user actions (account changes, key rotations, billing events) are recorded with metadata and accessible by authorized roles.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Perform various actions: create account, rotate key, change team roles, generate invoices."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify audit logs record each action with user identity, timestamp, and relevant details."
+      },
+      {
+        "type": "action",
+        "description": "Log in as user without audit permission and attempt to access audit logs."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm access is denied."
+      },
+      {
+        "type": "action",
+        "description": "Log in as authorized user and navigate to audit logs page."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify audit logs are searchable, sortable, and display accurate metadata."
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "White-label Customization Application in UI and Email Templates",
+    "description": "Validate that tenant-specific white-label configurations (logo, colors, favicon, SMTP settings) propagate correctly throughout the UI and email templates.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Configure tenant branding including custom logo, color scheme, and favicon."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify these branding elements appear on tenant UI pages consistently."
+      },
+      {
+        "type": "action",
+        "description": "Setup SMTP email configuration per tenant."
+      },
+      {
+        "type": "action",
+        "description": "Trigger an outbound email (notification or billing) to a user."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure email uses the tenant's customized templates and branding."
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "API Endpoint Response Time and Error Handling",
+    "description": "Test that all backend API endpoints respond within defined SLA limits and handle invalid input/errors gracefully with proper validation.",
+    "category": "performance",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send valid API requests covering all core operations (accounts, buckets, keys, billing, team)."
+      },
+      {
+        "type": "assertion",
+        "description": "Measure response times and verify they meet SLA (e.g., under 500ms)."
+      },
+      {
+        "type": "action",
+        "description": "Send invalid API requests with malformed or missing data."
+      },
+      {
+        "type": "assertion",
+        "description": "Check API returns appropriate error status codes and messages without exposing sensitive information."
+      },
+      {
+        "type": "action",
+        "description": "Check that rate limiting rejects excessive requests with proper responses."
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Role-based Access Control Enforcement and Tenant Isolation",
+    "description": "Verify that role-based access controls strictly isolate tenant data and prevent cross-tenant data leakage or unauthorized permission escalation.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as tenant A user and attempt to access tenant B data via UI and API."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure access is denied and no tenant B data is exposed."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to perform actions above assigned role permissions (e.g., developer tries admin-only actions)."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify these actions are blocked with appropriate error notifications."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to escalate permissions by direct API or UI manipulation."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm attempts are rejected and logged."
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Frontend UI Workflow Validation for Dashboard, Team, Billing, and Storage",
+    "description": "Confirm that the frontend UI provides modular, responsive, and intuitive workflows for all major features, leveraging Radix UI, TailwindCSS, and shadcn/ui components.",
+    "category": "ui",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate through dashboard pages and verify overview metrics and quick actions function as expected."
+      },
+      {
+        "type": "action",
+        "description": "Test team management UI flows including invitations, role updates, and removals."
+      },
+      {
+        "type": "action",
+        "description": "Exercise billing UI including plan selection, invoice views, and subscription management."
+      },
+      {
+        "type": "action",
+        "description": "Use storage management screens to create, modify, and delete buckets."
+      },
+      {
+        "type": "assertion",
+        "description": "Check UI responsiveness on various screen sizes and input correctness feedback."
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Security of Sensitive Data Storage and Transmission",
+    "description": "Ensure all sensitive information such as passwords and secret keys are hashed or encrypted securely both in storage and transit.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create or update user credentials and access keys."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that sensitive data is not stored in plaintext in databases."
+      },
+      {
+        "type": "action",
+        "description": "Intercept API calls to check transmission security."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm data is transmitted over secure channels (e.g., HTTPS/TLS)."
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Admin Dashboard Management and Quota Approvals",
+    "description": "Validate super admin functionalities including tenant account management, product and pricing setup, and quota request approvals without permission escalation risks.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as super admin."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to admin dashboard for tenant account management."
+      },
+      {
+        "type": "action",
+        "description": "Create, update, and suspend tenant accounts."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify changes propagate correctly without affecting unrelated tenants."
+      },
+      {
+        "type": "action",
+        "description": "Manage product catalog and pricing tiers."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm pricing changes are saved and reflected in billing flows."
+      },
+      {
+        "type": "action",
+        "description": "Review and approve/reject tenant quota increase requests."
+      },
+      {
+        "type": "assertion",
+        "description": "Check status updates and notifications are sent appropriately."
+      },
+      {
+        "type": "action",
+        "description": "Attempt unauthorized actions and verify no permission escalation occurs."
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "System Stability and Performance Under Load",
+    "description": "Conduct performance testing to ensure system stability, responsiveness, and proper operation of monitoring and rate limiting.",
+    "category": "performance",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate concurrent users performing core operations simultaneously."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify system remains stable with acceptable latency and throughput."
+      },
+      {
+        "type": "action",
+        "description": "Trigger rate limiting by exceeding request thresholds."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm rate limits activate and reject excessive requests safely."
+      },
+      {
+        "type": "action",
+        "description": "Check monitoring dashboards and alerts are updated accordingly."
+      }
+    ]
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:5000",
+  "backendAuthType": "public",
+  "executionArgs": {
+    "projectName": "PrimeCloudProV2",
+    "projectPath": "d:\\PROJETOS\\PRINECLOUDPROV2\\PrimeCloudProV2",
+    "testIds": [],
+    "additionalInstruction": "",
+    "envs": {
+      "API_KEY": "sk-user-SzC4la5jBvLNq1M-3OYGRcWsa-Oi57sol9W9Q2XL1p7pC7aGykTFwuyml-mrtPnsrrD2DC8odOe8WQ-eSkChUPvf851GMskewYAc8P8H2FVr9OimIeEoPBEVRqor7QF9r78"
+    }
+  },
+  "proxy": "http://bd934e31-5457-444c-81a6-8f68145e5803:ePWDmxJwc9LYILF6qshkoRXCHfYEghxT@tun.testsprite.com:8080"
+}

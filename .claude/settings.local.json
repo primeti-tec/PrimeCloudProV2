@@ -30,7 +30,21 @@
       "Bash(taskkill:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npx testsprite --help:*)",
+      "Bash(node --version)",
+      "Bash(npx:*)",
+      "Bash(ls -la \"d:\\\\PROJETOS\\\\PRINECLOUDPROV2\\\\PrimeCloudProV2\\\\testsprite_tests\"\" 2>/dev/null || echo \"Directory not found or empty \")",
+      "Bash(claude mcp list:*)",
+      "Bash(set API_KEY=sk-user-SzC4la5jBvLNq1M-3OYGRcWsa-Oi57sol9W9Q2XL1p7pC7aGykTFwuyml-mrtPnsrrD2DC8odOe8WQ-eSkChUPvf851GMskewYAc8P8H2FVr9OimIeEoPBEVRqor7QF9r78)",
+      "mcp__testsprite__testsprite_bootstrap",
+      "mcp__testsprite__testsprite_generate_code_summary",
+      "mcp__testsprite__testsprite_generate_standardized_prd",
+      "mcp__testsprite__testsprite_generate_frontend_test_plan",
+      "mcp__testsprite__testsprite_generate_code_and_execute",
+      "Bash(node:*)",
+      "Bash(if not exist \"d:\\\\PROJETOS\\\\PRINECLOUDPROV2\\\\PrimeCloudProV2\\\\testsprite_tests\\\\tmp\" mkdir \"d:\\\\PROJETOS\\\\PRINECLOUDPROV2\\\\PrimeCloudProV2\\\\testsprite_tests\\\\tmp\")",
+      "Bash(powershell -Command:*)"
     ]
   }
 }

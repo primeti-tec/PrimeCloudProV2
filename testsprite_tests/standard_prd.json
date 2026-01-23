@@ -1,0 +1,246 @@
+{
+  "meta": {
+    "project": "PrimeCloudProV2",
+    "date": "2026-01-21",
+    "prepared_by": "Claude (Anthropic)"
+  },
+  "product_overview": "PrimeCloudProV2 is a professional multi-tenant online backup platform providing secure, isolated S3-compatible storage management with full white-label capabilities, team and billing management, and robust administrative controls.",
+  "core_goals": [
+    "Offer a multi-tenant platform enabling clients to securely manage backups with S3-compatible interfaces.",
+    "Provide complete white-label customization including branding and custom domains per tenant.",
+    "Enable comprehensive team management with roles and permissions.",
+    "Support seamless billing, subscription, and order management with usage tracking.",
+    "Ensure data security through role-based access, hashed credentials, and account isolation.",
+    "Facilitate administrative control with audit logs, quota management, and notification systems."
+  ],
+  "key_features": [
+    "User authentication and role-based access control integrated via Clerk.",
+    "Multi-tenant account creation, branding customization, and custom domain management with DNS verification.",
+    "S3-compatible storage using MinIO with bucket CRUD, versioning, lifecycle policies, and usage statistics.",
+    "Access key management supporting key creation, rotation, revocation, and permission granularity.",
+    "Team member management including invitations and role assignment (owner, admin, developer).",
+    "Billing system with product plans, invoices, subscriptions, order processing, and quota requests.",
+    "SFTP credential management for secure file transfers tied to tenant accounts.",
+    "In-app notifications system with various types and read/unread handling.",
+    "Audit logs tracking key user and system actions for compliance and monitoring.",
+    "White-label features supporting custom logos, colors, favicon, and SMTP email configuration per tenant.",
+    "Admin dashboard for super admins to manage accounts, products, pricing, and quota approvals.",
+    "Frontend UI components built with React, Radix UI, TailwindCSS, and shadcn/ui for a modular and responsive interface.",
+    "Backend API with Express.js and TypeScript providing extensive REST endpoints for all core operations."
+  ],
+  "user_flow_summary": [
+    "User registration and login through Clerk-powered authentication enabling access to protected tenant resources.",
+    "Account creation process with multi-tenant isolation and initial branding configuration.",
+    "Dashboard providing overview metrics including storage usage, quick actions for bucket and team management.",
+    "Bucket management flows allowing users to create, version, and apply lifecycle rules to storage buckets.",
+    "Team management including inviting members, role assignment, and managing permissions within accounts.",
+    "Creation and management of S3 access keys to enable programmatic access to storage.",
+    "Billing and subscription lifecycle from plan selection and subscription through invoice generation and payment tracking.",
+    "Notification system displaying alerts about quotas, payments, and account activity with acknowledgment features.",
+    "Audit log review by authorized users to monitor account and system actions.",
+    "Admin users accessing a comprehensive dashboard to oversee tenant accounts, quota request approvals, and pricing configurations.",
+    "SFTP credential creation and password resets for secure file transfers per tenant."
+  ],
+  "validation_criteria": [
+    "Ensure authentication and authorization enforce role-based access control strictly isolating tenant data.",
+    "Validate all CRUD operations on accounts, buckets, access keys, and team members to function correctly with data integrity.",
+    "Test multi-tenant isolation thoroughly ensuring no data leakage across accounts.",
+    "Confirm white-label customization propagates correctly across UI and email templates.",
+    "Verify billing calculations are accurate with correct invoice generation and subscription state transitions.",
+    "Validate SFTP credential creation, password reset functionality, and proper logging of usage events.",
+    "Check notification delivery and user interaction (read/unread status) behaves consistently.",
+    "Audit logs must capture all critical events with relevant metadata and user identities.",
+    "Admin functionalities must allow efficient management and approval workflows without permission escalation risks.",
+    "All API endpoints should respond within defined SLAs and handle errors gracefully with proper validation.",
+    "Frontend UI must present intuitive workflows for all major features, including dashboard, team, billing, and storage management.",
+    "System must securely hash sensitive information (passwords, secret keys) and adhere to security best practices.",
+    "Performance testing should confirm system stability under load, with plans for monitoring and rate limiting implemented."
+  ],
+  "code_summary": {
+    "tech_stack": [
+      "TypeScript",
+      "React 18",
+      "Vite",
+      "Express 5",
+      "PostgreSQL",
+      "Drizzle ORM",
+      "TailwindCSS",
+      "Radix UI",
+      "React Query (TanStack)",
+      "Clerk Authentication",
+      "MinIO Object Storage",
+      "Nodemailer",
+      "Zod Validation"
+    ],
+    "features": [
+      {
+        "name": "Authentication",
+        "description": "User authentication with Clerk (Sign In, Sign Up, OAuth). Protected routes with role-based access control.",
+        "files": [
+          "client/src/pages/SignIn.tsx",
+          "client/src/pages/SignUp.tsx",
+          "client/src/hooks/use-auth.ts",
+          "client/src/lib/auth-utils.ts",
+          "server/replit_integrations/auth/index.ts"
+        ]
+      },
+      {
+        "name": "Dashboard",
+        "description": "Main user dashboard showing account overview, storage usage, and quick actions.",
+        "files": [
+          "client/src/pages/Dashboard.tsx",
+          "client/src/App.tsx"
+        ]
+      },
+      {
+        "name": "Account Management",
+        "description": "Multi-tenant account creation, update, branding customization, and custom domain configuration.",
+        "files": [
+          "client/src/pages/CreateAccount.tsx",
+          "client/src/pages/Settings.tsx",
+          "client/src/hooks/use-accounts.ts",
+          "client/src/hooks/use-current-account.ts",
+          "server/routes.ts"
+        ]
+      },
+      {
+        "name": "Storage Management",
+        "description": "Bucket CRUD operations, versioning, lifecycle rules, and storage limits.",
+        "files": [
+          "client/src/pages/Storage.tsx",
+          "client/src/pages/BucketBrowser.tsx",
+          "client/src/hooks/use-buckets.ts",
+          "server/services/minio.service.ts"
+        ]
+      },
+      {
+        "name": "Team Management",
+        "description": "Team member management, invitations, role assignments (owner, admin, developer, external_client).",
+        "files": [
+          "client/src/pages/Team.tsx",
+          "client/src/hooks/use-members.ts",
+          "client/src/hooks/use-invitations.ts",
+          "client/src/pages/AcceptInvite.tsx"
+        ]
+      },
+      {
+        "name": "API Keys",
+        "description": "S3-compatible access key management with create, rotate, revoke, and toggle active status.",
+        "files": [
+          "client/src/pages/ApiKeys.tsx",
+          "client/src/hooks/use-access-keys.ts"
+        ]
+      },
+      {
+        "name": "Billing and Orders",
+        "description": "Order management, subscriptions, invoices, and pricing configuration.",
+        "files": [
+          "client/src/pages/Billing.tsx",
+          "client/src/pages/Orders.tsx",
+          "client/src/hooks/use-billing.ts",
+          "client/src/hooks/use-subscriptions.ts",
+          "server/services/billing.service.ts"
+        ]
+      },
+      {
+        "name": "VPS Configurator",
+        "description": "Configure and order VPS instances with CPU, RAM, storage, OS, and location options.",
+        "files": [
+          "client/src/pages/ContractService.tsx",
+          "client/src/components/VpsConfigurator.tsx",
+          "client/src/hooks/use-vps-order.ts",
+          "client/src/hooks/use-pricing.ts"
+        ]
+      },
+      {
+        "name": "Backup Configuration",
+        "description": "Configure backup services for cloud and VPS environments.",
+        "files": [
+          "client/src/pages/BackupConfig.tsx",
+          "client/src/hooks/use-backup-order.ts"
+        ]
+      },
+      {
+        "name": "SFTP Access",
+        "description": "SFTP credential management for file transfer access.",
+        "files": [
+          "client/src/pages/SftpAccess.tsx",
+          "server/services/sftpgo.service.ts"
+        ]
+      },
+      {
+        "name": "Audit Logs",
+        "description": "Activity logging and audit trail for account actions.",
+        "files": [
+          "client/src/pages/AuditLogs.tsx",
+          "client/src/hooks/use-audit-logs.ts",
+          "server/services/audit.service.ts"
+        ]
+      },
+      {
+        "name": "Notifications",
+        "description": "In-app notification system with bell icon and notification management.",
+        "files": [
+          "client/src/components/NotificationsBell.tsx",
+          "client/src/hooks/use-notifications.ts",
+          "server/services/notification.service.ts"
+        ]
+      },
+      {
+        "name": "Admin Dashboard",
+        "description": "Super admin dashboard for managing accounts, products, pricing, and quota requests.",
+        "files": [
+          "client/src/pages/AdminDashboard.tsx",
+          "client/src/hooks/use-admin.ts",
+          "client/src/components/admin/PricingManager.tsx"
+        ]
+      },
+      {
+        "name": "Email Configuration",
+        "description": "SMTP email configuration for custom email sending per account.",
+        "files": [
+          "server/routes/smtp.ts",
+          "server/services/email.ts"
+        ]
+      },
+      {
+        "name": "Navigation Components",
+        "description": "Top navigation bar and sidebar components for app navigation.",
+        "files": [
+          "client/src/components/TopNavigation.tsx",
+          "client/src/components/Sidebar.tsx"
+        ]
+      },
+      {
+        "name": "Theme and Branding",
+        "description": "Dark/light mode toggle and white-label branding support.",
+        "files": [
+          "client/src/components/mode-toggle.tsx",
+          "client/src/components/theme-provider.tsx",
+          "client/src/components/branding-provider.tsx"
+        ]
+      },
+      {
+        "name": "Landing Page",
+        "description": "Public landing page for the application.",
+        "files": [
+          "client/src/pages/LandingPage.tsx"
+        ]
+      },
+      {
+        "name": "UI Components",
+        "description": "Reusable UI components based on Radix UI and shadcn/ui.",
+        "files": [
+          "client/src/components/ui/button.tsx",
+          "client/src/components/ui/card.tsx",
+          "client/src/components/ui/dialog.tsx",
+          "client/src/components/ui/form.tsx",
+          "client/src/components/ui/input.tsx",
+          "client/src/components/ui/table.tsx",
+          "client/src/components/ui/toast.tsx",
+          "client/src/components/ui/tabs.tsx"
+        ]
+      }
+    ]
+  }
+}
