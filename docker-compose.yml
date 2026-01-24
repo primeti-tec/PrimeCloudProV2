@@ -1,52 +1,68 @@
-version: "3.8"
+version: "3.9"
 
 services:
-  app:
-    build: .
-    restart: always
+  api:
+    container_name: primecloudpro_api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+    # expõe a API no host
     ports:
       - "5000:5000"
+
     environment:
       NODE_ENV: production
       PORT: "5000"
 
-      DATABASE_URL: ${DATABASE_URL}
-      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
-      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      # DB (dentro do docker -> db:5432)
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-primecloudpro}?schema=public}
 
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_PORT: ${MINIO_PORT}
-      MINIO_USE_SSL: ${MINIO_USE_SSL}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # Clerk (obrigatórias)
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-MISSING_CLERK_PUBLISHABLE_KEY}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-MISSING_CLERK_SECRET_KEY}
+
+      # MinIO (se não usar ainda, deixa MISSING pra denunciar)
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-MISSING_MINIO_ENDPOINT}
+      MINIO_PORT: ${MINIO_PORT:-9000}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-MISSING_MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-MISSING_MINIO_ROOT_PASSWORD}
 
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - primecloud-network
+
+    # opcional, mas ajuda MUITO a não “subir quebrado”
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:5000/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
   db:
-    image: postgres:15-alpine
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: primecloudpro
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - primecloud-network
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+    container_name: primecloudpro_db
+    image: postgres:16
+    restart: unless-stopped
 
-networks:
-  primecloud-network:
-    driver: bridge
+    # host:5433 -> container:5432
+    ports:
+      - "5433:5432"
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-primecloudpro}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 volumes:
-  postgres_data:
+  pgdata:
