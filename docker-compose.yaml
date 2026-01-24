@@ -1,37 +1,45 @@
-version: '3.8'
+version: "3.8"
 
 services:
   app:
     build: .
-    container_name: primecloud-app
     restart: always
     ports:
       - "5000:5000"
     environment:
-      - NODE_ENV=production
-      - PORT=5000
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/primecloudpro
-      # Variáveis abaixo devem ser preenchidas no painel do Coolify/Portainer
-      - CLERK_PUBLISHABLE_KEY=
-      - CLERK_SECRET_KEY=
-      - MINIO_ENDPOINT=
-      - MINIO_PORT=
-      - MINIO_USE_SSL=
-      - MINIO_ROOT_USER=
-      - MINIO_ROOT_PASSWORD=
+      NODE_ENV: production
+      PORT: "5000"
+
+      # Banco (defina no Coolify)
+      DATABASE_URL: ${DATABASE_URL:-MISSING_DATABASE_URL}
+
+      # Clerk (defina no Coolify)
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-MISSING_CLERK_PUBLISHABLE_KEY}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-MISSING_CLERK_SECRET_KEY}
+
+      # Se seu frontend/SDK usa NEXT_PUBLIC (opcional; pode repetir o mesmo pk)
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-${CLERK_PUBLISHABLE_KEY:-MISSING_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}}
+
+      # MinIO (defina no Coolify)
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-MISSING_MINIO_ENDPOINT}
+      MINIO_PORT: ${MINIO_PORT:-9000}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-MISSING_MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-MISSING_MINIO_ROOT_PASSWORD}
+
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - primecloud-network
 
   db:
     image: postgres:15-alpine
-    container_name: primecloud-postgres
     restart: always
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=primecloudpro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: primecloudpro
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
