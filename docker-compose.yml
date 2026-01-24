@@ -10,17 +10,15 @@ services:
       NODE_ENV: production
       PORT: "5000"
 
-      # Banco (defina no Coolify)
+      # Obrigatórias (defina no Coolify)
       DATABASE_URL: ${DATABASE_URL:-MISSING_DATABASE_URL}
-
-      # Clerk (defina no Coolify)
       CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-MISSING_CLERK_PUBLISHABLE_KEY}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-MISSING_CLERK_SECRET_KEY}
 
-      # Se seu frontend/SDK usa NEXT_PUBLIC (opcional; pode repetir o mesmo pk)
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-${CLERK_PUBLISHABLE_KEY:-MISSING_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}}
+      # Opcional (se não definir, vai ficar MISSING e você vê no printenv)
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-MISSING_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
 
-      # MinIO (defina no Coolify)
+      # MinIO (se não estiver usando ainda, pode deixar com MISSING pra denunciar)
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-MISSING_MINIO_ENDPOINT}
       MINIO_PORT: ${MINIO_PORT:-9000}
       MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
