@@ -27,6 +27,9 @@ const accountUpdateSchema = z.object({
   phone: z.string().optional(),
   document: z.string().optional(),
   documentType: z.enum(["cpf", "cnpj"]).optional(),
+  billingEmail: z.string().email("Email inválido").optional().or(z.literal('')),
+  financialContact: z.string().optional(),
+  billingDay: z.coerce.number().min(1).max(28).optional(),
 });
 
 type AccountUpdateForm = z.infer<typeof accountUpdateSchema>;
@@ -113,6 +116,9 @@ export default function Settings() {
         phone: selectedAccount.phone || "",
         document: selectedAccount.document || "",
         documentType: (selectedAccount.documentType as "cpf" | "cnpj") || "cnpj",
+        billingEmail: selectedAccount.billingEmail || "",
+        financialContact: selectedAccount.financialContact || "",
+        billingDay: selectedAccount.billingDay || 10,
       });
     }
   }, [selectedAccount, form]);
@@ -140,6 +146,9 @@ export default function Settings() {
     const payload: AccountUpdateForm = {
       name: data.name,
       phone: data.phone,
+      billingEmail: data.billingEmail,
+      financialContact: data.financialContact,
+      billingDay: data.billingDay,
     };
 
     if (data.document && data.document.trim()) {
@@ -599,6 +608,69 @@ export default function Settings() {
                           </FormItem>
                         )}
                       />
+
+                      <Separator className="my-6" />
+
+                      <div className="space-y-4">
+                        <Label className="text-base font-semibold">Dados de Cobrança</Label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="financialContact"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Responsável Financeiro</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="Nome do responsável" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="billingEmail"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email de Cobrança</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="financeiro@empresa.com" type="email" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={form.control}
+                          name="billingDay"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Dia de Vencimento Preferencial</FormLabel>
+                              <Select
+                                onValueChange={(val) => field.onChange(parseInt(val))}
+                                value={field.value?.toString()}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o dia" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {[5, 10, 15, 20, 25].map((day) => (
+                                    <SelectItem key={day} value={day.toString()}>
+                                      Dia {day}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
                       <div className="flex items-center gap-4 pt-2">
                         <div>

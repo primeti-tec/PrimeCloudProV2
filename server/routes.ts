@@ -732,6 +732,123 @@ export async function registerRoutes(
     res.json({ success: true, message: 'Pricing configs seeded' });
   });
 
+  // === ADMIN BUCKETS MANAGEMENT ===
+  // List all buckets across all accounts (Super Admin only)
+  app.get('/api/admin/buckets', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const buckets = await storage.getAllBucketsWithDetails();
+      res.json(buckets);
+    } catch (err) {
+      console.error('[Admin Buckets] Error fetching buckets:', err);
+      res.status(500).json({ message: "Failed to fetch buckets" });
+    }
+  });
+
+  // === ADMIN INVOICES MANAGEMENT ===
+  // List all invoices (Admin)
+  app.get('/api/admin/invoices', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const allInvoices = await storage.getAllInvoices();
+      res.json(allInvoices);
+    } catch (err) {
+      console.error('[Admin Invoices] Error fetching invoices:', err);
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  // Generate monthly invoices for all accounts (Admin)
+  app.post('/api/admin/invoices/generate-monthly', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const { userId } = getAuth(req);
+      const result = await storage.generateAllMonthlyInvoices();
+
+      await storage.createAuditLog({
+        userId: userId!,
+        action: 'INVOICES_GENERATED',
+        resource: 'invoices',
+        details: { generated: result.generated, errors: result.errors },
+        severity: 'info',
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      console.error('[Admin Invoices] Error generating invoices:', err);
+      res.status(500).json({ message: err.message || "Failed to generate invoices" });
+    }
+  });
+
+  // Generate invoice for a specific account (Admin)
+  app.post('/api/admin/invoices/generate/:accountId', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const accountId = parseInt(req.params.accountId);
+      const invoice = await storage.generateMonthlyInvoice(accountId);
+      res.json(invoice);
+    } catch (err: any) {
+      console.error('[Admin Invoices] Error generating invoice:', err);
+      res.status(500).json({ message: err.message || "Failed to generate invoice" });
+    }
+  });
+
+  // Mark invoice as paid (Admin)
+  app.patch('/api/admin/invoices/:id/paid', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const { userId } = getAuth(req);
+      const invoiceId = parseInt(req.params.id);
+      const { paymentMethod } = req.body;
+
+      const invoice = await storage.markInvoicePaid(invoiceId, paymentMethod);
+
+      await storage.createAuditLog({
+        userId: userId!,
+        action: 'INVOICE_PAID',
+        resource: 'invoice',
+        details: { invoiceId, invoiceNumber: invoice.invoiceNumber, paymentMethod },
+        severity: 'info',
+      });
+
+      res.json(invoice);
+    } catch (err: any) {
+      console.error('[Admin Invoices] Error marking invoice paid:', err);
+      res.status(500).json({ message: err.message || "Failed to update invoice" });
+    }
+  });
+
+  // Update invoice status (Admin)
+  app.patch('/api/admin/invoices/:id/status', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const { status } = req.body;
+
+      if (!['pending', 'paid', 'overdue', 'canceled'].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      const invoice = await storage.updateInvoiceStatus(invoiceId, status);
+      res.json(invoice);
+    } catch (err: any) {
+      console.error('[Admin Invoices] Error updating invoice status:', err);
+      res.status(500).json({ message: err.message || "Failed to update invoice" });
+    }
+  });
+
   // Remove Member
   app.delete(api.members.remove.path, requireAuth(), async (req: any, res) => {
     const { userId } = getAuth(req);

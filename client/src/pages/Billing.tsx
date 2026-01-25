@@ -5,7 +5,7 @@ import { useSubscribe } from "@/hooks/use-subscriptions";
 import { useQuotaRequests, useCreateQuotaRequest } from "@/hooks/use-quota-requests";
 import { useInvoices, useUsageSummary } from "@/hooks/use-billing";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui-custom";
-import { Check, Loader2, CreditCard, Download, FileText, HardDrive, Wifi, Activity, DollarSign, ArrowUp, FileUp, Clock, CheckCircle, XCircle, AlertTriangle, ShoppingCart, Package, RefreshCw, X } from "lucide-react";
+import { Check, Loader2, CreditCard, Download, FileText, HardDrive, Wifi, Activity, DollarSign, ArrowUp, FileUp, Clock, CheckCircle, XCircle, AlertTriangle, ShoppingCart, Package, RefreshCw, X, Building2 } from "lucide-react";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -118,6 +118,7 @@ export default function Billing() {
   const [quotaDialogOpen, setQuotaDialogOpen] = useState(false);
   const [requestedQuota, setRequestedQuota] = useState("");
   const [quotaReason, setQuotaReason] = useState("");
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
 
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices(currentAccount?.id);
   const { data: usage, isLoading: usageLoading } = useUsageSummary(currentAccount?.id);
@@ -548,15 +549,29 @@ export default function Billing() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => downloadInvoicePdf(invoice)}
-                          data-testid={`button-download-invoice-${invoice.id}`}
-                        >
-                          <Download className="h-4 w-4 mr-1" />
-                          Baixar
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          {invoice.status === 'pending' && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => setPaymentInvoice(invoice)}
+                              className="bg-green-600 hover:bg-green-700"
+                              data-testid={`button-pay-invoice-${invoice.id}`}
+                            >
+                              <CreditCard className="h-4 w-4 mr-1" />
+                              Pagar
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => downloadInvoicePdf(invoice)}
+                            data-testid={`button-download-invoice-${invoice.id}`}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Baixar
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -769,6 +784,72 @@ export default function Billing() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Payment Instructions Dialog */}
+        <Dialog open={!!paymentInvoice} onOpenChange={(open) => !open && setPaymentInvoice(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Realizar Pagamento</DialogTitle>
+              <DialogDescription>
+                Utilize os dados abaixo para pagar a fatura {paymentInvoice?.invoiceNumber}.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+              <div className="text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
+                <p className="text-sm text-muted-foreground mb-1">Valor a Pagar</p>
+                <div className="text-3xl font-bold text-green-600">
+                  R$ {((paymentInvoice?.totalAmount || 0) / 100).toFixed(2).replace('.', ',')}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Vencimento: {paymentInvoice?.dueDate ? new Date(paymentInvoice.dueDate).toLocaleDateString() : '-'}
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 font-semibold text-sm">
+                    <div className="h-6 w-6 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">PIX</div>
+                    Chave PIX (CNPJ)
+                  </div>
+                  <div className="relative">
+                    <div className="flex bg-muted p-3 rounded-md font-mono text-sm justify-between items-center border">
+                      <span>44.444.444/0001-44</span>
+                      <Button variant="ghost" size="sm" className="h-6 ml-2" onClick={() => {
+                        navigator.clipboard.writeText("44.444.444/0001-44");
+                        toast({ title: "Copiado!", description: "Chave PIX copiada para a área de transferência." });
+                      }}>
+                        Copiar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 font-semibold text-sm">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    Dados Bancários
+                  </div>
+                  <div className="bg-muted p-3 rounded-md text-sm space-y-1 border">
+                    <p><span className="text-muted-foreground">Banco:</span> 000 - Banco do Brasil</p>
+                    <p><span className="text-muted-foreground">Agência:</span> 1234-5</p>
+                    <p><span className="text-muted-foreground">Conta:</span> 12345-6</p>
+                    <p><span className="text-muted-foreground">Favorecido:</span> Prime Cloud Pro LTDA</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded text-xs text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-900">
+                <p>Após realizar o pagamento, envie o comprovante para <strong>financeiro@cloudstoragepro.com.br</strong> com o número da fatura no assunto.</p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button onClick={() => setPaymentInvoice(null)}>Fechar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </main>
     </div>
   );

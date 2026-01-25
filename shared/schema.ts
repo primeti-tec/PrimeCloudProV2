@@ -54,6 +54,10 @@ export const accounts = pgTable("accounts", {
   smtpFromEmail: text("smtp_from_email"), // From email address
   smtpFromName: text("smtp_from_name"), // From display name
   smtpEncryption: text("smtp_encryption"), // none, ssl, tls
+  // Billing Information
+  billingEmail: text("billing_email"), // Email for invoices (fallback to owner)
+  financialContact: text("financial_contact"), // Name of financial responsible
+  billingDay: integer("billing_day").default(10), // Day of month for invoice due date (1-28)
   createdAt: timestamp("created_at").defaultNow(),
 });
 

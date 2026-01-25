@@ -697,6 +697,133 @@ export class DatabaseStorage implements IStorage {
     return existingInvoices;
   }
 
+  // Get all invoices (Admin)
+  async getAllInvoices(): Promise<(Invoice & { account?: Account })[]> {
+    const results = await db.select({
+      invoice: invoices,
+      account: accounts
+    })
+      .from(invoices)
+      .leftJoin(accounts, eq(invoices.accountId, accounts.id))
+      .orderBy(desc(invoices.createdAt));
+
+    return results.map(r => ({
+      ...r.invoice,
+      account: r.account || undefined
+    }));
+  }
+
+  // Get invoice by ID
+  async getInvoice(id: number): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return invoice;
+  }
+
+  // Generate invoice number
+  private generateInvoiceNumber(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const random = Math.floor(Math.random() * 9000) + 1000;
+    return `INV-${year}${month}-${random}`;
+  }
+
+  // Generate monthly invoice for a single account
+  async generateMonthlyInvoice(accountId: number): Promise<Invoice> {
+    const account = await this.getAccount(accountId);
+    if (!account) throw new Error("Account not found");
+
+    const usage = await this.getUsageSummary(accountId);
+    const subscription = await this.getSubscription(accountId);
+
+    const now = new Date();
+    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    // Due date based on account's billingDay preference
+    const billingDay = account.billingDay || 10;
+    const dueDate = new Date(now.getFullYear(), now.getMonth() + 1, billingDay);
+
+    // Calculate costs
+    const baseCost = subscription?.product?.price || 0;
+    const pricePerGB = subscription?.product?.pricePerStorageGB || 15;
+    const pricePerTransferGB = subscription?.product?.pricePerTransferGB || 40;
+
+    const storageLimit = subscription?.product?.storageLimit || 100;
+    const transferLimit = subscription?.product?.transferLimit ?? 500;
+
+    const excessStorage = Math.max(0, usage.storageUsedGB - storageLimit);
+    const excessTransfer = Math.max(0, usage.bandwidthUsedGB - transferLimit);
+
+    const storageCostCents = Math.ceil(excessStorage * pricePerGB);
+    const bandwidthCostCents = Math.ceil(excessTransfer * pricePerTransferGB);
+
+    const subtotal = baseCost + storageCostCents + bandwidthCostCents;
+    const taxAmount = 0; // No tax for now
+    const totalAmount = subtotal + taxAmount;
+
+    const [invoice] = await db.insert(invoices).values({
+      accountId,
+      invoiceNumber: this.generateInvoiceNumber(),
+      periodStart,
+      periodEnd,
+      storageGB: Math.ceil(usage.storageUsedGB),
+      storageCost: storageCostCents,
+      bandwidthGB: Math.ceil(usage.bandwidthUsedGB),
+      bandwidthCost: bandwidthCostCents,
+      subtotal,
+      taxAmount,
+      totalAmount,
+      status: 'pending',
+      dueDate,
+    }).returning();
+
+    return invoice;
+  }
+
+  // Generate invoices for all active accounts
+  async generateAllMonthlyInvoices(): Promise<{ generated: number; errors: string[] }> {
+    const activeAccounts = await db.select().from(accounts).where(eq(accounts.status, 'active'));
+
+    let generated = 0;
+    const errors: string[] = [];
+
+    for (const account of activeAccounts) {
+      try {
+        await this.generateMonthlyInvoice(account.id);
+        generated++;
+      } catch (err: any) {
+        errors.push(`Account ${account.id} (${account.name}): ${err.message}`);
+      }
+    }
+
+    return { generated, errors };
+  }
+
+  // Mark invoice as paid
+  async markInvoicePaid(id: number, paymentMethod?: string): Promise<Invoice> {
+    const [invoice] = await db.update(invoices)
+      .set({
+        status: 'paid',
+        paidAt: new Date(),
+        paymentMethod: paymentMethod || 'manual'
+      })
+      .where(eq(invoices.id, id))
+      .returning();
+
+    return invoice;
+  }
+
+  // Update invoice status
+  async updateInvoiceStatus(id: number, status: string): Promise<Invoice> {
+    const [invoice] = await db.update(invoices)
+      .set({ status })
+      .where(eq(invoices.id, id))
+      .returning();
+
+    return invoice;
+  }
+
   // Usage Summary
   async getUsageSummary(accountId: number): Promise<{
     storageUsedGB: number;
@@ -1146,6 +1273,59 @@ export class DatabaseStorage implements IStorage {
     for (const config of seedData) {
       await db.insert(pricingConfigs).values(config);
     }
+  }
+
+  // === ADMIN BUCKETS ===
+  async getAllBucketsWithDetails(): Promise<{
+    id: number;
+    name: string;
+    region: string | null;
+    sizeBytes: number;
+    objectCount: number | null;
+    storageLimitGB: number | null;
+    createdAt: Date | null;
+    accountId: number | null;
+    accountName: string;
+    accountStatus: string | null;
+    estimatedCostCents: number;
+  }[]> {
+    const results = await db.select({
+      id: buckets.id,
+      name: buckets.name,
+      region: buckets.region,
+      sizeBytes: buckets.sizeBytes,
+      objectCount: buckets.objectCount,
+      storageLimitGB: buckets.storageLimitGB,
+      createdAt: buckets.createdAt,
+      accountId: buckets.accountId,
+      accountName: accounts.name,
+      accountStatus: accounts.status,
+    })
+      .from(buckets)
+      .leftJoin(accounts, eq(buckets.accountId, accounts.id))
+      .orderBy(desc(buckets.sizeBytes));
+
+    // Cost estimation: use default 15 cents per GB/month (0.15 BRL)
+    const COST_PER_GB_CENTS = 15;
+
+    return results.map(r => {
+      const sizeGB = Number(r.sizeBytes || 0) / (1024 * 1024 * 1024);
+      const estimatedCostCents = Math.ceil(sizeGB * COST_PER_GB_CENTS);
+
+      return {
+        id: r.id,
+        name: r.name,
+        region: r.region,
+        sizeBytes: Number(r.sizeBytes || 0),
+        objectCount: r.objectCount,
+        storageLimitGB: r.storageLimitGB,
+        createdAt: r.createdAt,
+        accountId: r.accountId,
+        accountName: r.accountName || 'Unknown',
+        accountStatus: r.accountStatus,
+        estimatedCostCents,
+      };
+    });
   }
 }
 

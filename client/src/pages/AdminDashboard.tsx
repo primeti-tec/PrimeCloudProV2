@@ -15,6 +15,8 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import type { Account, QuotaRequest, Product } from "@shared/schema";
 import { PricingManager } from "@/components/admin/PricingManager";
 import { OrdersManager } from "@/components/admin/OrdersManager";
+import { BucketsManager } from "@/components/admin/BucketsManager";
+import { InvoicesManager } from "@/components/admin/InvoicesManager";
 
 
 
@@ -797,9 +799,19 @@ export default function AdminDashboard() {
           <OrdersManager />
         </div>
 
+        {/* Invoices / Billing Management Section */}
+        <div className="mb-8">
+          <InvoicesManager />
+        </div>
+
         {/* Pricing Management Section */}
         <div className="mb-8">
           <PricingManager />
+        </div>
+
+        {/* Storage / Buckets Overview Section */}
+        <div className="mb-8">
+          <BucketsManager />
         </div>
 
         <Card>
