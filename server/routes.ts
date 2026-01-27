@@ -9,6 +9,7 @@ import { validateDocument } from "./lib/document-validation";
 import * as domainService from "./services/domain-service";
 import * as smtpRoutes from "./routes/smtp";
 import { sendInvitationEmail, sendEmail } from "./services/email";
+import crypto from "crypto";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -44,6 +45,64 @@ export async function registerRoutes(
   app.get(api.products.list.path, async (req, res) => {
     const products = await storage.getProducts();
     res.json(products);
+  });
+
+  app.get("/api/shares/:token/download", async (req, res) => {
+    const token = req.params.token;
+    const share = await storage.getObjectShareByToken(token);
+
+    if (!share) {
+      return res.status(404).json({ message: "Share not found" });
+    }
+
+    if (share.expiresAt && new Date(share.expiresAt) < new Date()) {
+      return res.status(410).json({ message: "Share expired" });
+    }
+
+    if (!share.accountId || !share.bucketId) {
+      return res.status(404).json({ message: "Bucket not found" });
+    }
+
+    const bucket = await storage.getBucket(share.bucketId);
+    if (!bucket || bucket.accountId !== share.accountId) {
+      return res.status(404).json({ message: "Bucket not found" });
+    }
+
+    const { MinioService } = await import("./services/minio.service");
+    const minioService = new MinioService(share.accountId.toString());
+
+    try {
+      const extension = share.objectKey.split(".").pop()?.toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        pdf: "application/pdf",
+        txt: "text/plain",
+        md: "text/markdown",
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        gif: "image/gif",
+        webp: "image/webp",
+        svg: "image/svg+xml",
+        mp4: "video/mp4",
+        webm: "video/webm",
+        mp3: "audio/mpeg",
+        wav: "audio/wav",
+      };
+
+      const disposition = share.access === "download" ? "attachment" : "inline";
+      const fileName = share.objectKey.split("/").pop() || share.objectKey;
+      const contentType = mimeTypes[extension || ""] || "application/octet-stream";
+      const respHeaders: Record<string, string> = {
+        "response-content-disposition": `${disposition}; filename=\"${fileName}\"`,
+        "response-content-type": contentType,
+      };
+
+      const downloadUrl = await minioService.presignedGetObject(bucket.name, share.objectKey, 3600, respHeaders);
+      res.redirect(downloadUrl);
+    } catch (error) {
+      console.error("Error generating share download URL:", error);
+      res.status(500).json({ message: "Failed to generate download URL" });
+    }
   });
 
   app.get("/api/auth/user", requireAuth(), async (req: any, res) => {
@@ -430,18 +489,41 @@ export async function registerRoutes(
   const isSuperAdmin = (email?: string) => email ? SUPER_ADMINS.includes(email) : false;
 
   app.get(api.admin.listAccounts.path, requireAuth(), async (req: any, res) => {
-    // if (!isSuperAdmin(req.currentUser?.email)) return res.status(403).json({ message: "Forbidden" });
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    const { userId } = getAuth(req);
     const accounts = await storage.getAllAccounts();
+    await storage.createAuditLog({
+      userId: userId || "unknown",
+      action: "ADMIN_ACCOUNTS_VIEWED",
+      resource: "account",
+      details: { total: accounts.length },
+      context: "admin",
+    });
     res.json(accounts);
   });
 
   app.get(api.admin.getStats.path, requireAuth(), async (req: any, res) => {
-    // if (!isSuperAdmin(req.currentUser?.email)) return res.status(403).json({ message: "Forbidden" });
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    const { userId } = getAuth(req);
     const stats = await storage.getAdminStats();
+    await storage.createAuditLog({
+      userId: userId || "unknown",
+      action: "ADMIN_STATS_VIEWED",
+      resource: "stats",
+      details: { totalAccounts: stats.totalAccounts },
+      context: "admin",
+    });
     res.json(stats);
   });
 
   app.post(api.admin.approveAccount.path, requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
     const accountId = parseInt(req.params.id);
     const { userId } = getAuth(req);
     const account = await storage.updateAccount(accountId, { status: 'active' });
@@ -456,6 +538,9 @@ export async function registerRoutes(
   });
 
   app.post(api.admin.rejectAccount.path, requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
     const accountId = parseInt(req.params.id);
     const { userId } = getAuth(req);
     const { reason } = req.body || {};
@@ -471,6 +556,9 @@ export async function registerRoutes(
   });
 
   app.post(api.admin.suspendAccount.path, requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
     const accountId = parseInt(req.params.id);
     const { userId } = getAuth(req);
     const { reason } = req.body || {};
@@ -486,6 +574,9 @@ export async function registerRoutes(
   });
 
   app.post(api.admin.reactivateAccount.path, requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
     const accountId = parseInt(req.params.id);
     const { userId } = getAuth(req);
     const account = await storage.updateAccount(accountId, { status: 'active' });
@@ -500,6 +591,9 @@ export async function registerRoutes(
   });
 
   app.post(api.admin.adjustQuota.path, requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
     try {
       const accountId = parseInt(req.params.id);
       const { userId } = getAuth(req);
@@ -531,7 +625,9 @@ export async function registerRoutes(
 
   // Admin Products CRUD (protected by isSuperAdmin check)
   app.get(api.admin.listProducts.path, requireAuth(), async (req: any, res) => {
-    // Listing products is public for now (needed for billing page)
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
     const products = await storage.getProducts();
     res.json(products);
   });
@@ -739,7 +835,15 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Forbidden: Admin access required" });
     }
     try {
+      const { userId } = getAuth(req);
       const buckets = await storage.getAllBucketsWithDetails();
+      await storage.createAuditLog({
+        userId: userId || "unknown",
+        action: "ADMIN_BUCKETS_VIEWED",
+        resource: "bucket",
+        details: { total: buckets.length },
+        context: "admin",
+      });
       res.json(buckets);
     } catch (err) {
       console.error('[Admin Buckets] Error fetching buckets:', err);
@@ -1030,6 +1134,7 @@ export async function registerRoutes(
     const accountId = parseInt(req.params.accountId);
     const bucketId = parseInt(req.params.bucketId);
     const prefix = req.query.prefix as string | undefined;
+    const recursive = req.query.recursive === 'true';
 
     const membership = await storage.getMembership(userId, accountId);
     if (!membership) return res.status(403).json({ message: "Forbidden" });
@@ -1058,19 +1163,34 @@ export async function registerRoutes(
     const minioService = new MinioService(accountId.toString());
 
     try {
-      console.log(`[Objects] Listing objects for bucket: ${bucket.name}, account: ${accountId}, prefix: ${prefix || '(none)'}`);
-      const result = await minioService.listObjectsWithPrefixes(bucket.name, prefix || undefined);
-      console.log(`[Objects] Listing result: ${result.objects.length} objects, ${result.prefixes.length} prefixes`);
-      res.json({
-        objects: result.objects.map((obj: any) => ({
-          name: obj.name,
-          size: obj.size,
-          lastModified: obj.lastModified?.toISOString() || new Date().toISOString(),
-          etag: obj.etag,
-        })),
-        prefixes: result.prefixes,
-        prefix: prefix || '',
-      });
+      console.log(`[Objects] Listing objects for bucket: ${bucket.name}, account: ${accountId}, prefix: ${prefix || '(none)'}, recursive: ${recursive}`);
+      if (recursive) {
+        const objects = await minioService.listObjectsRecursive(bucket.name, prefix || undefined);
+        console.log(`[Objects] Recursive result: ${objects.length} objects`);
+        res.json({
+          objects: objects.map((obj: any) => ({
+            name: obj.name,
+            size: obj.size,
+            lastModified: obj.lastModified?.toISOString() || new Date().toISOString(),
+            etag: obj.etag,
+          })),
+          prefixes: [],
+          prefix: prefix || '',
+        });
+      } else {
+        const result = await minioService.listObjectsWithPrefixes(bucket.name, prefix || undefined);
+        console.log(`[Objects] Listing result: ${result.objects.length} objects, ${result.prefixes.length} prefixes`);
+        res.json({
+          objects: result.objects.map((obj: any) => ({
+            name: obj.name,
+            size: obj.size,
+            lastModified: obj.lastModified?.toISOString() || new Date().toISOString(),
+            etag: obj.etag,
+          })),
+          prefixes: result.prefixes,
+          prefix: prefix || '',
+        });
+      }
     } catch (error) {
       console.error("[Objects] Error listing objects:", error);
       res.status(500).json({ message: "Failed to list objects" });
@@ -1272,6 +1392,195 @@ export async function registerRoutes(
     }
 
     await storage.revokeAccessKey(keyId);
+    res.json({ success: true });
+  });
+
+  const ensureBucketPermission = async (userId: string, accountId: number, bucketId: number, required: "read" | "write") => {
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return { ok: false as const, message: "Forbidden" };
+
+    const bucket = await storage.getBucket(bucketId);
+    if (!bucket || bucket.accountId !== accountId) {
+      return { ok: false as const, message: "Bucket not found" };
+    }
+
+    if (membership.role === 'external_client') {
+      const permissions = await storage.getBucketPermissionsForMember(membership.id);
+      const bucketPerm = permissions.find(p => p.bucketId === bucketId);
+      if (!bucketPerm) return { ok: false as const, message: "No permission for this bucket" };
+
+      if (required === "read" && !['read', 'read-write'].includes(bucketPerm.permission)) {
+        return { ok: false as const, message: "No read permission for this bucket" };
+      }
+      if (required === "write" && !['write', 'read-write'].includes(bucketPerm.permission)) {
+        return { ok: false as const, message: "No write permission for this bucket" };
+      }
+    }
+
+    return { ok: true as const, membership };
+  };
+
+  // --- Object Favorites ---
+  app.get(api.objectFavorites.list.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+
+    const access = await ensureBucketPermission(userId!, accountId, bucketId, "read");
+    if (!access.ok) return res.status(403).json({ message: access.message });
+
+    const keys = await storage.getObjectFavorites(userId!, accountId, bucketId);
+    res.json({ keys });
+  });
+
+  app.post(api.objectFavorites.add.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const { key } = req.body || {};
+
+    const access = await ensureBucketPermission(userId!, accountId, bucketId, "read");
+    if (!access.ok) return res.status(403).json({ message: access.message });
+
+    if (!key) return res.status(400).json({ message: "Object key is required" });
+    await storage.addObjectFavorite(userId!, accountId, bucketId, key);
+    res.status(201).json({ success: true });
+  });
+
+  app.delete(api.objectFavorites.remove.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const { key } = req.body || {};
+
+    const access = await ensureBucketPermission(userId!, accountId, bucketId, "read");
+    if (!access.ok) return res.status(403).json({ message: access.message });
+
+    if (!key) return res.status(400).json({ message: "Object key is required" });
+    await storage.removeObjectFavorite(userId!, accountId, bucketId, key);
+    res.json({ success: true });
+  });
+
+  // --- Object Tags ---
+  app.get(api.objectTags.list.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+
+    const access = await ensureBucketPermission(userId!, accountId, bucketId, "read");
+    if (!access.ok) return res.status(403).json({ message: access.message });
+
+    const tags = await storage.getObjectTags(userId!, accountId, bucketId);
+    res.json({ tags });
+  });
+
+  app.post(api.objectTags.add.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const { key, tag } = req.body || {};
+
+    const access = await ensureBucketPermission(userId!, accountId, bucketId, "read");
+    if (!access.ok) return res.status(403).json({ message: access.message });
+
+    if (!key || !tag) return res.status(400).json({ message: "Object key and tag are required" });
+    await storage.addObjectTag(userId!, accountId, bucketId, key, tag);
+    res.status(201).json({ success: true });
+  });
+
+  app.delete(api.objectTags.remove.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const { key, tag } = req.body || {};
+
+    const access = await ensureBucketPermission(userId!, accountId, bucketId, "read");
+    if (!access.ok) return res.status(403).json({ message: access.message });
+
+    if (!key || !tag) return res.status(400).json({ message: "Object key and tag are required" });
+    await storage.removeObjectTag(userId!, accountId, bucketId, key, tag);
+    res.json({ success: true });
+  });
+
+  // --- Object Shares ---
+  app.get(api.objectShares.listByMe.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+
+    const access = await ensureBucketPermission(userId!, accountId, bucketId, "read");
+    if (!access.ok) return res.status(403).json({ message: access.message });
+
+    const shares = await storage.getObjectSharesByUser(accountId, bucketId, userId!);
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    res.json(shares.map((share) => ({
+      ...share,
+      shareUrl: `${baseUrl}/api/shares/${share.token}/download`,
+    })));
+  });
+
+  app.get(api.objectShares.listWithMe.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const userEmail = req.currentUser?.email || "";
+
+    const access = await ensureBucketPermission(userId!, accountId, bucketId, "read");
+    if (!access.ok) return res.status(403).json({ message: access.message });
+
+    if (!userEmail) return res.json([]);
+    const shares = await storage.getObjectSharesWithUser(accountId, bucketId, userEmail);
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    res.json(shares.map((share) => ({
+      ...share,
+      shareUrl: `${baseUrl}/api/shares/${share.token}/download`,
+    })));
+  });
+
+  app.post(api.objectShares.create.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const { key, sharedWithEmail, access, expiresAt } = req.body || {};
+
+    const accessCheck = await ensureBucketPermission(userId!, accountId, bucketId, "read");
+    if (!accessCheck.ok) return res.status(403).json({ message: accessCheck.message });
+
+    if (!key) return res.status(400).json({ message: "Object key is required" });
+
+    const token = crypto.randomBytes(24).toString("hex");
+    const expiresDate = expiresAt ? new Date(expiresAt) : null;
+    const share = await storage.createObjectShare({
+      accountId,
+      bucketId,
+      objectKey: key,
+      sharedByUserId: userId!,
+      sharedWithEmail: sharedWithEmail || null,
+      access: access || "read",
+      expiresAt: expiresDate,
+      token,
+    });
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    res.status(201).json({
+      id: share.id,
+      token: share.token,
+      shareUrl: `${baseUrl}/api/shares/${share.token}/download`,
+      access: share.access,
+      expiresAt: share.expiresAt ? share.expiresAt.toISOString() : null,
+    });
+  });
+
+  app.delete(api.objectShares.revoke.path, requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+    const shareId = parseInt(req.params.shareId);
+
+    const access = await ensureBucketPermission(userId!, accountId, bucketId, "read");
+    if (!access.ok) return res.status(403).json({ message: access.message });
+
+    await storage.revokeObjectShare(accountId, bucketId, userId!, shareId);
     res.json({ success: true });
   });
 

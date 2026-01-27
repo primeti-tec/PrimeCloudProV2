@@ -297,6 +297,128 @@ export const api = {
       },
     },
   },
+  objectFavorites: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/favorites',
+      responses: {
+        200: z.object({ keys: z.array(z.string()) }),
+        403: errorSchemas.forbidden,
+      },
+    },
+    add: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/favorites',
+      input: z.object({ key: z.string().min(1) }),
+      responses: {
+        201: z.object({ success: z.boolean() }),
+        403: errorSchemas.forbidden,
+      },
+    },
+    remove: {
+      method: 'DELETE' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/favorites',
+      input: z.object({ key: z.string().min(1) }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        403: errorSchemas.forbidden,
+      },
+    },
+  },
+  objectTags: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/tags',
+      responses: {
+        200: z.object({ tags: z.array(z.object({ key: z.string(), tags: z.array(z.string()) })) }),
+        403: errorSchemas.forbidden,
+      },
+    },
+    add: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/tags',
+      input: z.object({ key: z.string().min(1), tag: z.string().min(1) }),
+      responses: {
+        201: z.object({ success: z.boolean() }),
+        403: errorSchemas.forbidden,
+      },
+    },
+    remove: {
+      method: 'DELETE' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/tags',
+      input: z.object({ key: z.string().min(1), tag: z.string().min(1) }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        403: errorSchemas.forbidden,
+      },
+    },
+  },
+  objectShares: {
+    listByMe: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/shares',
+      responses: {
+        200: z.array(z.object({
+          id: z.number(),
+          bucketId: z.number(),
+          objectKey: z.string(),
+          sharedWithEmail: z.string().nullable(),
+          access: z.string(),
+          token: z.string(),
+          expiresAt: z.string().nullable(),
+          createdAt: z.string().nullable(),
+          shareUrl: z.string(),
+        })),
+        403: errorSchemas.forbidden,
+      },
+    },
+    listWithMe: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/shares/with-me',
+      responses: {
+        200: z.array(z.object({
+          id: z.number(),
+          bucketId: z.number(),
+          objectKey: z.string(),
+          sharedWithEmail: z.string().nullable(),
+          access: z.string(),
+          token: z.string(),
+          expiresAt: z.string().nullable(),
+          createdAt: z.string().nullable(),
+          shareUrl: z.string(),
+        })),
+        403: errorSchemas.forbidden,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/shares',
+      input: z.object({
+        key: z.string().min(1),
+        sharedWithEmail: z.string().email().optional(),
+        access: z.enum(["read", "download"]).optional(),
+        expiresAt: z.string().optional(),
+      }),
+      responses: {
+        201: z.object({
+          id: z.number(),
+          token: z.string(),
+          shareUrl: z.string(),
+          access: z.string(),
+          expiresAt: z.string().nullable(),
+        }),
+        403: errorSchemas.forbidden,
+      },
+    },
+    revoke: {
+      method: 'DELETE' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId/objects/shares/:shareId',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        403: errorSchemas.forbidden,
+      },
+    },
+  },
   // Access Keys
   accessKeys: {
     list: {

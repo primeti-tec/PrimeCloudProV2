@@ -210,6 +210,41 @@ export const bucketPermissions = pgTable("bucket_permissions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === OBJECT FAVORITES ===
+export const objectFavorites = pgTable("object_favorites", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  bucketId: integer("bucket_id").references(() => buckets.id),
+  userId: varchar("user_id").references(() => users.id),
+  objectKey: text("object_key").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === OBJECT TAGS ===
+export const objectTags = pgTable("object_tags", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  bucketId: integer("bucket_id").references(() => buckets.id),
+  userId: varchar("user_id").references(() => users.id),
+  objectKey: text("object_key").notNull(),
+  tag: text("tag").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === OBJECT SHARES ===
+export const objectShares = pgTable("object_shares", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id),
+  bucketId: integer("bucket_id").references(() => buckets.id),
+  objectKey: text("object_key").notNull(),
+  sharedByUserId: varchar("shared_by_user_id").references(() => users.id),
+  sharedWithEmail: text("shared_with_email"),
+  access: text("access").default("read"), // read, download
+  token: text("token").notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 
 // === SUBSCRIPTIONS ===
 export const subscriptions = pgTable("subscriptions", {
@@ -476,6 +511,9 @@ export const insertMemberSchema = createInsertSchema(accountMembers).omit({ id: 
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true });
 export const insertBucketSchema = createInsertSchema(buckets).omit({ id: true, createdAt: true, objectCount: true, sizeBytes: true, versioningEnabled: true, lifecycleRules: true });
 export const insertBucketPermissionSchema = createInsertSchema(bucketPermissions).omit({ id: true, createdAt: true });
+export const insertObjectFavoriteSchema = createInsertSchema(objectFavorites).omit({ id: true, createdAt: true });
+export const insertObjectTagSchema = createInsertSchema(objectTags).omit({ id: true, createdAt: true });
+export const insertObjectShareSchema = createInsertSchema(objectShares).omit({ id: true, createdAt: true, token: true, sharedByUserId: true });
 
 export const lifecycleRuleSchema = z.object({
   id: z.string(),
@@ -517,6 +555,9 @@ export type UsageRecord = typeof usageRecords.$inferSelect;
 export type QuotaRequest = typeof quotaRequests.$inferSelect;
 export type SftpCredential = typeof sftpCredentials.$inferSelect;
 export type BucketPermission = typeof bucketPermissions.$inferSelect;
+export type ObjectFavorite = typeof objectFavorites.$inferSelect;
+export type ObjectTag = typeof objectTags.$inferSelect;
+export type ObjectShare = typeof objectShares.$inferSelect;
 export type PricingConfig = typeof pricingConfigs.$inferSelect;
 export type PricingHistory = typeof pricingHistory.$inferSelect;
 
@@ -524,6 +565,9 @@ export type CreateAccountRequest = z.infer<typeof insertAccountSchema>;
 export type UpdateAccountRequest = Partial<CreateAccountRequest>;
 export type CreateMemberRequest = z.infer<typeof insertMemberSchema>;
 export type CreateBucketRequest = z.infer<typeof insertBucketSchema>;
+export type CreateObjectFavoriteRequest = z.infer<typeof insertObjectFavoriteSchema>;
+export type CreateObjectTagRequest = z.infer<typeof insertObjectTagSchema>;
+export type CreateObjectShareRequest = z.infer<typeof insertObjectShareSchema>;
 export type CreateAccessKeyRequest = z.infer<typeof insertAccessKeySchema>;
 export type CreateNotificationRequest = z.infer<typeof insertNotificationSchema>;
 export type CreateAuditLogRequest = z.infer<typeof insertAuditLogSchema>;

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
+import { apiRequest } from "@/lib/queryClient";
 import { type CreateMemberRequest } from "@shared/schema";
 
 export function useMembers(accountId: number | undefined) {
@@ -41,11 +42,7 @@ export function useRemoveMember() {
   return useMutation({
     mutationFn: async ({ accountId, memberId }: { accountId: number; memberId: number }) => {
       const url = buildUrl(api.members.remove.path, { accountId, memberId });
-      const res = await fetch(url, {
-        method: api.members.remove.method,
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to remove member");
+      await apiRequest(api.members.remove.method, url);
     },
     onSuccess: (_, { accountId }) => {
       queryClient.invalidateQueries({ queryKey: [api.members.list.path, accountId] });

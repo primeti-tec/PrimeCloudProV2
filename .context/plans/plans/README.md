@@ -3,7 +3,9 @@
 This directory contains plans for coordinating work across documentation and playbooks.
 
 ## Plan Queue
-1. [Restringir Chaves S3 Por Bucket](./restringir-chaves-s3-por-bucket.md)
+1. [Interface De Arquivos Do Bucket Admin E Externo](./interface-de-arquivos-do-bucket-admin-e-externo.md)
+2. [Perfil Super Admin Com Menus Admin E Visao Total](./perfil-super-admin-com-menus-admin-e-visao-total.md)
+3. [Restringir Chaves S3 Por Bucket](./restringir-chaves-s3-por-bucket.md)
 
 ## How To Create Or Update Plans
 - Run "ai-context plan <name>" to scaffold a new plan template.

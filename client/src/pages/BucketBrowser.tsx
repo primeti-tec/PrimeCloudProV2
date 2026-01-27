@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
+import { useBranding } from "@/components/branding-provider";
 import { useMyAccounts } from "@/hooks/use-accounts";
 import { useCurrentRole } from "@/hooks/use-current-account";
 import {
@@ -9,17 +10,20 @@ import {
   useUploadFile,
   useDeleteObject,
   useGetDownloadUrl,
+  useBucketFavorites,
+  useAddFavorite,
+  useRemoveFavorite,
+  useBucketTags,
+  useAddTag,
+  useRemoveTag,
+  useBucketSharesByMe,
+  useBucketSharesWithMe,
+  useCreateShare,
+  useRevokeShare,
+  type ListObjectsResponse,
   type BucketObject,
 } from "@/hooks/use-buckets";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Badge,
-  Input,
-} from "@/components/ui-custom";
+import { Button, Input } from "@/components/ui-custom";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -40,25 +44,23 @@ import {
   FileAudio,
   FileArchive,
   FileCode,
+  Star,
+  Tag,
   Upload,
   Download,
   Trash2,
-  ChevronRight,
-  ArrowLeft,
   Home,
   RefreshCw,
   Eye,
   Search,
-  X,
+  Bell,
+  List,
+  Plus,
+  Share2,
+  User,
   ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Bucket } from "@shared/schema";
-
-// Extended bucket type with user permission
-interface BucketWithPermission extends Bucket {
-  userPermission?: "read" | "write" | "read-write";
-}
 
 // File type detection helpers
 function getFileExtension(filename: string): string {
@@ -332,9 +334,10 @@ function FilePreviewModal({
 
 export default function BucketBrowser() {
   const { bucketId } = useParams<{ bucketId: string }>();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { data: accounts, isLoading: isAccountsLoading } = useMyAccounts();
   const { isExternalClient } = useCurrentRole();
+  const branding = useBranding();
   const bucketIdInt = parseInt(bucketId || "0");
 
   // Find the current account - for now we default to the first one
@@ -364,15 +367,104 @@ export default function BucketBrowser() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
+  // Share state
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareTarget, setShareTarget] = useState<BucketObject | null>(null);
+  const [shareEmail, setShareEmail] = useState("");
+  const [shareExpiresDays, setShareExpiresDays] = useState("");
+  const [shareAccess, setShareAccess] = useState<"read" | "download">("read");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+
+  // Tag state
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [tagTarget, setTagTarget] = useState<BucketObject | null>(null);
+  const [tagInput, setTagInput] = useState("");
+
+  useEffect(() => {
+    if (!shareDialogOpen) {
+      setShareTarget(null);
+      setShareUrl(null);
+      setShareEmail("");
+      setShareExpiresDays("");
+      setShareAccess("read");
+    }
+  }, [shareDialogOpen]);
+
+  useEffect(() => {
+    if (!tagDialogOpen) {
+      setTagTarget(null);
+      setTagInput("");
+    }
+  }, [tagDialogOpen]);
+
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const getViewFromSearch = () => {
+    if (typeof window === "undefined") return "all";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("view") || "all";
+  };
+  const [viewParam, setViewParam] = useState(getViewFromSearch);
+
+  useEffect(() => {
+    const updateView = () => setViewParam(getViewFromSearch());
+    const handlePopState = () => updateView();
+    const handleHashChange = () => updateView();
+
+    const originalPush = history.pushState;
+    const originalReplace = history.replaceState;
+
+    history.pushState = function (this: History, ...args) {
+      const result = originalPush.apply(this, args as any);
+      updateView();
+      return result;
+    } as History["pushState"];
+
+    history.replaceState = function (this: History, ...args) {
+      const result = originalReplace.apply(this, args as any);
+      updateView();
+      return result;
+    } as History["replaceState"];
+
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("hashchange", handleHashChange);
+
+    return () => {
+      history.pushState = originalPush;
+      history.replaceState = originalReplace;
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, []);
+  const allowedViews = ["all", "recent", "favorites", "shared-with-you", "shared-by-link", "tags"];
+  const activeView = allowedViews.includes(viewParam) ? viewParam : "all";
+  const listPrefix = activeView === "all" ? currentPrefix : "";
+  const listRecursive = activeView !== "all";
+  const cacheKey = currentAccount?.id && bucket?.id
+    ? `bucketObjects:${currentAccount.id}:${bucket.id}:${activeView}`
+    : null;
+  const cachedInitialData = (() => {
+    if (!cacheKey || activeView === "all") return undefined;
+    try {
+      const raw = window.localStorage.getItem(cacheKey);
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw) as { ts: number; data: ListObjectsResponse };
+      if (!parsed?.ts || !parsed?.data) return undefined;
+      if (Date.now() - parsed.ts > 10 * 60 * 1000) return undefined;
+      return parsed.data;
+    } catch {
+      return undefined;
+    }
+  })();
 
   const {
     data: objectsData,
     isLoading: isObjectsLoading,
     error: objectsError,
     refetch,
-  } = useBucketObjects(currentAccount?.id, bucket?.id, currentPrefix);
+  } = useBucketObjects(currentAccount?.id, bucket?.id, listPrefix, listRecursive, cachedInitialData);
 
   const { mutate: uploadFile, isPending: isUploading } = useUploadFile(
     currentAccount?.id,
@@ -387,6 +479,19 @@ export default function BucketBrowser() {
     bucket?.id
   );
 
+  const { data: favoritesData } = useBucketFavorites(currentAccount?.id, bucket?.id);
+  const { mutate: addFavorite } = useAddFavorite(currentAccount?.id, bucket?.id);
+  const { mutate: removeFavorite } = useRemoveFavorite(currentAccount?.id, bucket?.id);
+
+  const { data: tagsData } = useBucketTags(currentAccount?.id, bucket?.id);
+  const { mutate: addTag } = useAddTag(currentAccount?.id, bucket?.id);
+  const { mutate: removeTag } = useRemoveTag(currentAccount?.id, bucket?.id);
+
+  const { data: sharesByMe } = useBucketSharesByMe(currentAccount?.id, bucket?.id);
+  const { data: sharesWithMe } = useBucketSharesWithMe(currentAccount?.id, bucket?.id);
+  const { mutateAsync: createShare } = useCreateShare(currentAccount?.id, bucket?.id);
+  const { mutate: revokeShare } = useRevokeShare(currentAccount?.id, bucket?.id);
+
   // Permission checks
   const canRead =
     !isExternalClient ||
@@ -396,6 +501,34 @@ export default function BucketBrowser() {
     !isExternalClient ||
     bucket?.userPermission === "write" ||
     bucket?.userPermission === "read-write";
+
+  const viewLabelMap: Record<string, string> = {
+    all: "Todos os arquivos",
+    recent: "Recentes",
+    favorites: "Favoritos",
+    "shared-with-you": "Compartilhado com você",
+    "shared-by-link": "Compartilhado por link",
+    tags: "Tags",
+  };
+
+  useEffect(() => {
+    if (activeView !== "all" && currentPrefix) {
+      setCurrentPrefix("");
+    }
+  }, [activeView, currentPrefix]);
+
+  const favoriteSet = new Set(favoritesData?.keys || []);
+  const tagsMap = new Map(
+    (tagsData?.tags || []).map((entry) => [entry.key, entry.tags])
+  );
+  const taggedKeys = new Set(tagsMap.keys());
+  const sharedByKeys = new Set((sharesByMe || []).map((share) => share.objectKey));
+  const sharedByLinkKeys = new Set(
+    (sharesByMe || [])
+      .filter((share) => !share.sharedWithEmail)
+      .map((share) => share.objectKey)
+  );
+  const sharedWithKeys = new Set((sharesWithMe || []).map((share) => share.objectKey));
 
   // Filtered objects based on search
   const filteredObjects =
@@ -412,14 +545,38 @@ export default function BucketBrowser() {
         .includes(searchTerm.toLowerCase())
     ) || [];
 
-  // Breadcrumb parts
-  const breadcrumbParts = currentPrefix
-    .split("/")
-    .filter(Boolean)
-    .map((part, index, arr) => ({
-      name: part,
-      path: arr.slice(0, index + 1).join("/") + "/",
-    }));
+  const displayPrefixes = activeView === "all" ? filteredPrefixes : [];
+  const displayObjects = activeView === "recent"
+    ? [...filteredObjects]
+        .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
+        .slice(0, 10)
+    : activeView === "favorites"
+      ? filteredObjects.filter((obj) => favoriteSet.has(obj.name))
+      : activeView === "shared-by-link"
+        ? filteredObjects.filter((obj) => sharedByLinkKeys.has(obj.name))
+        : activeView === "shared-with-you"
+          ? filteredObjects.filter((obj) => sharedWithKeys.has(obj.name))
+          : activeView === "tags"
+            ? filteredObjects.filter((obj) => taggedKeys.has(obj.name))
+            : filteredObjects;
+  const isFilteredEmpty = activeView !== "all" && displayObjects.length === 0;
+
+  useEffect(() => {
+    if (!cacheKey || activeView === "all") return;
+    if (!objectsData) return;
+
+    const cachedData: ListObjectsResponse = {
+      objects: displayObjects.slice(0, 300),
+      prefixes: [],
+      prefix: "",
+    };
+
+    try {
+      window.localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: cachedData }));
+    } catch {
+      // ignore storage errors
+    }
+  }, [cacheKey, activeView, objectsData, displayObjects]);
 
   const handleFileSelect = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -536,6 +693,86 @@ export default function BucketBrowser() {
     });
   };
 
+  const handleToggleFavorite = (obj: BucketObject) => {
+    if (favoriteSet.has(obj.name)) {
+      removeFavorite(obj.name);
+      return;
+    }
+    addFavorite(obj.name);
+  };
+
+  const handleOpenShare = (obj: BucketObject) => {
+    const existingShare = (sharesByMe || []).find((share) => share.objectKey === obj.name);
+    setShareTarget(obj);
+    setShareDialogOpen(true);
+    setShareEmail("");
+    setShareExpiresDays("");
+    setShareAccess((existingShare?.access as "read" | "download") || "read");
+    setShareUrl(existingShare?.shareUrl || null);
+  };
+
+  const handleCreateShare = async () => {
+    if (!shareTarget) return;
+    const expiresAt = shareExpiresDays
+      ? new Date(Date.now() + Number(shareExpiresDays) * 24 * 60 * 60 * 1000).toISOString()
+      : undefined;
+
+    try {
+      const result = await createShare({
+        key: shareTarget.name,
+        sharedWithEmail: shareEmail || undefined,
+        access: shareAccess,
+        expiresAt,
+      });
+      setShareUrl(result.shareUrl);
+      toast({
+        title: "Compartilhamento criado",
+        description: "Link gerado com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao criar compartilhamento.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCopyShare = () => {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl);
+    toast({ title: "Link copiado", description: "O link foi copiado para a área de transferência." });
+  };
+
+  const handleRevokeShare = (shareId: number) => {
+    revokeShare(shareId, {
+      onSuccess: () => {
+        setShareUrl(null);
+        toast({ title: "Compartilhamento revogado", description: "O link foi revogado." });
+      },
+      onError: () => {
+        toast({ title: "Erro", description: "Falha ao revogar compartilhamento.", variant: "destructive" });
+      },
+    });
+  };
+
+  const handleOpenTags = (obj: BucketObject) => {
+    setTagTarget(obj);
+    setTagDialogOpen(true);
+    setTagInput("");
+  };
+
+  const handleAddTag = () => {
+    if (!tagTarget || !tagInput.trim()) return;
+    addTag({ key: tagTarget.name, tag: tagInput.trim() });
+    setTagInput("");
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    if (!tagTarget) return;
+    removeTag({ key: tagTarget.name, tag });
+  };
+
   const navigateToFolder = (prefix: string) => {
     setCurrentPrefix(prefix);
     setSearchTerm("");
@@ -560,8 +797,8 @@ export default function BucketBrowser() {
               <Skeleton className="h-4 w-32" />
             </div>
           </div>
-          <Card className="border-none shadow-xl overflow-hidden bg-white/50 backdrop-blur-sm">
-            <CardHeader className="bg-white p-6 border-b border-border/50">
+          <div className="border border-border rounded-lg shadow-sm overflow-hidden bg-white/50 backdrop-blur-sm">
+            <div className="bg-white p-6 border-b border-border/50">
               <div className="flex items-center justify-between">
                 <Skeleton className="h-8 w-48" />
                 <div className="flex gap-2">
@@ -569,17 +806,15 @@ export default function BucketBrowser() {
                   <Skeleton className="h-9 w-32" />
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="p-4 space-y-4">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className="flex items-center gap-4">
-                    <Skeleton className="h-12 w-full rounded-lg" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="p-4 space-y-4">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                </div>
+              ))}
+            </div>
+          </div>
         </main>
       </div>
     );
@@ -603,358 +838,475 @@ export default function BucketBrowser() {
     );
   }
 
+  const currentShare = shareTarget
+    ? (sharesByMe || []).find((share) => share.objectKey === shareTarget.name)
+    : null;
+  const currentTags = tagTarget ? tagsMap.get(tagTarget.name) || [] : [];
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
-      <main className="flex-1 ml-72 p-8">
-        {/* Header */}
-        <header className="flex flex-col gap-4 mb-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation("/dashboard/storage")}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
-            </Button>
-            <div className="flex-1">
-              <h1 className="text-2xl font-display font-bold text-foreground">
-                {bucket.name}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Navegue e gerencie os arquivos deste bucket
-              </p>
+      <main className="flex-1 ml-72 flex flex-col min-h-screen">
+          <header className="h-14 flex items-center justify-end px-6 text-white" style={{ backgroundColor: branding.primaryColor }}>
+            <div className="flex items-center gap-5">
+              <Search className="h-4 w-4" />
+              <Bell className="h-4 w-4" />
+              <div className="h-8 w-8 rounded-full bg-white/70 dark:bg-white/20 flex items-center justify-center text-slate-700">
+                <User className="h-4 w-4" />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+          </header>
+
+          <div className="px-6 py-4 bg-card border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => setLocation("/dashboard/storage")}
+                title="Voltar para Armazenamento"
+              >
+                <Home className="h-4 w-4" />
+              </button>
+              <span className="text-slate-300">|</span>
+              <span className="text-sm font-semibold text-foreground">{branding.name || bucket.name}</span>
+              {branding.name && branding.name !== bucket.name && (
+                <span className="text-xs text-muted-foreground">{bucket.name}</span>
+              )}
+              <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                {viewLabelMap[activeView] || "Todos os arquivos"}
+              </span>
               {isExternalClient && (
-                <Badge
-                  variant="secondary"
-                  className={
+                <span
+                  className={`text-xs px-2 py-1 rounded-full ${
                     bucket.userPermission === "read-write"
                       ? "bg-green-100 text-green-700"
                       : bucket.userPermission === "write"
                         ? "bg-amber-100 text-amber-700"
                         : "bg-slate-100 text-slate-700"
-                  }
+                  }`}
                 >
                   {bucket.userPermission === "read-write"
                     ? "Leitura e Escrita"
                     : bucket.userPermission === "write"
                       ? "Somente Escrita"
                       : "Somente Leitura"}
-                </Badge>
+                </span>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refetch()}
-                disabled={isObjectsLoading}
+              <button
+                type="button"
+                onClick={() => {
+                  if (canWrite) fileInputRef.current?.click();
+                }}
+                className="h-8 w-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground"
+                disabled={!canWrite}
+                title={canWrite ? "Upload" : "Sem permissão"}
               >
-                <RefreshCw
-                  className={`h-4 w-4 mr-2 ${isObjectsLoading ? "animate-spin" : ""}`}
-                />
-                Atualizar
-              </Button>
-              {canWrite && (
-                <>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                  >
-                    {isUploading ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Upload className="h-4 w-4 mr-2" />
-                    )}
-                    Upload
-                  </Button>
-                </>
-              )}
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
-          </div>
-
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1 text-sm bg-muted/50 rounded-lg px-3 py-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2"
-              onClick={() => navigateToFolder("")}
-            >
-              <Home className="h-4 w-4" />
-            </Button>
-            {breadcrumbParts.map((part) => (
-              <div key={part.path} className="flex items-center">
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2"
-                  onClick={() => navigateToFolder(part.path)}
-                >
-                  {part.name}
-                </Button>
-              </div>
-            ))}
-          </div>
-
-          {/* Upload Progress */}
-          {uploadProgress !== null && (
-            <div className="flex items-center gap-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-blue-700">
-                  Enviando arquivo...
-                </p>
-                <Progress value={uploadProgress} className="h-2 mt-1" />
-              </div>
-              <span className="text-sm text-blue-600">
-                {Math.round(uploadProgress)}%
-              </span>
-            </div>
-          )}
-        </header>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Arquivos e Pastas</CardTitle>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-4 text-muted-foreground">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4" />
                 <Input
-                  placeholder="Buscar arquivos..."
+                  placeholder="Buscar"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
+                  className="pl-8 h-8 text-sm bg-background"
                 />
               </div>
+              <button type="button" className="text-muted-foreground">
+                <List className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="text-muted-foreground"
+                title="Atualizar"
+              >
+                <RefreshCw className={`h-4 w-4 ${isObjectsLoading ? "animate-spin" : ""}`} />
+              </button>
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isObjectsLoading ? (
-              <div className="p-4 space-y-4">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className="flex items-center gap-4">
-                    <Skeleton className="h-12 w-full rounded-lg" />
+          </div>
+
+          <div className="flex-1 bg-muted/30 dark:bg-background/40 p-6 overflow-y-auto">
+            {uploadProgress !== null && (
+              <div className="mb-4 flex items-center gap-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-700">Enviando arquivo...</p>
+                  <Progress value={uploadProgress} className="h-2 mt-1" />
+                </div>
+                <span className="text-sm text-blue-600">{Math.round(uploadProgress)}%</span>
+              </div>
+            )}
+
+            <div className="bg-card shadow-sm border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-muted-foreground border-b">
+                    <th className="w-10 p-4">
+                      <input type="checkbox" />
+                    </th>
+                    <th className="p-4">Nome</th>
+                    <th className="p-4 hidden md:table-cell">Tamanho</th>
+                    <th className="p-4 hidden md:table-cell">Modificado</th>
+                    <th className="p-4 text-right"> </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isObjectsLoading ? (
+                    <tr>
+                      <td colSpan={5} className="p-6">
+                        <div className="space-y-3">
+                          {[1, 2, 3, 4].map((i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : objectsError ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-destructive">
+                        <p>Erro ao carregar arquivos: {(objectsError as Error).message}</p>
+                        <Button variant="outline" className="mt-4" onClick={() => refetch()}>
+                          Tentar Novamente
+                        </Button>
+                      </td>
+                    </tr>
+                  ) : (displayPrefixes.length === 0 && displayObjects.length === 0) || isFilteredEmpty ? (
+                    <tr>
+                      <td colSpan={5} className="p-12 text-center text-muted-foreground">
+                        <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                        <p>
+                          {isFilteredEmpty
+                            ? "Nenhum item para este filtro."
+                            : currentPrefix
+                              ? "Esta pasta está vazia."
+                              : "Nenhum arquivo neste bucket ainda."}
+                        </p>
+                        {canWrite && (
+                          <Button variant="outline" className="mt-4" onClick={() => fileInputRef.current?.click()}>
+                            <Upload className="h-4 w-4 mr-2" /> Fazer Upload
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                    <>
+                      {currentPrefix && activeView === "all" && (
+                        <tr className="hover:bg-muted/20 transition-colors cursor-pointer" onClick={navigateUp}>
+                          <td className="p-4">
+                            <input type="checkbox" />
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <FolderOpen className="h-4 w-4 text-blue-500" />
+                              <span className="font-medium">..</span>
+                            </div>
+                          </td>
+                          <td className="p-4 hidden md:table-cell text-muted-foreground">—</td>
+                          <td className="p-4 hidden md:table-cell text-muted-foreground">—</td>
+                          <td className="p-4 text-right text-muted-foreground">
+                            <Share2 className="h-4 w-4 inline" />
+                          </td>
+                        </tr>
+                      )}
+
+                      {displayPrefixes.map((prefix) => (
+                        <tr
+                          key={prefix}
+                          className="hover:bg-muted/20 transition-colors cursor-pointer"
+                          onClick={() => navigateToFolder(prefix)}
+                        >
+                          <td className="p-4">
+                            <input type="checkbox" />
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <FolderOpen className="h-4 w-4 text-blue-500" />
+                              <span className="font-medium">
+                                {getDisplayName(prefix, currentPrefix)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-4 hidden md:table-cell text-muted-foreground">0 KB</td>
+                          <td className="p-4 hidden md:table-cell text-muted-foreground">—</td>
+                          <td className="p-4 text-right text-muted-foreground">
+                            <Share2 className="h-4 w-4 inline" />
+                          </td>
+                        </tr>
+                      ))}
+
+                      {displayObjects.map((obj) => (
+                        <tr key={obj.name} className="hover:bg-muted/20 transition-colors">
+                          <td className="p-4">
+                            <input type="checkbox" />
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-3">
+                                {getFileIcon(obj.name)}
+                                <span className="font-medium">
+                                  {getDisplayName(obj.name, currentPrefix)}
+                                </span>
+                              </div>
+                              {(tagsMap.get(obj.name) || []).length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {(tagsMap.get(obj.name) || []).map((tag) => (
+                                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 hidden md:table-cell text-muted-foreground">
+                            {formatBytes(obj.size)}
+                          </td>
+                          <td className="p-4 hidden md:table-cell text-muted-foreground">
+                            {formatDate(obj.lastModified)}
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-2 text-muted-foreground">
+                              {canRead && (
+                                <>
+                                  <button
+                                    type="button"
+                                    title={favoriteSet.has(obj.name) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                                    onClick={() => handleToggleFavorite(obj)}
+                                    className={favoriteSet.has(obj.name) ? "text-yellow-500" : ""}
+                                  >
+                                    <Star className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Tags"
+                                    onClick={() => handleOpenTags(obj)}
+                                  >
+                                    <Tag className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Compartilhar"
+                                    onClick={() => handleOpenShare(obj)}
+                                  >
+                                    <Share2 className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
+                              {canRead && (
+                                <>
+                                  <button
+                                    type="button"
+                                    title={isPreviewable(obj.name) ? "Visualizar" : "Abrir"}
+                                    onClick={() => handlePreview(obj)}
+                                    disabled={isLoadingPreview}
+                                  >
+                                    {isLoadingPreview && previewFile?.name === obj.name ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Eye className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                  <button type="button" title="Download" onClick={() => handleDownload(obj)}>
+                                    <Download className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
+                              {canWrite && (
+                                <button
+                                  type="button"
+                                  title="Excluir"
+                                  onClick={() => {
+                                    setObjectToDelete(obj);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
+
+          {/* File Preview Modal */}
+          <FilePreviewModal
+            isOpen={previewOpen}
+            onClose={handleClosePreview}
+            file={previewFile}
+            previewUrl={previewUrl}
+            onDownload={() => previewFile && handleDownload(previewFile)}
+          />
+
+          {/* Share Dialog */}
+          <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Compartilhar Arquivo</DialogTitle>
+                <DialogDescription>
+                  Gere um link de compartilhamento ou envie para um email.
+                </DialogDescription>
+              </DialogHeader>
+              {shareTarget && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                    {getFileIcon(shareTarget.name)}
+                    <div>
+                      <p className="font-medium">{getDisplayName(shareTarget.name, currentPrefix)}</p>
+                      <p className="text-sm text-muted-foreground">{formatBytes(shareTarget.size)}</p>
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : objectsError ? (
-              <div className="p-12 text-center text-destructive">
-                <p>Erro ao carregar arquivos: {(objectsError as Error).message}</p>
-                <Button variant="outline" className="mt-4" onClick={() => refetch()}>
-                  Tentar Novamente
-                </Button>
-              </div>
-            ) : filteredPrefixes.length === 0 && filteredObjects.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                <p>
-                  {currentPrefix
-                    ? "Esta pasta está vazia."
-                    : "Nenhum arquivo neste bucket ainda."}
-                </p>
-                {canWrite && (
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Email (opcional)</label>
+                    <Input
+                      value={shareEmail}
+                      onChange={(e) => setShareEmail(e.target.value)}
+                      placeholder="cliente@empresa.com"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">Acesso</label>
+                      <select
+                        value={shareAccess}
+                        onChange={(e) => setShareAccess(e.target.value as "read" | "download")}
+                        className="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="read">Visualizar</option>
+                        <option value="download">Download</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">Expira em (dias)</label>
+                      <Input
+                        type="number"
+                        value={shareExpiresDays}
+                        onChange={(e) => setShareExpiresDays(e.target.value)}
+                        min={1}
+                        placeholder="Opcional"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  {shareUrl && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">Link gerado</label>
+                      <div className="flex gap-2">
+                        <Input value={shareUrl} readOnly className="bg-background" />
+                        <Button variant="outline" onClick={handleCopyShare}>Copiar</Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <DialogFooter className="flex justify-between">
+                {currentShare && (
                   <Button
                     variant="outline"
-                    className="mt-4"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => handleRevokeShare(currentShare.id)}
                   >
-                    <Upload className="h-4 w-4 mr-2" /> Fazer Upload
+                    Revogar link
                   </Button>
                 )}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50 border-b">
-                    <tr>
-                      <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">
-                        Nome
-                      </th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                        Tamanho
-                      </th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                        Última Modificação
-                      </th>
-                      <th className="text-right p-4 pr-6 text-sm font-medium text-muted-foreground">
-                        Ações
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {/* Go up folder */}
-                    {currentPrefix && (
-                      <tr
-                        className="hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={navigateUp}
-                      >
-                        <td className="p-4 pl-6" colSpan={4}>
-                          <div className="flex items-center gap-3">
-                            <FolderOpen className="h-5 w-5 text-amber-500" />
-                            <span className="font-medium text-slate-600">
-                              ..
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
+                <Button onClick={handleCreateShare}>Gerar link</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Tags Dialog */}
+          <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Tags do Arquivo</DialogTitle>
+                <DialogDescription>Adicione ou remova tags para este arquivo.</DialogDescription>
+              </DialogHeader>
+              {tagTarget && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                    {getFileIcon(tagTarget.name)}
+                    <div>
+                      <p className="font-medium">{getDisplayName(tagTarget.name, currentPrefix)}</p>
+                      <p className="text-sm text-muted-foreground">{formatBytes(tagTarget.size)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      placeholder="Nova tag"
+                      className="bg-background"
+                    />
+                    <Button onClick={handleAddTag}>Adicionar</Button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {currentTags.length === 0 && (
+                      <span className="text-sm text-muted-foreground">Nenhuma tag cadastrada.</span>
                     )}
-
-                    {/* Folders (prefixes) */}
-                    {filteredPrefixes.map((prefix) => (
-                      <tr
-                        key={prefix}
-                        className="hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => navigateToFolder(prefix)}
+                    {currentTags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground hover:bg-muted/70"
                       >
-                        <td className="p-4 pl-6">
-                          <div className="flex items-center gap-3">
-                            <FolderOpen className="h-5 w-5 text-amber-500" />
-                            <span className="font-medium">
-                              {getDisplayName(prefix, currentPrefix)}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-sm text-muted-foreground">—</td>
-                        <td className="p-4 text-sm text-muted-foreground">—</td>
-                        <td className="p-4 pr-6 text-right">
-                          <Button variant="ghost" size="sm">
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
+                        {tag} <span className="ml-1">×</span>
+                      </button>
                     ))}
-
-                    {/* Files */}
-                    {filteredObjects.map((obj) => (
-                      <tr
-                        key={obj.name}
-                        className="hover:bg-muted/50 transition-colors"
-                      >
-                        <td className="p-4 pl-6">
-                          <div className="flex items-center gap-3">
-                            {getFileIcon(obj.name)}
-                            <span className="font-medium">
-                              {getDisplayName(obj.name, currentPrefix)}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-sm text-slate-600">
-                          {formatBytes(obj.size)}
-                        </td>
-                        <td className="p-4 text-sm text-slate-600">
-                          {formatDate(obj.lastModified)}
-                        </td>
-                        <td className="p-4 pr-6">
-                          <div className="flex items-center justify-end gap-1">
-                            {canRead && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  title={isPreviewable(obj.name) ? "Visualizar" : "Abrir"}
-                                  onClick={() => handlePreview(obj)}
-                                  disabled={isLoadingPreview}
-                                >
-                                  {isLoadingPreview && previewFile?.name === obj.name ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  title="Download"
-                                  onClick={() => handleDownload(obj)}
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
-                            {canWrite && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title="Excluir"
-                                onClick={() => {
-                                  setObjectToDelete(obj);
-                                  setDeleteDialogOpen(true);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* File Preview Modal */}
-        <FilePreviewModal
-          isOpen={previewOpen}
-          onClose={handleClosePreview}
-          file={previewFile}
-          previewUrl={previewUrl}
-          onDownload={() => previewFile && handleDownload(previewFile)}
-        />
-
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Excluir Arquivo</DialogTitle>
-              <DialogDescription>
-                Tem certeza que deseja excluir este arquivo? Esta ação não pode
-                ser desfeita.
-              </DialogDescription>
-            </DialogHeader>
-            {objectToDelete && (
-              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                {getFileIcon(objectToDelete.name)}
-                <div>
-                  <p className="font-medium">
-                    {getDisplayName(objectToDelete.name, currentPrefix)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatBytes(objectToDelete.size)}
-                  </p>
+                  </div>
                 </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setDeleteDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteConfirm}
-                disabled={isDeleting}
-              >
-                {isDeleting && (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                )}
-                Excluir
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Confirmation Dialog */}
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Excluir Arquivo</DialogTitle>
+                <DialogDescription>
+                  Tem certeza que deseja excluir este arquivo? Esta ação não pode ser desfeita.
+                </DialogDescription>
+              </DialogHeader>
+              {objectToDelete && (
+                <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                  {getFileIcon(objectToDelete.name)}
+                  <div>
+                    <p className="font-medium">
+                      {getDisplayName(objectToDelete.name, currentPrefix)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatBytes(objectToDelete.size)}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+                  {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Excluir
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
       </main>
     </div>
   );

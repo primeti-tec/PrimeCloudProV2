@@ -268,8 +268,9 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground">Gerencie contas e visualize métricas da plataforma.</p>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="shadow-sm">
+        <section id="admin-overview">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card className="shadow-sm">
             <CardContent className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div className="p-3 rounded-xl bg-blue-500/10">
@@ -319,10 +320,10 @@ export default function AdminDashboard() {
               <p className="text-xs text-muted-foreground mt-1">Soma dos planos base</p>
             </CardContent>
           </Card>
-        </div>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <Card className="shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <Card className="shadow-sm">
             <CardContent className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div className="p-3 rounded-xl bg-teal-500/10">
@@ -406,10 +407,10 @@ export default function AdminDashboard() {
               <p className="text-xs text-muted-foreground mt-1">Este mês</p>
             </CardContent>
           </Card>
-        </div>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <Card className="shadow-md border-border/60">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <Card className="shadow-md border-border/60">
             <CardHeader>
               <CardTitle className="text-lg">MRR ao Longo do Tempo</CardTitle>
             </CardHeader>
@@ -452,11 +453,13 @@ export default function AdminDashboard() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
+          </div>
+        </section>
 
         {/* Pending Quota Requests Section */}
         {(pendingQuotaRequests && pendingQuotaRequests.length > 0) && (
-          <Card className="mb-8 border-purple-200 dark:border-purple-900 bg-purple-50/30 dark:bg-purple-950/20">
+          <section id="admin-quota-requests">
+            <Card className="mb-8 border-purple-200 dark:border-purple-900 bg-purple-50/30 dark:bg-purple-950/20">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <FileUp className="h-5 w-5 text-purple-600 dark:text-purple-500" />
@@ -514,11 +517,13 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </CardContent>
-          </Card>
+            </Card>
+          </section>
         )}
 
         {pendingAccounts.length > 0 && (
-          <Card className="mb-8 border-yellow-200 dark:border-yellow-900 bg-yellow-50/30 dark:bg-yellow-950/20">
+          <section id="admin-pending-accounts">
+            <Card className="mb-8 border-yellow-200 dark:border-yellow-900 bg-yellow-50/30 dark:bg-yellow-950/20">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
@@ -574,100 +579,103 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </CardContent>
-          </Card>
+            </Card>
+          </section>
         )}
-
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-green-600" />
-              Contas Ativas ({activeAccounts.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
-            ) : activeAccounts.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                <Building2 className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                <p>Nenhuma conta ativa ainda.</p>
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-slate-50 dark:bg-muted/50 border-b">
-                  <tr>
-                    <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Conta</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Documento</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Uso de Armazenamento</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Quota</th>
-                    <th className="text-right p-4 pr-6 text-sm font-medium text-muted-foreground">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {activeAccounts.map((account) => {
-                    const usagePercent = account.storageQuotaGB ? ((account.storageUsed || 0) / (account.storageQuotaGB * 1024 * 1024 * 1024)) * 100 : 0;
-                    return (
-                      <tr key={account.id} className="hover:bg-slate-50/50 dark:hover:bg-muted/30 transition-colors" data-testid={`row-active-${account.id}`}>
-                        <td className="p-4 pl-6">
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                              {account.name.charAt(0).toUpperCase()}
+        <section id="admin-active-accounts">
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-green-600" />
+                Contas Ativas ({activeAccounts.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
+              ) : activeAccounts.length === 0 ? (
+                <div className="p-12 text-center text-muted-foreground">
+                  <Building2 className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                  <p>Nenhuma conta ativa ainda.</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-slate-50 dark:bg-muted/50 border-b">
+                    <tr>
+                      <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Conta</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Documento</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Uso de Armazenamento</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Quota</th>
+                      <th className="text-right p-4 pr-6 text-sm font-medium text-muted-foreground">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {activeAccounts.map((account) => {
+                      const usagePercent = account.storageQuotaGB ? ((account.storageUsed || 0) / (account.storageQuotaGB * 1024 * 1024 * 1024)) * 100 : 0;
+                      return (
+                        <tr key={account.id} className="hover:bg-slate-50/50 dark:hover:bg-muted/30 transition-colors" data-testid={`row-active-${account.id}`}>
+                          <td className="p-4 pl-6">
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                                {account.name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium">{account.name}</span>
                             </div>
-                            <span className="font-medium">{account.name}</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
-                          {account.document ? (
-                            <span className="font-mono text-xs">{account.documentType?.toUpperCase()}: {account.document}</span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <HardDrive className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{formatBytes(account.storageUsed)}</span>
-                            {usagePercent > 80 && (
-                              <Badge variant="destructive" className="text-xs">Alto</Badge>
+                          </td>
+                          <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
+                            {account.document ? (
+                              <span className="font-mono text-xs">{account.documentType?.toUpperCase()}: {account.document}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
                             )}
-                          </div>
-                        </td>
-                        <td className="p-4 text-sm">
-                          <span className="font-medium">{account.storageQuotaGB || 100} GB</span>
-                        </td>
-                        <td className="p-4 pr-6 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openQuotaDialog(account)}
-                              data-testid={`button-quota-${account.id}`}
-                            >
-                              <Settings2 className="mr-1 h-4 w-4" /> Quota
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-destructive border-destructive/30"
-                              onClick={() => handleSuspend(account.id, account.name)}
-                              disabled={isSuspending}
-                              data-testid={`button-suspend-${account.id}`}
-                            >
-                              <Pause className="mr-1 h-4 w-4" /> Suspender
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <HardDrive className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{formatBytes(account.storageUsed)}</span>
+                              {usagePercent > 80 && (
+                                <Badge variant="destructive" className="text-xs">Alto</Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 text-sm">
+                            <span className="font-medium">{account.storageQuotaGB || 100} GB</span>
+                          </td>
+                          <td className="p-4 pr-6 text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openQuotaDialog(account)}
+                                data-testid={`button-quota-${account.id}`}
+                              >
+                                <Settings2 className="mr-1 h-4 w-4" /> Quota
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive border-destructive/30"
+                                onClick={() => handleSuspend(account.id, account.name)}
+                                disabled={isSuspending}
+                                data-testid={`button-suspend-${account.id}`}
+                              >
+                                <Pause className="mr-1 h-4 w-4" /> Suspender
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </section>
 
         {suspendedAccounts.length > 0 && (
-          <Card className="mb-8 border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-950/20">
+          <section id="admin-suspended-accounts">
+            <Card className="mb-8 border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-950/20">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Pause className="h-5 w-5 text-red-600 dark:text-red-500" />
@@ -711,197 +719,201 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </CardContent>
-          </Card>
+            </Card>
+          </section>
         )}
-
-        <Card className="mb-8">
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
-              Produtos/Planos
-            </CardTitle>
-            <Button onClick={() => openProductDialog()} data-testid="button-create-product">
-              <Plus className="mr-1 h-4 w-4" /> Criar Produto
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            {productsLoading ? (
-              <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
-            ) : !products || products.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                <Package className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                <p>Nenhum produto ainda. Crie seu primeiro produto para começar.</p>
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-slate-50 dark:bg-muted/50 border-b">
-                  <tr>
-                    <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Nome</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Preço</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Limite de Armazenamento</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Limite de Transferência</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="text-right p-4 pr-6 text-sm font-medium text-muted-foreground">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {products.map((product) => (
-                    <tr key={product.id} className="hover:bg-slate-50/50 dark:hover:bg-muted/30 transition-colors" data-testid={`row-product-${product.id}`}>
-                      <td className="p-4 pl-6">
-                        <div>
-                          <span className="font-medium text-slate-900 dark:text-foreground">{product.name}</span>
-                          {product.description && (
-                            <p className="text-sm text-muted-foreground truncate max-w-xs">{product.description}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm font-medium">{formatCurrency(product.price)}/mês</td>
-                      <td className="p-4 text-sm">{product.storageLimit} GB</td>
-                      <td className="p-4 text-sm">{product.transferLimit ? `${product.transferLimit} GB` : 'Ilimitado'}</td>
-                      <td className="p-4">
-                        {product.isPublic ? (
-                          <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Público</Badge>
-                        ) : (
-                          <Badge variant="secondary">Privado</Badge>
-                        )}
-                      </td>
-                      <td className="p-4 pr-6 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openProductDialog(product)}
-                            data-testid={`button-edit-product-${product.id}`}
-                          >
-                            <Pencil className="mr-1 h-4 w-4" /> Editar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive border-destructive/30"
-                            onClick={() => handleDeleteProduct(product)}
-                            disabled={isDeletingProduct}
-                            data-testid={`button-delete-product-${product.id}`}
-                          >
-                            <Trash2 className="mr-1 h-4 w-4" /> Excluir
-                          </Button>
-                        </div>
-                      </td>
+        <section id="admin-products">
+          <Card className="mb-8">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                Produtos/Planos
+              </CardTitle>
+              <Button onClick={() => openProductDialog()} data-testid="button-create-product">
+                <Plus className="mr-1 h-4 w-4" /> Criar Produto
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {productsLoading ? (
+                <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
+              ) : !products || products.length === 0 ? (
+                <div className="p-12 text-center text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                  <p>Nenhum produto ainda. Crie seu primeiro produto para começar.</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-slate-50 dark:bg-muted/50 border-b">
+                    <tr>
+                      <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Nome</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Preço</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Limite de Armazenamento</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Limite de Transferência</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
+                      <th className="text-right p-4 pr-6 text-sm font-medium text-muted-foreground">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
+                  </thead>
+                  <tbody className="divide-y">
+                    {products.map((product) => (
+                      <tr key={product.id} className="hover:bg-slate-50/50 dark:hover:bg-muted/30 transition-colors" data-testid={`row-product-${product.id}`}>
+                        <td className="p-4 pl-6">
+                          <div>
+                            <span className="font-medium text-slate-900 dark:text-foreground">{product.name}</span>
+                            {product.description && (
+                              <p className="text-sm text-muted-foreground truncate max-w-xs">{product.description}</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4 text-sm font-medium">{formatCurrency(product.price)}/mês</td>
+                        <td className="p-4 text-sm">{product.storageLimit} GB</td>
+                        <td className="p-4 text-sm">{product.transferLimit ? `${product.transferLimit} GB` : 'Ilimitado'}</td>
+                        <td className="p-4">
+                          {product.isPublic ? (
+                            <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Público</Badge>
+                          ) : (
+                            <Badge variant="secondary">Privado</Badge>
+                          )}
+                        </td>
+                        <td className="p-4 pr-6 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openProductDialog(product)}
+                              data-testid={`button-edit-product-${product.id}`}
+                            >
+                              <Pencil className="mr-1 h-4 w-4" /> Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive border-destructive/30"
+                              onClick={() => handleDeleteProduct(product)}
+                              disabled={isDeletingProduct}
+                              data-testid={`button-delete-product-${product.id}`}
+                            >
+                              <Trash2 className="mr-1 h-4 w-4" /> Excluir
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </section>
 
-        <div className="mb-8">
+        <section id="admin-orders" className="mb-8">
           <OrdersManager />
-        </div>
+        </section>
 
         {/* Invoices / Billing Management Section */}
-        <div className="mb-8">
+        <section id="admin-invoices" className="mb-8">
           <InvoicesManager />
-        </div>
+        </section>
 
         {/* Pricing Management Section */}
-        <div className="mb-8">
+        <section id="admin-pricing" className="mb-8">
           <PricingManager />
-        </div>
+        </section>
 
         {/* Storage / Buckets Overview Section */}
-        <div className="mb-8">
+        <section id="admin-buckets" className="mb-8">
           <BucketsManager />
-        </div>
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Todas as Contas</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
-            ) : accounts?.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                <Building2 className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                <p>Nenhuma conta ainda.</p>
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-slate-50 dark:bg-muted/50 border-b">
-                  <tr>
-                    <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Conta</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Documento</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Telefone</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Uso / Quota</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Criado em</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {accounts?.map((account) => (
-                    <tr key={account.id} className="hover:bg-slate-50/50 dark:hover:bg-muted/30 transition-colors" data-testid={`row-account-${account.id}`}>
-                      <td className="p-4 pl-6">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                            {account.name.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="font-medium">{account.name}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
-                        {account.document ? (
-                          <span className="font-mono text-xs">{account.documentType?.toUpperCase()}: {account.document}</span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
-                        {account.phone || <span className="text-muted-foreground">-</span>}
-                      </td>
-                      <td className="p-4">
-                        {account.status === 'active' ? (
-                          <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Ativo</Badge>
-                        ) : account.status === 'suspended' ? (
-                          <Badge variant="destructive">Suspenso</Badge>
-                        ) : account.status === 'rejected' ? (
-                          <Badge variant="destructive">Rejeitado</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300">Pendente</Badge>
-                        )}
-                      </td>
-                      <td className="p-4 text-sm">
-                        {(() => {
-                          const usedGB = ((account.storageUsed || 0) / (1024 * 1024 * 1024));
-                          const quotaGB = account.storageQuotaGB || 100;
-                          const percentage = Math.min(100, (usedGB / quotaGB) * 100);
-                          const isWarning = percentage >= 80;
-                          const isCritical = percentage >= 95;
-                          return (
-                            <div className="flex flex-col gap-1">
-                              <span className={`font-medium ${isCritical ? 'text-red-600' : isWarning ? 'text-yellow-600' : ''}`}>
-                                {usedGB.toFixed(2)} / {quotaGB} GB
-                              </span>
-                              <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full ${isCritical ? 'bg-red-500' : isWarning ? 'bg-yellow-500' : 'bg-green-500'}`}
-                                  style={{ width: `${percentage}%` }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {account.createdAt ? new Date(account.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
-                      </td>
+        <section id="admin-all-accounts">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Todas as Contas</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
+              ) : accounts?.length === 0 ? (
+                <div className="p-12 text-center text-muted-foreground">
+                  <Building2 className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                  <p>Nenhuma conta ainda.</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-slate-50 dark:bg-muted/50 border-b">
+                    <tr>
+                      <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Conta</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Documento</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Telefone</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Uso / Quota</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Criado em</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
+                  </thead>
+                  <tbody className="divide-y">
+                    {accounts?.map((account) => (
+                      <tr key={account.id} className="hover:bg-slate-50/50 dark:hover:bg-muted/30 transition-colors" data-testid={`row-account-${account.id}`}>
+                        <td className="p-4 pl-6">
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                              {account.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="font-medium">{account.name}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
+                          {account.document ? (
+                            <span className="font-mono text-xs">{account.documentType?.toUpperCase()}: {account.document}</span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
+                          {account.phone || <span className="text-muted-foreground">-</span>}
+                        </td>
+                        <td className="p-4">
+                          {account.status === 'active' ? (
+                            <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Ativo</Badge>
+                          ) : account.status === 'suspended' ? (
+                            <Badge variant="destructive">Suspenso</Badge>
+                          ) : account.status === 'rejected' ? (
+                            <Badge variant="destructive">Rejeitado</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300">Pendente</Badge>
+                          )}
+                        </td>
+                        <td className="p-4 text-sm">
+                          {(() => {
+                            const usedGB = ((account.storageUsed || 0) / (1024 * 1024 * 1024));
+                            const quotaGB = account.storageQuotaGB || 100;
+                            const percentage = Math.min(100, (usedGB / quotaGB) * 100);
+                            const isWarning = percentage >= 80;
+                            const isCritical = percentage >= 95;
+                            return (
+                              <div className="flex flex-col gap-1">
+                                <span className={`font-medium ${isCritical ? 'text-red-600' : isWarning ? 'text-yellow-600' : ''}`}>
+                                  {usedGB.toFixed(2)} / {quotaGB} GB
+                                </span>
+                                <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${isCritical ? 'bg-red-500' : isWarning ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                    style={{ width: `${percentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {account.createdAt ? new Date(account.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </section>
       </main>
 
       <Dialog open={quotaDialogOpen} onOpenChange={setQuotaDialogOpen}>

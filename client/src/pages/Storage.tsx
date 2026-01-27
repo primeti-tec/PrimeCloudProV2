@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
 import { useMyAccounts } from "@/hooks/use-accounts";
@@ -365,6 +365,13 @@ export default function Storage() {
   const [isPublic, setIsPublic] = useState(false);
   const [limit, setLimit] = useState(50);
 
+  useEffect(() => {
+    if (!isExternalClient || isLoading) return;
+    if (!buckets || buckets.length === 0) return;
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    setLocation(`/dashboard/storage/${buckets[0].id}${search}`);
+  }, [isExternalClient, isLoading, buckets, setLocation]);
+
   const handleCreate = () => {
     if (!bucketName.trim()) return;
     createBucket(
@@ -433,7 +440,9 @@ export default function Storage() {
             <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-page-title">
               Buckets de Armazenamento
             </h1>
-            <p className="text-muted-foreground">Gerencie seus buckets de armazenamento S3-compatible.</p>
+            <p className="text-muted-foreground">
+              {currentAccount?.brandingName || currentAccount?.name || "Sua conta"}: gerencie seus buckets de armazenamento S3-compatible.
+            </p>
           </div>
           {canManageBucket() && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -613,7 +622,7 @@ export default function Storage() {
                           <div className="flex items-center justify-end gap-2 flex-wrap">
                             <Button
                               size="sm"
-                              variant="default"
+                              variant="primary"
                               onClick={() => setLocation(`/dashboard/storage/${bucket.id}`)}
                               data-testid={`button-browse-${bucket.id}`}
                             >

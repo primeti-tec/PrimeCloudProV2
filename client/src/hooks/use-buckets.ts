@@ -123,17 +123,25 @@ export interface ListObjectsResponse {
   prefix: string;
 }
 
-export function useBucketObjects(accountId: number | undefined, bucketId: number | undefined, prefix?: string) {
+export function useBucketObjects(
+  accountId: number | undefined,
+  bucketId: number | undefined,
+  prefix?: string,
+  recursive?: boolean,
+  initialData?: ListObjectsResponse
+) {
   return useQuery<ListObjectsResponse>({
-    queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', prefix || ''],
+    queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', prefix || '', recursive ? 'recursive' : ''],
     queryFn: async () => {
       if (!accountId || !bucketId) return { objects: [], prefixes: [], prefix: '' };
       const url = new URL(buildUrl(api.objects.list.path, { accountId, bucketId }), window.location.origin);
       if (prefix) url.searchParams.set('prefix', prefix);
+      if (recursive) url.searchParams.set('recursive', 'true');
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error('Failed to fetch objects');
       return res.json();
     },
+    initialData,
     enabled: !!accountId && !!bucketId,
   });
 }
@@ -215,6 +223,168 @@ export function useUploadFile(accountId: number | undefined, bucketId: number | 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets'] });
+    },
+  });
+}
+
+// ===== Object Favorites, Tags, Shares =====
+
+export interface ObjectFavoritesResponse {
+  keys: string[];
+}
+
+export interface ObjectTagEntry {
+  key: string;
+  tags: string[];
+}
+
+export interface ObjectTagsResponse {
+  tags: ObjectTagEntry[];
+}
+
+export interface ObjectShare {
+  id: number;
+  bucketId: number | null;
+  objectKey: string;
+  sharedWithEmail: string | null;
+  access: string | null;
+  token: string;
+  expiresAt: string | null;
+  createdAt: string | null;
+  shareUrl: string;
+}
+
+export function useBucketFavorites(accountId: number | undefined, bucketId: number | undefined) {
+  return useQuery<ObjectFavoritesResponse>({
+    queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'favorites'],
+    queryFn: async () => {
+      if (!accountId || !bucketId) return { keys: [] };
+      const res = await fetch(buildUrl(api.objectFavorites.list.path, { accountId, bucketId }));
+      if (!res.ok) throw new Error('Failed to fetch favorites');
+      return res.json();
+    },
+    enabled: !!accountId && !!bucketId,
+  });
+}
+
+export function useAddFavorite(accountId: number | undefined, bucketId: number | undefined) {
+  return useMutation({
+    mutationFn: async (key: string) => {
+      if (!accountId || !bucketId) throw new Error('No account or bucket');
+      const res = await apiRequest(api.objectFavorites.add.method, buildUrl(api.objectFavorites.add.path, { accountId, bucketId }), { key });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'favorites'] });
+    },
+  });
+}
+
+export function useRemoveFavorite(accountId: number | undefined, bucketId: number | undefined) {
+  return useMutation({
+    mutationFn: async (key: string) => {
+      if (!accountId || !bucketId) throw new Error('No account or bucket');
+      const res = await apiRequest(api.objectFavorites.remove.method, buildUrl(api.objectFavorites.remove.path, { accountId, bucketId }), { key });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'favorites'] });
+    },
+  });
+}
+
+export function useBucketTags(accountId: number | undefined, bucketId: number | undefined) {
+  return useQuery<ObjectTagsResponse>({
+    queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'tags'],
+    queryFn: async () => {
+      if (!accountId || !bucketId) return { tags: [] };
+      const res = await fetch(buildUrl(api.objectTags.list.path, { accountId, bucketId }));
+      if (!res.ok) throw new Error('Failed to fetch tags');
+      return res.json();
+    },
+    enabled: !!accountId && !!bucketId,
+  });
+}
+
+export function useAddTag(accountId: number | undefined, bucketId: number | undefined) {
+  return useMutation({
+    mutationFn: async ({ key, tag }: { key: string; tag: string }) => {
+      if (!accountId || !bucketId) throw new Error('No account or bucket');
+      const res = await apiRequest(api.objectTags.add.method, buildUrl(api.objectTags.add.path, { accountId, bucketId }), { key, tag });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'tags'] });
+    },
+  });
+}
+
+export function useRemoveTag(accountId: number | undefined, bucketId: number | undefined) {
+  return useMutation({
+    mutationFn: async ({ key, tag }: { key: string; tag: string }) => {
+      if (!accountId || !bucketId) throw new Error('No account or bucket');
+      const res = await apiRequest(api.objectTags.remove.method, buildUrl(api.objectTags.remove.path, { accountId, bucketId }), { key, tag });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'tags'] });
+    },
+  });
+}
+
+export function useBucketSharesByMe(accountId: number | undefined, bucketId: number | undefined) {
+  return useQuery<ObjectShare[]>({
+    queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'shares', 'by-me'],
+    queryFn: async () => {
+      if (!accountId || !bucketId) return [];
+      const res = await fetch(buildUrl(api.objectShares.listByMe.path, { accountId, bucketId }));
+      if (!res.ok) throw new Error('Failed to fetch shares');
+      return res.json();
+    },
+    enabled: !!accountId && !!bucketId,
+  });
+}
+
+export function useBucketSharesWithMe(accountId: number | undefined, bucketId: number | undefined) {
+  return useQuery<ObjectShare[]>({
+    queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'shares', 'with-me'],
+    queryFn: async () => {
+      if (!accountId || !bucketId) return [];
+      const res = await fetch(buildUrl(api.objectShares.listWithMe.path, { accountId, bucketId }));
+      if (!res.ok) throw new Error('Failed to fetch shares');
+      return res.json();
+    },
+    enabled: !!accountId && !!bucketId,
+  });
+}
+
+export function useCreateShare(accountId: number | undefined, bucketId: number | undefined) {
+  return useMutation({
+    mutationFn: async (data: { key: string; sharedWithEmail?: string; access?: "read" | "download"; expiresAt?: string }) => {
+      if (!accountId || !bucketId) throw new Error('No account or bucket');
+      const res = await apiRequest(api.objectShares.create.method, buildUrl(api.objectShares.create.path, { accountId, bucketId }), data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'shares'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'shares', 'by-me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'shares', 'with-me'] });
+    },
+  });
+}
+
+export function useRevokeShare(accountId: number | undefined, bucketId: number | undefined) {
+  return useMutation({
+    mutationFn: async (shareId: number) => {
+      if (!accountId || !bucketId) throw new Error('No account or bucket');
+      const url = buildUrl(api.objectShares.revoke.path, { accountId, bucketId, shareId });
+      const res = await apiRequest(api.objectShares.revoke.method, url);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'shares'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'shares', 'by-me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets', bucketId, 'objects', 'shares', 'with-me'] });
     },
   });
 }

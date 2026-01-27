@@ -1,11 +1,12 @@
 import { db } from "./db";
 import { minioService } from "./services/minio.service";
 import {
-  users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs, invitations, sftpCredentials, invoices, usageRecords, quotaRequests, orders, bucketPermissions, vpsConfigs, pricingConfigs, pricingHistory,
+  users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs, invitations, sftpCredentials, invoices, usageRecords, quotaRequests, orders, bucketPermissions, objectFavorites, objectTags, objectShares, vpsConfigs, pricingConfigs, pricingHistory,
   type Account, type Product, type Subscription, type AccountMember, type Bucket, type AccessKey,
   type Notification, type AuditLog, type Invitation, type SftpCredential, type Invoice, type QuotaRequest, type Order, type OrderWithDetails, type VpsConfig, type PricingConfig, type PricingHistory,
   type CreateAccountRequest, type CreateMemberRequest, type CreateBucketRequest, type CreateAccessKeyRequest,
-  type CreateNotificationRequest, type CreateAuditLogRequest, type CreateQuotaRequestRequest, type CreateOrderRequest, type UpdateOrderRequest, type CreateVpsConfigRequest, type CreatePricingConfigRequest, type UpdatePricingConfigRequest
+  type CreateNotificationRequest, type CreateAuditLogRequest, type CreateQuotaRequestRequest, type CreateOrderRequest, type UpdateOrderRequest, type CreateVpsConfigRequest, type CreatePricingConfigRequest, type UpdatePricingConfigRequest,
+  type ObjectShare
 } from "@shared/schema";
 import { eq, and, desc, count, isNull, gt, gte, lte, ilike, or } from "drizzle-orm";
 import crypto from "crypto";
@@ -42,6 +43,19 @@ export interface IStorage {
   getBuckets(accountId: number): Promise<Bucket[]>;
   getBucket(id: number): Promise<Bucket | undefined>;
   deleteBucket(id: number): Promise<void>;
+
+  // Object Metadata
+  getObjectFavorites(userId: string, accountId: number, bucketId: number): Promise<string[]>;
+  addObjectFavorite(userId: string, accountId: number, bucketId: number, objectKey: string): Promise<void>;
+  removeObjectFavorite(userId: string, accountId: number, bucketId: number, objectKey: string): Promise<void>;
+  getObjectTags(userId: string, accountId: number, bucketId: number): Promise<{ key: string; tags: string[] }[]>;
+  addObjectTag(userId: string, accountId: number, bucketId: number, objectKey: string, tag: string): Promise<void>;
+  removeObjectTag(userId: string, accountId: number, bucketId: number, objectKey: string, tag: string): Promise<void>;
+  createObjectShare(data: { accountId: number; bucketId: number; objectKey: string; sharedByUserId: string; sharedWithEmail?: string | null; access?: string; expiresAt?: Date | null; token: string; }): Promise<ObjectShare>;
+  getObjectSharesByUser(accountId: number, bucketId: number, userId: string): Promise<ObjectShare[]>;
+  getObjectSharesWithUser(accountId: number, bucketId: number, userEmail: string): Promise<ObjectShare[]>;
+  revokeObjectShare(accountId: number, bucketId: number, userId: string, shareId: number): Promise<void>;
+  getObjectShareByToken(token: string): Promise<ObjectShare | undefined>;
 
   // Access Keys
   createAccessKey(data: CreateAccessKeyRequest): Promise<AccessKey & { rawSecret: string }>;
@@ -279,6 +293,133 @@ export class DatabaseStorage implements IStorage {
 
     // 2. Remove from DB
     await db.delete(buckets).where(eq(buckets.id, id));
+  }
+
+  // Object Metadata
+  async getObjectFavorites(userId: string, accountId: number, bucketId: number): Promise<string[]> {
+    const rows = await db
+      .select({ objectKey: objectFavorites.objectKey })
+      .from(objectFavorites)
+      .where(and(
+        eq(objectFavorites.userId, userId),
+        eq(objectFavorites.accountId, accountId),
+        eq(objectFavorites.bucketId, bucketId)
+      ));
+    return rows.map((row) => row.objectKey);
+  }
+
+  async addObjectFavorite(userId: string, accountId: number, bucketId: number, objectKey: string): Promise<void> {
+    const existing = await db
+      .select({ id: objectFavorites.id })
+      .from(objectFavorites)
+      .where(and(
+        eq(objectFavorites.userId, userId),
+        eq(objectFavorites.accountId, accountId),
+        eq(objectFavorites.bucketId, bucketId),
+        eq(objectFavorites.objectKey, objectKey)
+      ));
+    if (existing.length > 0) return;
+    await db.insert(objectFavorites).values({ userId, accountId, bucketId, objectKey });
+  }
+
+  async removeObjectFavorite(userId: string, accountId: number, bucketId: number, objectKey: string): Promise<void> {
+    await db.delete(objectFavorites).where(and(
+      eq(objectFavorites.userId, userId),
+      eq(objectFavorites.accountId, accountId),
+      eq(objectFavorites.bucketId, bucketId),
+      eq(objectFavorites.objectKey, objectKey)
+    ));
+  }
+
+  async getObjectTags(userId: string, accountId: number, bucketId: number): Promise<{ key: string; tags: string[] }[]> {
+    const rows = await db
+      .select({ objectKey: objectTags.objectKey, tag: objectTags.tag })
+      .from(objectTags)
+      .where(and(
+        eq(objectTags.userId, userId),
+        eq(objectTags.accountId, accountId),
+        eq(objectTags.bucketId, bucketId)
+      ));
+
+    const tagMap = new Map<string, string[]>();
+    rows.forEach((row) => {
+      const list = tagMap.get(row.objectKey) || [];
+      if (!list.includes(row.tag)) {
+        list.push(row.tag);
+      }
+      tagMap.set(row.objectKey, list);
+    });
+
+    return Array.from(tagMap.entries()).map(([key, tags]) => ({ key, tags }));
+  }
+
+  async addObjectTag(userId: string, accountId: number, bucketId: number, objectKey: string, tag: string): Promise<void> {
+    const existing = await db
+      .select({ id: objectTags.id })
+      .from(objectTags)
+      .where(and(
+        eq(objectTags.userId, userId),
+        eq(objectTags.accountId, accountId),
+        eq(objectTags.bucketId, bucketId),
+        eq(objectTags.objectKey, objectKey),
+        eq(objectTags.tag, tag)
+      ));
+    if (existing.length > 0) return;
+    await db.insert(objectTags).values({ userId, accountId, bucketId, objectKey, tag });
+  }
+
+  async removeObjectTag(userId: string, accountId: number, bucketId: number, objectKey: string, tag: string): Promise<void> {
+    await db.delete(objectTags).where(and(
+      eq(objectTags.userId, userId),
+      eq(objectTags.accountId, accountId),
+      eq(objectTags.bucketId, bucketId),
+      eq(objectTags.objectKey, objectKey),
+      eq(objectTags.tag, tag)
+    ));
+  }
+
+  async createObjectShare(data: { accountId: number; bucketId: number; objectKey: string; sharedByUserId: string; sharedWithEmail?: string | null; access?: string; expiresAt?: Date | null; token: string; }): Promise<ObjectShare> {
+    const [share] = await db.insert(objectShares).values({
+      accountId: data.accountId,
+      bucketId: data.bucketId,
+      objectKey: data.objectKey,
+      sharedByUserId: data.sharedByUserId,
+      sharedWithEmail: data.sharedWithEmail || null,
+      access: data.access || "read",
+      expiresAt: data.expiresAt || null,
+      token: data.token,
+    }).returning();
+    return share;
+  }
+
+  async getObjectSharesByUser(accountId: number, bucketId: number, userId: string): Promise<ObjectShare[]> {
+    return await db.select().from(objectShares).where(and(
+      eq(objectShares.accountId, accountId),
+      eq(objectShares.bucketId, bucketId),
+      eq(objectShares.sharedByUserId, userId)
+    )).orderBy(desc(objectShares.createdAt));
+  }
+
+  async getObjectSharesWithUser(accountId: number, bucketId: number, userEmail: string): Promise<ObjectShare[]> {
+    return await db.select().from(objectShares).where(and(
+      eq(objectShares.accountId, accountId),
+      eq(objectShares.bucketId, bucketId),
+      eq(objectShares.sharedWithEmail, userEmail)
+    )).orderBy(desc(objectShares.createdAt));
+  }
+
+  async revokeObjectShare(accountId: number, bucketId: number, userId: string, shareId: number): Promise<void> {
+    await db.delete(objectShares).where(and(
+      eq(objectShares.id, shareId),
+      eq(objectShares.accountId, accountId),
+      eq(objectShares.bucketId, bucketId),
+      eq(objectShares.sharedByUserId, userId)
+    ));
+  }
+
+  async getObjectShareByToken(token: string): Promise<ObjectShare | undefined> {
+    const [share] = await db.select().from(objectShares).where(eq(objectShares.token, token));
+    return share;
   }
 
   async updateBucketVersioning(id: number, enabled: boolean): Promise<Bucket> {

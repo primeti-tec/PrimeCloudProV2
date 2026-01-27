@@ -12,7 +12,7 @@ import { queryClient } from "@/lib/queryClient";
 import { buildUrl, api } from "@shared/routes";
 
 export function Sidebar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
   const branding = useBranding();
   const { isExternalClient, canViewBilling, canViewSettings, canManageMembers } = useCurrentRole();
@@ -22,8 +22,24 @@ export function Sidebar() {
   const currentAccount = accounts?.[0];
   const { data: buckets } = useBuckets(currentAccount?.id);
 
+  const bucketCount = buckets?.length || 0;
+  const hasSingleBucket = bucketCount === 1;
+  const singleBucket = hasSingleBucket ? buckets?.[0] : undefined;
+  const bucketLabel = hasSingleBucket ? branding.name : singleBucket?.name;
+
   // Storage submenu expanded state
-  const [storageExpanded, setStorageExpanded] = useState(location.startsWith("/dashboard/storage"));
+  const [storageExpanded, setStorageExpanded] = useState(() => {
+    if (typeof window === "undefined") return location.startsWith("/dashboard/storage");
+    const stored = window.localStorage.getItem("storageMenuExpanded");
+    if (stored === null) return location.startsWith("/dashboard/storage");
+    return stored === "true";
+  });
+  const [adminExpanded, setAdminExpanded] = useState(() => {
+    if (typeof window === "undefined") return location.startsWith("/admin");
+    const stored = window.localStorage.getItem("adminMenuExpanded");
+    if (stored === null) return location.startsWith("/admin");
+    return stored === "true";
+  });
 
   // Update expansion when location changes to storage section
   useEffect(() => {
@@ -32,8 +48,25 @@ export function Sidebar() {
     }
   }, [location]);
 
-  // For demo purposes, assume email containing "admin" is super admin
-  const isSuperAdmin = user?.email?.includes("admin");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("storageMenuExpanded", String(storageExpanded));
+  }, [storageExpanded]);
+
+
+  useEffect(() => {
+    if (location.startsWith("/admin")) {
+      setAdminExpanded(true);
+    }
+  }, [location]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("adminMenuExpanded", String(adminExpanded));
+  }, [adminExpanded]);
+
+  const SUPER_ADMINS = ["sergio.louzan@gmail.com", "admin@primecloudpro.com"];
+  const isSuperAdmin = SUPER_ADMINS.includes(user?.email || "");
 
   // Check if we're in storage section
   const isInStorageSection = location.startsWith("/dashboard/storage");
@@ -54,6 +87,66 @@ export function Sidebar() {
     navItems.push({ name: "Admin Portal", href: "/admin", icon: Shield, show: true });
   }
 
+  const adminMenuItems = [
+    { id: "admin-overview", name: "Visão Geral" },
+    { id: "admin-quota-requests", name: "Solicitações de Quota" },
+    { id: "admin-pending-accounts", name: "Contas Pendentes" },
+    { id: "admin-active-accounts", name: "Contas Ativas" },
+    { id: "admin-suspended-accounts", name: "Contas Suspensas" },
+    { id: "admin-products", name: "Produtos/Planos" },
+    { id: "admin-orders", name: "Pedidos" },
+    { id: "admin-invoices", name: "Faturas" },
+    { id: "admin-pricing", name: "Precificação" },
+    { id: "admin-buckets", name: "Buckets" },
+    { id: "admin-all-accounts", name: "Todas as Contas" },
+  ];
+
+  const [activeAdminSection, setActiveAdminSection] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (location !== "/admin") {
+      setActiveAdminSection(null);
+      return;
+    }
+    const hash = window.location.hash.replace("#", "");
+    if (hash) {
+      setActiveAdminSection(hash);
+    }
+  }, [location]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (location === "/admin") {
+        const hash = window.location.hash.replace("#", "");
+        setActiveAdminSection(hash || null);
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [location]);
+
+  const navigateAdminSection = (sectionId: string) => {
+    const scrollToSection = () => {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+        setActiveAdminSection(sectionId);
+      }
+    };
+
+    if (location !== "/admin") {
+      setLocation("/admin");
+      setTimeout(() => {
+        window.location.hash = sectionId;
+        scrollToSection();
+      }, 50);
+      return;
+    }
+
+    window.location.hash = sectionId;
+    scrollToSection();
+  };
+
   const prefetchBucketObjects = (bucketId: number) => {
     if (!currentAccount?.id) return;
     queryClient.prefetchQuery({
@@ -66,6 +159,23 @@ export function Sidebar() {
       },
     });
   };
+
+  const viewParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("view") || "all" : "all";
+  const filesMenuItems = [
+    { id: "all", name: "Todos os arquivos" },
+    { id: "recent", name: "Recentes" },
+    { id: "favorites", name: "Favoritos" },
+    { id: "shared-with-you", name: "Compartilhado com você" },
+    { id: "shared-by-link", name: "Compartilhado por link" },
+    { id: "tags", name: "Tags" },
+  ];
+
+  const getStorageTarget = (bucketId: number, view: string) => {
+    const suffix = view ? `?view=${view}` : "";
+    return `/dashboard/storage/${bucketId}${suffix}`;
+  };
+
+  const isBucketActive = (bucketId: number) => location.startsWith(`/dashboard/storage/${bucketId}`);
 
   return (
     <div className="h-screen w-72 bg-card border-r border-border flex flex-col fixed left-0 top-0 z-20">
@@ -112,62 +222,136 @@ export function Sidebar() {
           </Link>
         )}
 
-        {/* Storage Section - Simplified as requested */}
-        <div>
-          <div className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${isInStorageSection ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:bg-accent hover:text-foreground"
-            }`}>
+        {/* Storage Section - show only if multiple buckets */}
+        {!hasSingleBucket && (
+          <div>
+            <div className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${isInStorageSection ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}>
 
-            <Link href="/dashboard/storage" className="flex items-center gap-3 flex-1 cursor-pointer">
-              <Database className={`h-5 w-5 transition-colors ${isInStorageSection ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
-              Armazenamento
-            </Link>
+              <Link href="/dashboard/storage" className="flex items-center gap-3 flex-1 cursor-pointer">
+                <Database className={`h-5 w-5 transition-colors ${isInStorageSection ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
+                Armazenamento
+              </Link>
 
-            <div
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setStorageExpanded(!storageExpanded);
-              }}
-              className="p-1 rounded-md hover:bg-background/20 cursor-pointer text-muted-foreground hover:text-foreground"
-            >
-              {storageExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <div
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setStorageExpanded(!storageExpanded);
+                }}
+                className="p-1 rounded-md hover:bg-background/20 cursor-pointer text-muted-foreground hover:text-foreground"
+              >
+                {storageExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </div>
             </div>
-          </div>
 
-          {/* Direct Bucket List */}
-          {storageExpanded && (
-            <div className="ml-4 mt-1 space-y-1 border-l-2 border-border/50 pl-2">
-              {buckets && buckets.slice(0, 5).map(bucket => (
-                <Link key={bucket.id} href={`/dashboard/storage/${bucket.id}`}>
-                  <div
-                    onMouseEnter={() => prefetchBucketObjects(bucket.id)}
-                    className={`flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer text-sm ${location === `/dashboard/storage/${bucket.id}`
-                      ? "bg-primary/10 text-primary font-medium"
+            {/* Direct Bucket List */}
+            {storageExpanded && (
+              <div className="ml-4 mt-1 space-y-1 border-l-2 border-border/50 pl-2">
+                {buckets && buckets.slice(0, 5).map(bucket => (
+                  <div key={bucket.id}>
+                    <Link href={`/dashboard/storage/${bucket.id}`}>
+                      <div
+                        onMouseEnter={() => prefetchBucketObjects(bucket.id)}
+                        className={`flex items-start gap-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer text-sm ${isBucketActive(bucket.id)
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                          }`}
+                      >
+                        <FolderOpen className="h-3.5 w-3.5 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-medium">{bucket.name}</span>
+                          <span className="block truncate text-[11px] text-muted-foreground/80">
+                            {branding.name}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+
+                    {isBucketActive(bucket.id) && (
+                      <div className="ml-6 mt-1 space-y-1">
+                        {filesMenuItems.map((item) => {
+                          const isActive = isInStorageSection && viewParam === item.id;
+                          return (
+                            <button
+                              key={`${bucket.id}-${item.id}`}
+                              type="button"
+                              onClick={() => setLocation(getStorageTarget(bucket.id, item.id))}
+                              className={`w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 text-xs ${isActive
+                                ? "bg-primary/10 text-primary font-semibold"
+                                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                }`}
+                            >
+                              <span className="truncate">{item.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {buckets && buckets.length > 5 && (
+                  <Link href="/dashboard/storage">
+                    <div className="text-xs text-muted-foreground hover:text-primary px-3 py-1 cursor-pointer transition-colors block">
+                      +{buckets.length - 5} mais...
+                    </div>
+                  </Link>
+                )}
+
+                {(!buckets || buckets.length === 0) && (
+                  <div className="text-xs text-muted-foreground px-3 py-1 italic">
+                    Nenhum bucket
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Single bucket menu */}
+        {hasSingleBucket && singleBucket && (
+          <div className="mt-2">
+            <Link href={`/dashboard/storage/${singleBucket.id}`}>
+              <div className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer border ${isInStorageSection
+                ? "bg-primary/10 text-primary border-primary/20"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground border-transparent"
+                }`}
+              >
+                <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isInStorageSection ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                  <Database className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className={`text-sm font-semibold truncate ${isInStorageSection ? "text-primary" : ""}`}>
+                    {bucketLabel || "Bucket"}
+                  </span>
+                  {bucketLabel !== singleBucket.name && (
+                    <span className="text-xs text-muted-foreground truncate">{singleBucket.name}</span>
+                  )}
+                </div>
+              </div>
+            </Link>
+            <div className="ml-10 mt-2 space-y-1">
+              {filesMenuItems.map((item) => {
+                const isActive = isInStorageSection && viewParam === item.id;
+                return (
+                  <button
+                    key={`single-${item.id}`}
+                    type="button"
+                    onClick={() => setLocation(getStorageTarget(singleBucket.id, item.id))}
+                    className={`w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 text-xs ${isActive
+                      ? "bg-primary/10 text-primary font-semibold"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
                       }`}
                   >
-                    <FolderOpen className="h-3.5 w-3.5" />
-                    <span className="truncate text-xs font-medium">{bucket.name}</span>
-                  </div>
-                </Link>
-              ))}
-
-              {buckets && buckets.length > 5 && (
-                <Link href="/dashboard/storage">
-                  <div className="text-xs text-muted-foreground hover:text-primary px-3 py-1 cursor-pointer transition-colors block">
-                    +{buckets.length - 5} mais...
-                  </div>
-                </Link>
-              )}
-
-              {(!buckets || buckets.length === 0) && (
-                <div className="text-xs text-muted-foreground px-3 py-1 italic">
-                  Nenhum bucket
-                </div>
-              )}
+                    <span className="truncate">{item.name}</span>
+                  </button>
+                );
+              })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
 
         {/* Other nav items */}
         {navItems.filter(item => item.name !== "Dashboard").map((item) => {
@@ -189,6 +373,39 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {isSuperAdmin && (
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={() => setAdminExpanded(!adminExpanded)}
+              className="w-full flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-4"
+            >
+              <span>Admin</span>
+              {adminExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+            {adminExpanded && (
+              <div className="space-y-1">
+                {adminMenuItems.map((item) => {
+                  const isActive = location === "/admin" && activeAdminSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => navigateAdminSection(item.id)}
+                      className={`w-full text-left flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 cursor-pointer group ${isActive
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        }`}
+                    >
+                      <span className="text-sm">{item.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       <div className="p-4 border-t border-border/50 bg-accent/30">

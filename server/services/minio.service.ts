@@ -598,6 +598,59 @@ export class MinioService {
     }
 
     /**
+     * List objects recursively in a bucket (flat list)
+     */
+    async listObjectsRecursive(bucketName: string, prefix?: string): Promise<any[]> {
+        const fullBucketName = this.getTenantBucketName(bucketName);
+
+        if (!isMinioAvailable) {
+            console.log(`[MOCK] Listing objects recursively in bucket: ${fullBucketName}, prefix: ${prefix}`);
+            return [];
+        }
+
+        const fetchObjectsRecursive = async (bName: string): Promise<{ objects: any[]; found: boolean }> => {
+            try {
+                const objects: any[] = [];
+
+                console.log(`[MINIO] Listing objects recursively in bucket: ${bName}, prefix: ${prefix || '(root)'}`);
+                const stream = minioClient.listObjectsV2(bName, prefix || '', true);
+
+                return new Promise((resolve, reject) => {
+                    stream.on("data", (obj: any) => {
+                        if (!obj.prefix) {
+                            objects.push(obj);
+                        }
+                    });
+                    stream.on("error", (err: any) => {
+                        console.log(`[MINIO] Error listing bucket ${bName}:`, err.code || err.message);
+                        if (err.code === 'NoSuchBucket' || err.statusCode === 404) {
+                            resolve({ objects: [], found: false });
+                        } else {
+                            reject(err);
+                        }
+                    });
+                    stream.on("end", () => {
+                        console.log(`[MINIO] Found ${objects.length} objects in ${bName}`);
+                        resolve({ objects, found: true });
+                    });
+                });
+            } catch (error) {
+                console.error(`❌ Failed to list objects recursively in bucket: ${bName}`, error);
+                return { objects: [], found: false };
+            }
+        };
+
+        let result = await fetchObjectsRecursive(fullBucketName);
+
+        if (!result.found && this.tenantPrefix && bucketName !== fullBucketName) {
+            console.log(`[MINIO] Falling back to non-prefixed bucket (recursive): ${bucketName}`);
+            result = await fetchObjectsRecursive(bucketName);
+        }
+
+        return result.objects;
+    }
+
+    /**
      * Get total usage metrics for a tenant
      */
     async getTenantUsageMetrics(): Promise<UsageMetrics> {
