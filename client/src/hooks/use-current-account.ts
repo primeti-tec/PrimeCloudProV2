@@ -2,10 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMyAccounts } from "./use-accounts";
 import { useState, useEffect } from "react";
 import { api } from "@shared/routes";
+import { type AccountWithRole } from "@shared/schema";
+import { logger } from "@/lib/logger";
 
 export function useCurrentAccount() {
   const { data: accounts } = useMyAccounts();
-  const [account, setAccount] = useState<any>(null);
+  const [account, setAccount] = useState<AccountWithRole | null>(null);
 
   // Get the current account from localStorage or default to first account
   useEffect(() => {
@@ -20,7 +22,7 @@ export function useCurrentAccount() {
   }, [accounts]);
 
   const switchAccount = (accountId: number) => {
-    const newAccount = accounts?.find(a => a.id === accountId);
+    const newAccount = accounts?.find((a) => a.id === accountId);
     if (newAccount) {
       setAccount(newAccount);
       localStorage.setItem("currentAccountId", accountId.toString());
@@ -28,20 +30,6 @@ export function useCurrentAccount() {
   };
 
   return { account, switchAccount, accounts };
-}
-
-export function useCurrentRole() {
-  const { account } = useCurrentAccount();
-  const role = account?.role || 'developer';
-
-  const isExternalClient = role === 'external_client';
-  const isOwner = role === 'owner';
-  const isAdmin = role === 'admin' || role === 'owner';
-  const canManageMembers = isAdmin || isOwner;
-  const canViewBilling = !isExternalClient;
-  const canViewSettings = !isExternalClient;
-
-  return { role, isExternalClient, isOwner, isAdmin, canManageMembers, canViewBilling, canViewSettings };
 }
 
 export function useUpdateBranding() {
@@ -66,8 +54,8 @@ export function useUpdateBranding() {
       });
 
       const contentType = res.headers.get("content-type");
-      console.log("Response status:", res.status);
-      console.log("Response content-type:", contentType);
+      logger.log("Response status:", res.status);
+      logger.log("Response content-type:", contentType);
 
       if (!res.ok) {
         // Check if response is JSON before trying to parse
@@ -76,7 +64,7 @@ export function useUpdateBranding() {
           throw new Error(error.message || "Failed to update branding");
         } else {
           const text = await res.text();
-          console.error("Non-JSON error response:", text.substring(0, 200));
+          logger.error("Non-JSON error response:", text.substring(0, 200));
           throw new Error(`Failed to update branding (status ${res.status})`);
         }
       }
@@ -84,7 +72,7 @@ export function useUpdateBranding() {
       // Check if success response is JSON
       if (!contentType?.includes("application/json")) {
         const text = await res.text();
-        console.error("Non-JSON success response:", text.substring(0, 200));
+        logger.error("Non-JSON success response:", text.substring(0, 200));
         throw new Error("Server returned non-JSON response");
       }
 

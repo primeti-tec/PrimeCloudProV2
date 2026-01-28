@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAdminInvoices, useGenerateMonthlyInvoices, useMarkInvoicePaid, InvoiceWithAccount } from '@/hooks/use-admin-invoices';
+import { useAdminInvoices, useGenerateMonthlyInvoices, useMarkInvoicePaid, InvoiceWithAccount, useDeleteInvoice } from '@/hooks/use-admin-invoices';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -19,13 +19,15 @@ import {
     AlertTriangle,
     Calendar,
     Building2,
-    Zap
+    Zap,
+    Trash2
 } from 'lucide-react';
 
 export function InvoicesManager() {
     const { data: invoices, isLoading, error, refetch, isRefetching } = useAdminInvoices();
     const generateInvoices = useGenerateMonthlyInvoices();
     const markPaid = useMarkInvoicePaid();
+    const deleteInvoice = useDeleteInvoice();
     const { toast } = useToast();
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -55,6 +57,24 @@ export function InvoicesManager() {
                 return <Badge variant="secondary">Cancelado</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
+        }
+    };
+
+    const handleDelete = async (invoiceId: number) => {
+        if (!confirm('Tem certeza que deseja excluir esta fatura permanentemente?')) return;
+
+        try {
+            await deleteInvoice.mutateAsync(invoiceId);
+            toast({
+                title: "Fatura Excluída",
+                description: "A fatura foi removida com sucesso.",
+            });
+        } catch (err: any) {
+            toast({
+                title: "Erro",
+                description: err.message,
+                variant: "destructive",
+            });
         }
     };
 
@@ -306,22 +326,33 @@ export function InvoicesManager() {
                                             {getStatusBadge(invoice.status)}
                                         </TableCell>
                                         <TableCell className="text-right pr-6">
-                                            {invoice.status === 'pending' && (
+                                            <div className="flex justify-end gap-2">
+                                                {invoice.status === 'pending' && (
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => setPaymentDialog(invoice)}
+                                                        className="bg-green-600 hover:bg-green-700"
+                                                    >
+                                                        <CheckCircle className="h-4 w-4 mr-1" />
+                                                        Confirmar Pgto.
+                                                    </Button>
+                                                )}
+                                                {invoice.status === 'paid' && (
+                                                    <span className="text-sm text-green-600 flex items-center gap-1">
+                                                        <CheckCircle className="h-4 w-4" />
+                                                        Pago em {formatDate(invoice.paidAt)}
+                                                    </span>
+                                                )}
                                                 <Button
                                                     size="sm"
-                                                    onClick={() => setPaymentDialog(invoice)}
-                                                    className="bg-green-600 hover:bg-green-700"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                    onClick={() => handleDelete(invoice.id)}
+                                                    disabled={deleteInvoice.isPending}
                                                 >
-                                                    <CheckCircle className="h-4 w-4 mr-1" />
-                                                    Confirmar Pgto.
+                                                    <Trash2 className="h-4 w-4" />
                                                 </Button>
-                                            )}
-                                            {invoice.status === 'paid' && (
-                                                <span className="text-sm text-green-600 flex items-center gap-1">
-                                                    <CheckCircle className="h-4 w-4" />
-                                                    Pago em {formatDate(invoice.paidAt)}
-                                                </span>
-                                            )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}

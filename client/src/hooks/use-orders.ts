@@ -92,3 +92,56 @@ export function useAdminUpdateOrder() {
     },
   });
 }
+
+export function useAdminDenyOrder() {
+  return useMutation({
+    mutationFn: async ({ orderId, reason }: { orderId: number; reason: string }) => {
+      // Direct path usage since not all routes are in shared definition yet
+      const res = await fetch(`/api/admin/orders/${orderId}/deny`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      });
+      if (!res.ok) throw new Error("Failed to deny order");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
+    },
+  });
+}
+
+export function useAdminCancelOrder() {
+  return useMutation({
+    mutationFn: async ({ orderId, reason }: { orderId: number; reason: string }) => {
+      const res = await fetch(`/api/admin/orders/${orderId}/cancel`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      });
+      if (!res.ok) throw new Error("Failed to cancel order");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
+    },
+  });
+}
+
+export function useAdminDeleteOrder() {
+  return useMutation({
+    mutationFn: async (orderId: number) => {
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error("Failed to delete order");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
+    },
+  });
+}

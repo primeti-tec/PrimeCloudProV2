@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
 import { useMyAccounts } from "@/hooks/use-accounts";
-import { useCurrentRole } from "@/hooks/use-current-account";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useBuckets, useCreateBucket, useDeleteBucket, useUpdateBucketVersioning, useBucketLifecycle, useAddLifecycleRule, useDeleteLifecycleRule, useUpdateBucketLimit } from "@/hooks/use-buckets";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input, Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui-custom";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -343,7 +343,7 @@ export default function Storage() {
   const [, setLocation] = useLocation();
   const { data: accounts } = useMyAccounts();
   const currentAccount = accounts?.[0];
-  const { isExternalClient } = useCurrentRole();
+  const { isExternalClient } = usePermissions();
   const { data: buckets, isLoading } = useBuckets(currentAccount?.id) as { data: BucketWithPermission[] | undefined, isLoading: boolean };
   const { mutate: createBucket, isPending: isCreating } = useCreateBucket(currentAccount?.id);
   const { mutate: deleteBucket, isPending: isDeleting } = useDeleteBucket(currentAccount?.id);

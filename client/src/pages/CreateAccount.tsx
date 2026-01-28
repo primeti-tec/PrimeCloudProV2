@@ -8,6 +8,7 @@ import { Loader2, Rocket, Building2, Phone, FileText, AlertCircle } from "lucide
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDocument, validateDocument } from "@/lib/document-validation";
+import { logger } from "@/lib/logger";
 
 export default function CreateAccount() {
   const { mutateAsync, isPending } = useCreateAccount();
@@ -43,7 +44,7 @@ export default function CreateAccount() {
       await mutateAsync({ ...data, documentType });
       setLocation("/dashboard");
     } catch (error) {
-      console.error(error);
+      logger.error(error);
     }
   };
 

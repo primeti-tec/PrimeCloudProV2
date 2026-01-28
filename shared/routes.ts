@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertAccountSchema, insertProductSchema, insertBucketSchema, insertAccessKeySchema, insertOrderSchema, accounts, products, accountMembers, subscriptions, buckets, accessKeys, invoices, usageRecords, orders } from './schema';
+import { insertAccountSchema, insertProductSchema, insertBucketSchema, insertAccessKeySchema, insertOrderSchema, accounts, products, accountMembers, subscriptions, buckets, accessKeys, invoices, usageRecords, orders, type AccountWithRole } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -43,7 +43,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/my-accounts',
       responses: {
-        200: z.array(z.custom<typeof accounts.$inferSelect & { role: string }>()),
+        200: z.array(z.custom<AccountWithRole>()),
       },
     },
     get: {
@@ -146,7 +146,11 @@ export const api = {
     adjustQuota: {
       method: 'POST' as const,
       path: '/api/admin/accounts/:id/adjust-quota',
-      input: z.object({ quotaGB: z.number().min(1), reason: z.string().min(1) }),
+      input: z.object({
+        quotaGB: z.number().min(1),
+        manualBandwidthGB: z.number().optional(),
+        reason: z.string().min(1)
+      }),
       responses: {
         200: z.custom<typeof accounts.$inferSelect>(),
       },

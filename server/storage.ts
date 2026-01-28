@@ -24,7 +24,7 @@ export interface IStorage {
   getAccount(id: number): Promise<Account | undefined>;
   getAccountsByOwner(userId: string | null): Promise<Account[]>;
   updateAccount(id: number, data: Partial<Account>): Promise<Account>;
-  getAllAccounts(): Promise<Account[]>; // Admin
+  getAllAccounts(): Promise<(Account & { subscription?: Subscription })[]>; // Admin
 
   // Members
   addMember(accountId: number, userId: string, role: string): Promise<AccountMember>;
@@ -37,6 +37,7 @@ export interface IStorage {
   // Subscriptions
   createSubscription(accountId: number, productId: number): Promise<Subscription>;
   getSubscription(accountId: number): Promise<(Subscription & { product: Product }) | undefined>;
+  updateSubscription(id: number, data: Partial<Subscription>): Promise<Subscription>;
 
   // Buckets
   createBucket(data: CreateBucketRequest): Promise<Bucket>;
@@ -115,7 +116,13 @@ export interface IStorage {
   getOrder(id: number): Promise<OrderWithDetails | undefined>;
   updateOrder(id: number, data: Partial<Order>): Promise<Order>;
   cancelOrder(id: number, reason?: string): Promise<Order>;
+
+  // Admin & Cleanup
   getAdminStats(): Promise<any>;
+  denyOrder(id: number, reason?: string): Promise<Order>;
+  deleteOrder(id: number): Promise<void>;
+  deleteInvoice(id: number): Promise<void>;
+  deleteAccount(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -165,8 +172,18 @@ export class DatabaseStorage implements IStorage {
     return account;
   }
 
-  async getAllAccounts(): Promise<Account[]> {
-    return await db.select().from(accounts);
+  async getAllAccounts(): Promise<(Account & { subscription?: Subscription })[]> {
+    const rows = await db.select({
+      account: accounts,
+      subscription: subscriptions
+    })
+      .from(accounts)
+      .leftJoin(subscriptions, and(eq(subscriptions.accountId, accounts.id), eq(subscriptions.status, 'active')));
+
+    return rows.map(r => ({
+      ...r.account,
+      subscription: r.subscription || undefined
+    }));
   }
 
   async addMember(accountId: number, userId: string, role: string): Promise<AccountMember> {
@@ -232,6 +249,14 @@ export class DatabaseStorage implements IStorage {
 
     if (!sub) return undefined;
     return { ...sub.subscription, product: sub.product };
+  }
+
+  async updateSubscription(id: number, data: Partial<Subscription>): Promise<Subscription> {
+    const [subscription] = await db.update(subscriptions)
+      .set({ ...data })
+      .where(eq(subscriptions.id, id))
+      .returning();
+    return subscription;
   }
 
   async removeMember(accountId: number, memberId: number): Promise<void> {
@@ -886,14 +911,24 @@ export class DatabaseStorage implements IStorage {
     const dueDate = new Date(now.getFullYear(), now.getMonth() + 1, billingDay);
 
     // Calculate costs
-    const baseCost = subscription?.product?.price || 0;
+    let baseCost = subscription?.product?.price || 0;
+
+    // Prepaid Check
+    const subPeriodEnd = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
+    if (subPeriodEnd && subPeriodEnd > now) {
+      baseCost = 0; // Prepaid, so no monthly base fee
+    }
+
     const pricePerGB = subscription?.product?.pricePerStorageGB || 15;
     const pricePerTransferGB = subscription?.product?.pricePerTransferGB || 40;
 
-    const storageLimit = subscription?.product?.storageLimit || 100;
+    const productLimit = subscription?.product?.storageLimit || 100;
+    const accountQuota = account.storageQuotaGB || 0;
+    const includedStorageGB = Math.max(productLimit, accountQuota);
+
     const transferLimit = subscription?.product?.transferLimit ?? 500;
 
-    const excessStorage = Math.max(0, usage.storageUsedGB - storageLimit);
+    const excessStorage = Math.max(0, usage.storageUsedGB - includedStorageGB);
     const excessTransfer = Math.max(0, usage.bandwidthUsedGB - transferLimit);
 
     const storageCostCents = Math.ceil(excessStorage * pricePerGB);
@@ -987,26 +1022,35 @@ export class DatabaseStorage implements IStorage {
 
     let apiRequestsCount = bucketList.reduce((sum, b) => sum + (b.objectCount || 0), 0) * 10;
 
-    const baseCost = subscription?.product?.price || 2900;
+    let baseCost = subscription?.product?.price || 2900;
 
     // Use product-specific price per GB or default to 15 cents (R$ 0.15)
-    // Note: The previous logic multiplied by 2 and then by 100 which seemed inconsistent.
-    // Assuming calculation: (Excess Storage GB) * (Price Per GB in cents) 
-    // Wait, the previous logic was: storageCost = (GB - Limit) * 2; projectedCost = baseCost + storageCost * 100;
-    // Use explicit pricing from product
     const pricePerStorageGB = subscription?.product?.pricePerStorageGB || 15;
     const pricePerTransferGB = subscription?.product?.pricePerTransferGB || 40;
 
-    const excessStorage = Math.max(0, storageUsedGB - (subscription?.product?.storageLimit || 100));
+    // Determine Included Storage: Use Account Quota if set and higher than Product Limit (for "Degustação")
+    const productLimit = subscription?.product?.storageLimit || 0;
+    const accountQuota = account?.storageQuotaGB || 0;
+    // If account has a custom quota higher than product, treat it as the free tier limit
+    const includedStorageGB = Math.max(productLimit, accountQuota);
+
+    const excessStorage = Math.max(0, storageUsedGB - includedStorageGB);
     const storageCostCents = Math.ceil(excessStorage * pricePerStorageGB);
 
-    // Assuming transferLimit is nullable, if null = unlimited? Or 0? Schema says integer("transfer_limit_gb"), nullable.
-    // If not set, treat as 500GB default or unlimited? Let's use logic: if limit exists and used > limit, charge.
-    // If limit is null (unlimited), extra cost is 0. 
-    // If we want to charge for ALL usage (meaning no free tier in plan), limit should be 0.
+    // Bandwidth Logic
+    // If limit is not set (null), treat as 500GB default
     const transferLimit = subscription?.product?.transferLimit ?? 500;
     const excessTransfer = Math.max(0, bandwidthUsedGB - transferLimit);
     const bandwidthCostCents = Math.ceil(excessTransfer * pricePerTransferGB);
+
+    // Prepaid Logic: Check if subscription is active and paid in advance
+    const now = new Date();
+    const periodEnd = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
+
+    // If active subscription has a future end date, assume base fee is prepaid
+    if (periodEnd && periodEnd > now) {
+      baseCost = 0;
+    }
 
     const projectedCost = baseCost + storageCostCents + bandwidthCostCents;
 
@@ -1467,6 +1511,54 @@ export class DatabaseStorage implements IStorage {
         estimatedCostCents,
       };
     });
+  }
+
+  async denyOrder(id: number, reason?: string): Promise<Order> {
+    const [order] = await db.update(orders)
+      .set({
+        status: 'denied',
+        adminNotes: reason,
+        updatedAt: new Date()
+      })
+      .where(eq(orders.id, id))
+      .returning();
+    return order;
+  }
+
+  async deleteOrder(id: number): Promise<void> {
+    // Also delete any associated VPS config
+    await db.delete(vpsConfigs).where(eq(vpsConfigs.orderId, id));
+    await db.delete(orders).where(eq(orders.id, id));
+  }
+
+  async deleteInvoice(id: number): Promise<void> {
+    await db.delete(invoices).where(eq(invoices.id, id));
+  }
+
+  async deleteAccount(id: number): Promise<void> {
+    const accountId = id;
+    // Helper to delete recursively (cascade simulation)
+    await db.delete(notifications).where(eq(notifications.accountId, accountId));
+    await db.delete(invitations).where(eq(invitations.accountId, accountId));
+    await db.delete(accessKeys).where(eq(accessKeys.accountId, accountId));
+    await db.delete(sftpCredentials).where(eq(sftpCredentials.accountId, accountId));
+    await db.delete(objectFavorites).where(eq(objectFavorites.accountId, accountId));
+    await db.delete(objectTags).where(eq(objectTags.accountId, accountId));
+    await db.delete(objectShares).where(eq(objectShares.accountId, accountId));
+    await db.delete(buckets).where(eq(buckets.accountId, accountId));
+    await db.delete(subscriptions).where(eq(subscriptions.accountId, accountId));
+    await db.delete(invoices).where(eq(invoices.accountId, accountId));
+    await db.delete(usageRecords).where(eq(usageRecords.accountId, accountId));
+    await db.delete(quotaRequests).where(eq(quotaRequests.accountId, accountId));
+
+    // Delete members
+    const members = await db.select().from(accountMembers).where(eq(accountMembers.accountId, accountId));
+    for (const member of members) {
+      await db.delete(bucketPermissions).where(eq(bucketPermissions.accountMemberId, member.id));
+    }
+    await db.delete(accountMembers).where(eq(accountMembers.accountId, accountId));
+
+    await db.delete(accounts).where(eq(accounts.id, accountId));
   }
 }
 

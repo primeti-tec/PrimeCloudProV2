@@ -1,0 +1,93 @@
+# Frontend Refactor Plan (Safe & Incremental)
+
+## Goals
+- Remove client-side hardcoded admin logic and rely on server-provided roles/claims.
+- Centralize permission logic with a single source of truth (server-derived).
+- Eliminate `any` usage in core UI paths; improve type safety.
+- Guard percentage calculations to avoid NaN/Infinity edge cases.
+- Remove/standardize debug logging (dev-only logging or structured logger).
+
+## Constraints
+- No breaking changes to routing or user flows.
+- UI can only *reflect* authorization; server remains authoritative.
+- Minimize component churn; refactor in small, verifiable steps.
+
+## Step 1 — Authorization Source of Truth (Backend-first)
+1.1 Identify the server endpoint that returns the authenticated user + role/claims (e.g., `/api/me`, `/api/session`, or equivalent).
+1.2 Ensure the server returns role/permissions for the active account (e.g., `role`, `isExternalClient`, `isAdmin`, `isOwner`).
+1.3 If missing, implement or extend the backend response (server + shared types).
+1.4 Add/confirm server-side authorization checks for admin-only routes and external-client restrictions.
+
+Risk controls
+- Keep current client checks temporarily as UI hints only until server checks are verified.
+- Add a feature flag or fallback to avoid blocking users if role payload is absent.
+
+Verification
+- Manual: non-admin cannot access `/admin` even if client tries.
+- API: server rejects restricted endpoints for insufficient roles.
+
+## Step 2 — Centralized Permissions Hook (Client)
+2.1 Create `usePermissions()` (or extend `useCurrentRole`) that consumes server-provided role/claims.
+2.2 Deprecate direct localStorage usage for permission decisions (keep for account selection only).
+2.3 Replace `SUPER_ADMINS` list in `App.tsx` with server-derived `isAdmin`.
+2.4 Update `PrivateRoute` to rely on `permissions` object (e.g., `canAccessAdmin`, `canAccessBilling`).
+
+Risk controls
+- Preserve `allowExternalClient` logic but drive it from server role.
+- Avoid redirect loops by handling loading/empty states explicitly.
+
+Verification
+- Unit or integration test for route gating (if feasible).
+- Manual: sign in as external client and verify storage-only access.
+
+## Step 3 — Typing Improvements (No Behavior Change)
+3.1 Define proper types for `Account`, `AccountRole`, and `Permissions` in shared types.
+3.2 Replace `any` in `useCurrentAccount` and `Dashboard` cards with typed props.
+3.3 Ensure React Query hooks return typed data consistently.
+
+Risk controls
+- Only adjust types; do not change runtime logic.
+- Use minimal type assertions to unblock compilation if backend types are missing.
+
+Verification
+- `tsc --noEmit` passes without new errors.
+
+## Step 4 — Defensive UI Math Guards
+4.1 Clamp or guard percentage calculation in `StatCardWithProgress`:
+    - If `totalValue <= 0`, display “—” and progress 0.
+    - If `usedValue < 0`, treat as 0.
+4.2 Add safe number formatting (avoid `toFixed` on undefined).
+
+Risk controls
+- No visual regressions: keep layout consistent.
+
+Verification
+- Manual: simulate account with 0 quota, ensure no NaN/Infinity in UI.
+
+## Step 5 — Logging Strategy
+5.1 Remove production `console.log`/`console.error` from UI flows.
+5.2 Introduce a tiny logger helper:
+    - Logs only in `import.meta.env.DEV`.
+    - Optional: send critical errors to a tracking service.
+5.3 Replace scattered logs with the logger helper.
+
+Risk controls
+- Preserve critical error reporting (toast/alert).
+
+Verification
+- Build output has no console spam in prod.
+
+## Step 6 — Regression Checklist
+- Auth flows still route correctly (sign-in, sign-up, invite).
+- Dashboard renders when data is loaded.
+- External client restrictions behave as before.
+- Admin page blocked for non-admins.
+- No new TS errors, lint passes.
+
+## Optional Tests (If Time)
+- Add a simple test for `usePermissions`.
+- Add a route guard test for `/admin`.
+
+## Rollout Plan
+- Merge in small PRs (Steps 1–2, then 3–5).
+- Rebuild `dist/` after changes if required by repo policy.

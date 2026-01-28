@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { useAdminAccounts, useApproveAccount, useRejectAccount, useSuspendAccount, useReactivateAccount, useAdjustQuota, useAdminStats } from "@/hooks/use-admin";
+import { useAdminAccounts, useApproveAccount, useRejectAccount, useSuspendAccount, useReactivateAccount, useAdjustQuota, useAdminStats, useDeleteAccount, useUpdateSubscription } from "@/hooks/use-admin";
+
 import { usePendingQuotaRequests, useApproveQuotaRequest, useRejectQuotaRequest } from "@/hooks/use-quota-requests";
 import { useAdminProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "@/hooks/use-products";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui-custom";
@@ -11,14 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, CheckCircle, Clock, Users, DollarSign, Building2, AlertCircle, XCircle, Pause, Play, Settings2, HardDrive, TrendingDown, Target, UserPlus, Wallet, FileUp, Package, Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { Account, QuotaRequest, Product } from "@shared/schema";
 import { PricingManager } from "@/components/admin/PricingManager";
 import { OrdersManager } from "@/components/admin/OrdersManager";
 import { BucketsManager } from "@/components/admin/BucketsManager";
 import { InvoicesManager } from "@/components/admin/InvoicesManager";
 
-
+const AdminDashboardCharts = lazy(() => import("@/pages/AdminDashboardCharts"));
 
 export default function AdminDashboard() {
   const { data: accounts, isLoading } = useAdminAccounts();
@@ -29,15 +29,23 @@ export default function AdminDashboard() {
   const { mutate: suspend, isPending: isSuspending } = useSuspendAccount();
   const { mutate: reactivate, isPending: isReactivating } = useReactivateAccount();
   const { mutate: adjustQuota, isPending: isAdjustingQuota } = useAdjustQuota();
+  const { mutate: deleteAccount, isPending: isDeletingAccount } = useDeleteAccount();
   const { mutate: createProduct, isPending: isCreatingProduct } = useCreateProduct();
   const { mutate: updateProduct, isPending: isUpdatingProduct } = useUpdateProduct();
   const { mutate: deleteProduct, isPending: isDeletingProduct } = useDeleteProduct();
   const { toast } = useToast();
 
+
+  const { mutate: updateSubscription, isPending: isUpdatingSubscription } = useUpdateSubscription();
+
   const [quotaDialogOpen, setQuotaDialogOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [newQuotaGB, setNewQuotaGB] = useState("");
+  const [newBandwidthGB, setNewBandwidthGB] = useState("");
   const [quotaReason, setQuotaReason] = useState("");
+
+  const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
+  const [newPeriodEnd, setNewPeriodEnd] = useState<string>("");
 
   // Quota requests
   const { data: pendingQuotaRequests, isLoading: quotaRequestsLoading } = usePendingQuotaRequests();
@@ -103,11 +111,63 @@ export default function AdminDashboard() {
     });
   };
 
+  const handleDeleteAccount = (accountId: number, accountName: string) => {
+    if (!confirm(`ATENÇÃO: Tem certeza que deseja excluir PERMANENTEMENTE a conta de ${accountName}? Isso apagará TODOS os dados, buckets, faturas e usuários associados. Esta ação NÃO pode ser desfeita.`)) return;
+
+    // Double confirmation for safety
+    if (!confirm(`Confirme novamente: Excluir ${accountName} e todos os seus dados?`)) return;
+
+    deleteAccount(accountId, {
+      onSuccess: () => {
+        toast({ title: "Conta Excluída", description: `A conta de ${accountName} e todos os dados associados foram removidos.` });
+      },
+      onError: (error) => {
+        toast({ title: "Erro", description: "Falha ao excluir conta. Verifique se existem dependências ativas.", variant: "destructive" });
+      }
+    });
+  };
+
   const openQuotaDialog = (account: Account) => {
     setSelectedAccount(account);
     setNewQuotaGB(String(account.storageQuotaGB || 100));
+    const bwGB = (account.bandwidthUsed || 0) / (1024 * 1024 * 1024);
+    setNewBandwidthGB(bwGB > 0 ? bwGB.toFixed(2) : "");
     setQuotaReason("");
     setQuotaDialogOpen(true);
+  };
+
+  const openSubscriptionDialog = (account: any) => {
+    setSelectedAccount(account);
+    // Try to get current period end if available in joined subscription or calculate
+    const currentEnd = account.subscription?.currentPeriodEnd
+      ? new Date(account.subscription.currentPeriodEnd).toISOString().split('T')[0]
+      : "";
+    setNewPeriodEnd(currentEnd);
+    setSubscriptionDialogOpen(true);
+  };
+
+  const handleUpdateSubscription = () => {
+    if (!selectedAccount || !newPeriodEnd) return;
+
+    // Check if account has a subscription
+    const subId = (selectedAccount as any).subscription?.id;
+    if (!subId) {
+      toast({ title: "Erro", description: "Esta conta não possui uma assinatura ativa para gerenciar.", variant: "destructive" });
+      return;
+    }
+
+    updateSubscription({
+      id: subId,
+      data: { currentPeriodEnd: new Date(newPeriodEnd).toISOString() }
+    }, {
+      onSuccess: () => {
+        setSubscriptionDialogOpen(false);
+        toast({ title: "Assinatura atualizada", description: "Data de término atualizada com sucesso." });
+      },
+      onError: (err) => {
+        toast({ title: "Erro", description: err.message, variant: "destructive" });
+      }
+    });
   };
 
   const handleAdjustQuota = () => {
@@ -120,9 +180,18 @@ export default function AdminDashboard() {
       toast({ title: "Erro", description: "A quota deve ser um número positivo.", variant: "destructive" });
       return;
     }
-    adjustQuota({ id: selectedAccount.id, quotaGB: quotaValue, reason: quotaReason.trim() }, {
+
+    let manualBandwidthGB: number | undefined;
+    if (newBandwidthGB) {
+      const bw = parseFloat(newBandwidthGB);
+      if (!isNaN(bw) && bw >= 0) {
+        manualBandwidthGB = bw;
+      }
+    }
+
+    adjustQuota({ id: selectedAccount.id, quotaGB: quotaValue, manualBandwidthGB, reason: quotaReason.trim() }, {
       onSuccess: () => {
-        toast({ title: "Quota Ajustada", description: `Quota de ${selectedAccount.name} atualizada para ${quotaValue} GB.` });
+        toast({ title: "Quota/Uso Ajustado", description: `Quota de ${selectedAccount.name} atualizada.` });
         setQuotaDialogOpen(false);
         setSelectedAccount(null);
       },
@@ -271,252 +340,216 @@ export default function AdminDashboard() {
         <section id="admin-overview">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-blue-500/10">
-                  <Users className="h-6 w-6 text-blue-500" />
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 rounded-xl bg-blue-500/10">
+                    <Users className="h-6 w-6 text-blue-500" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Total de Contas</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-total-accounts">{totalAccounts}</h3>
-            </CardContent>
-          </Card>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Total de Contas</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-total-accounts">{totalAccounts}</h3>
+              </CardContent>
+            </Card>
 
-          <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-green-500/10">
-                  <Building2 className="h-6 w-6 text-green-500" />
+            <Card className="shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 rounded-xl bg-green-500/10">
+                    <Building2 className="h-6 w-6 text-green-500" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Contas Ativas</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-active-accounts">{activeAccounts.length}</h3>
-            </CardContent>
-          </Card>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Contas Ativas</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-active-accounts">{activeAccounts.length}</h3>
+              </CardContent>
+            </Card>
 
-          <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-yellow-500/10">
-                  <Clock className="h-6 w-6 text-yellow-500" />
+            <Card className="shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 rounded-xl bg-yellow-500/10">
+                    <Clock className="h-6 w-6 text-yellow-500" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Aguardando Aprovação</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-pending-accounts">{pendingAccounts.length}</h3>
-            </CardContent>
-          </Card>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Aguardando Aprovação</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-pending-accounts">{pendingAccounts.length}</h3>
+              </CardContent>
+            </Card>
 
-          <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-primary/10">
-                  <DollarSign className="h-6 w-6 text-primary" />
+            <Card className="shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 rounded-xl bg-primary/10">
+                    <DollarSign className="h-6 w-6 text-primary" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">MRR Atual</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-mrr">
-                {formatCurrency(stats?.totalMrr || 0)}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">Soma dos planos base</p>
-            </CardContent>
-          </Card>
+                <p className="text-sm font-medium text-muted-foreground mb-1">MRR Atual</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-mrr">
+                  {formatCurrency(stats?.totalMrr || 0)}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">Soma dos planos base</p>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-teal-500/10">
-                  <TrendingDown className="h-6 w-6 text-teal-500" />
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 rounded-xl bg-teal-500/10">
+                    <TrendingDown className="h-6 w-6 text-teal-500" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Receita Projetada</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-projected-revenue">
-                {formatCurrency(stats?.projectedRevenue || 0)}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">Base + Uso excedente</p>
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-red-500/10">
-                  <TrendingDown className="h-6 w-6 text-red-500" />
+                <p className="text-sm font-medium text-muted-foreground mb-1">Receita Projetada</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-projected-revenue">
+                  {formatCurrency(stats?.projectedRevenue || 0)}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">Base + Uso excedente</p>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 rounded-xl bg-red-500/10">
+                    <TrendingDown className="h-6 w-6 text-red-500" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Taxa de Churn</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-churn-rate">
-                {stats && stats.totalAccounts > 0 ? ((stats.suspendedAccounts / stats.totalAccounts) * 100).toFixed(1) : 0}%
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">Últimos 30 dias</p>
-            </CardContent>
-          </Card>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Taxa de Churn</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-churn-rate">
+                  {stats && stats.totalAccounts > 0 ? ((stats.suspendedAccounts / stats.totalAccounts) * 100).toFixed(1) : 0}%
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">Últimos 30 dias</p>
+              </CardContent>
+            </Card>
 
-          <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-orange-500/10">
-                  <Target className="h-6 w-6 text-orange-500" />
+            <Card className="shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 rounded-xl bg-orange-500/10">
+                    <Target className="h-6 w-6 text-orange-500" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">CAC</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-cac">R$ 225</h3>
-              <p className="text-xs text-muted-foreground mt-1">Custo de Aquisição</p>
-            </CardContent>
-          </Card>
+                <p className="text-sm font-medium text-muted-foreground mb-1">CAC</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-cac">R$ 225</h3>
+                <p className="text-xs text-muted-foreground mt-1">Custo de Aquisição</p>
+              </CardContent>
+            </Card>
 
-          <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-purple-500/10">
-                  <Wallet className="h-6 w-6 text-purple-500" />
+            <Card className="shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 rounded-xl bg-purple-500/10">
+                    <Wallet className="h-6 w-6 text-purple-500" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">LTV</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-ltv">R$ 5.940</h3>
-              <p className="text-xs text-muted-foreground mt-1">Valor Vitalício</p>
-            </CardContent>
-          </Card>
+                <p className="text-sm font-medium text-muted-foreground mb-1">LTV</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-ltv">R$ 5.940</h3>
+                <p className="text-xs text-muted-foreground mt-1">Valor Vitalício</p>
+              </CardContent>
+            </Card>
 
-          <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-teal-500/10">
-                  <DollarSign className="h-6 w-6 text-teal-500" />
+            <Card className="shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 rounded-xl bg-teal-500/10">
+                    <DollarSign className="h-6 w-6 text-teal-500" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">ARPU</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-arpu">
-                {formatCurrency(stats && stats.activeAccounts > 0 ? Math.round(stats.totalMrr / stats.activeAccounts) : 0)}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">Receita Média por Usuário</p>
-            </CardContent>
-          </Card>
+                <p className="text-sm font-medium text-muted-foreground mb-1">ARPU</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-arpu">
+                  {formatCurrency(stats && stats.activeAccounts > 0 ? Math.round(stats.totalMrr / stats.activeAccounts) : 0)}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">Receita Média por Usuário</p>
+              </CardContent>
+            </Card>
 
-          <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-xl bg-indigo-500/10">
-                  <UserPlus className="h-6 w-6 text-indigo-500" />
+            <Card className="shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 rounded-xl bg-indigo-500/10">
+                    <UserPlus className="h-6 w-6 text-indigo-500" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Novos Cadastros</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-new-signups">
-                {stats?.newSignupsThisMonth || 0}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">Este mês</p>
-            </CardContent>
-          </Card>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Novos Cadastros</p>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground" data-testid="text-new-signups">
+                  {stats?.newSignupsThisMonth || 0}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">Este mês</p>
+              </CardContent>
+            </Card>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <Card className="shadow-md border-border/60">
-            <CardHeader>
-              <CardTitle className="text-lg">MRR ao Longo do Tempo</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats?.mrrHistory || []}>
-                  <defs>
-                    <linearGradient id="colorMrr" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$ ${value.toLocaleString('pt-BR')}`} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                    formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'MRR']}
-                  />
-                  <Area type="monotone" dataKey="mrr" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorMrr)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md border-border/60">
-            <CardHeader>
-              <CardTitle className="text-lg">Novos Cadastros por Mês</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats?.signupsHistory || []}>
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                    formatter={(value: number) => [value, 'Cadastros']}
-                  />
-                  <Bar dataKey="signups" fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-          </div>
+          <Suspense
+            fallback={
+              <div className="h-80 w-full flex items-center justify-center">
+                <Loader2 className="animate-spin h-6 w-6 text-primary" />
+              </div>
+            }
+          >
+            <AdminDashboardCharts stats={stats} />
+          </Suspense>
         </section>
 
         {/* Pending Quota Requests Section */}
         {(pendingQuotaRequests && pendingQuotaRequests.length > 0) && (
           <section id="admin-quota-requests">
             <Card className="mb-8 border-purple-200 dark:border-purple-900 bg-purple-50/30 dark:bg-purple-950/20">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileUp className="h-5 w-5 text-purple-600 dark:text-purple-500" />
-                Solicitações de Quota ({pendingQuotaRequests.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <table className="w-full">
-                <thead className="bg-purple-100/50 dark:bg-purple-900/30 border-b border-purple-200 dark:border-purple-800">
-                  <tr>
-                    <th className="text-left p-4 pl-6 text-sm font-medium text-purple-800 dark:text-purple-200">Conta</th>
-                    <th className="text-left p-4 text-sm font-medium text-purple-800 dark:text-purple-200">Atual</th>
-                    <th className="text-left p-4 text-sm font-medium text-purple-800 dark:text-purple-200">Solicitado</th>
-                    <th className="text-left p-4 text-sm font-medium text-purple-800 dark:text-purple-200">Motivo</th>
-                    <th className="text-left p-4 text-sm font-medium text-purple-800 dark:text-purple-200">Data</th>
-                    <th className="text-right p-4 pr-6 text-sm font-medium text-purple-800 dark:text-purple-200">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-purple-100 dark:divide-purple-800">
-                  {pendingQuotaRequests.map((request) => (
-                    <tr key={request.id} className="hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-colors" data-testid={`row-quota-request-${request.id}`}>
-                      <td className="p-4 pl-6">
-                        <span className="font-medium text-slate-900 dark:text-foreground">{request.account.name}</span>
-                      </td>
-                      <td className="p-4 text-sm">{request.currentQuotaGB} GB</td>
-                      <td className="p-4 text-sm font-medium text-purple-600">{request.requestedQuotaGB} GB</td>
-                      <td className="p-4 text-sm text-muted-foreground max-w-xs truncate">{request.reason || '-'}</td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {request.createdAt ? new Date(request.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
-                      </td>
-                      <td className="p-4 pr-6 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => openQuotaReviewDialog(request, 'approve')}
-                            disabled={isApprovingQuota || isRejectingQuota}
-                            data-testid={`button-approve-quota-${request.id}`}
-                          >
-                            <CheckCircle className="mr-1 h-4 w-4" /> Aprovar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive border-destructive/30"
-                            onClick={() => openQuotaReviewDialog(request, 'reject')}
-                            disabled={isApprovingQuota || isRejectingQuota}
-                            data-testid={`button-reject-quota-${request.id}`}
-                          >
-                            <XCircle className="mr-1 h-4 w-4" /> Rejeitar
-                          </Button>
-                        </div>
-                      </td>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileUp className="h-5 w-5 text-purple-600 dark:text-purple-500" />
+                  Solicitações de Quota ({pendingQuotaRequests.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <table className="w-full">
+                  <thead className="bg-purple-100/50 dark:bg-purple-900/30 border-b border-purple-200 dark:border-purple-800">
+                    <tr>
+                      <th className="text-left p-4 pl-6 text-sm font-medium text-purple-800 dark:text-purple-200">Conta</th>
+                      <th className="text-left p-4 text-sm font-medium text-purple-800 dark:text-purple-200">Atual</th>
+                      <th className="text-left p-4 text-sm font-medium text-purple-800 dark:text-purple-200">Solicitado</th>
+                      <th className="text-left p-4 text-sm font-medium text-purple-800 dark:text-purple-200">Motivo</th>
+                      <th className="text-left p-4 text-sm font-medium text-purple-800 dark:text-purple-200">Data</th>
+                      <th className="text-right p-4 pr-6 text-sm font-medium text-purple-800 dark:text-purple-200">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
+                  </thead>
+                  <tbody className="divide-y divide-purple-100 dark:divide-purple-800">
+                    {pendingQuotaRequests.map((request) => (
+                      <tr key={request.id} className="hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-colors" data-testid={`row-quota-request-${request.id}`}>
+                        <td className="p-4 pl-6">
+                          <span className="font-medium text-slate-900 dark:text-foreground">{request.account.name}</span>
+                        </td>
+                        <td className="p-4 text-sm">{request.currentQuotaGB} GB</td>
+                        <td className="p-4 text-sm font-medium text-purple-600">{request.requestedQuotaGB} GB</td>
+                        <td className="p-4 text-sm text-muted-foreground max-w-xs truncate">{request.reason || '-'}</td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {request.createdAt ? new Date(request.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
+                        </td>
+                        <td className="p-4 pr-6 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => openQuotaReviewDialog(request, 'approve')}
+                              disabled={isApprovingQuota || isRejectingQuota}
+                              data-testid={`button-approve-quota-${request.id}`}
+                            >
+                              <CheckCircle className="mr-1 h-4 w-4" /> Aprovar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive border-destructive/30"
+                              onClick={() => openQuotaReviewDialog(request, 'reject')}
+                              disabled={isApprovingQuota || isRejectingQuota}
+                              data-testid={`button-reject-quota-${request.id}`}
+                            >
+                              <XCircle className="mr-1 h-4 w-4" /> Rejeitar
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
             </Card>
           </section>
         )}
@@ -524,61 +557,61 @@ export default function AdminDashboard() {
         {pendingAccounts.length > 0 && (
           <section id="admin-pending-accounts">
             <Card className="mb-8 border-yellow-200 dark:border-yellow-900 bg-yellow-50/30 dark:bg-yellow-950/20">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
-                Aguardando Aprovação ({pendingAccounts.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <table className="w-full">
-                <thead className="bg-yellow-100/50 dark:bg-yellow-900/30 border-b border-yellow-200 dark:border-yellow-800">
-                  <tr>
-                    <th className="text-left p-4 pl-6 text-sm font-medium text-yellow-800 dark:text-yellow-200">Nome da Conta</th>
-                    <th className="text-left p-4 text-sm font-medium text-yellow-800 dark:text-yellow-200">Documento</th>
-                    <th className="text-left p-4 text-sm font-medium text-yellow-800 dark:text-yellow-200">Solicitado em</th>
-                    <th className="text-right p-4 pr-6 text-sm font-medium text-yellow-800 dark:text-yellow-200">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-yellow-100 dark:divide-yellow-800">
-                  {pendingAccounts.map((account) => (
-                    <tr key={account.id} className="hover:bg-yellow-50/50 dark:hover:bg-yellow-900/20 transition-colors" data-testid={`row-pending-${account.id}`}>
-                      <td className="p-4 pl-6">
-                        <span className="font-medium text-slate-900 dark:text-foreground">{account.name}</span>
-                      </td>
-                      <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
-                        {account.document ? `${account.documentType?.toUpperCase()}: ${account.document}` : 'Não informado'}
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {account.createdAt ? new Date(account.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
-                      </td>
-                      <td className="p-4 pr-6 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleApprove(account.id, account.name)}
-                            disabled={isApproving}
-                            data-testid={`button-approve-${account.id}`}
-                          >
-                            <CheckCircle className="mr-1 h-4 w-4" /> Aprovar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive border-destructive/30"
-                            onClick={() => handleReject(account.id, account.name)}
-                            disabled={isRejecting}
-                            data-testid={`button-reject-${account.id}`}
-                          >
-                            <XCircle className="mr-1 h-4 w-4" /> Rejeitar
-                          </Button>
-                        </div>
-                      </td>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
+                  Aguardando Aprovação ({pendingAccounts.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <table className="w-full">
+                  <thead className="bg-yellow-100/50 dark:bg-yellow-900/30 border-b border-yellow-200 dark:border-yellow-800">
+                    <tr>
+                      <th className="text-left p-4 pl-6 text-sm font-medium text-yellow-800 dark:text-yellow-200">Nome da Conta</th>
+                      <th className="text-left p-4 text-sm font-medium text-yellow-800 dark:text-yellow-200">Documento</th>
+                      <th className="text-left p-4 text-sm font-medium text-yellow-800 dark:text-yellow-200">Solicitado em</th>
+                      <th className="text-right p-4 pr-6 text-sm font-medium text-yellow-800 dark:text-yellow-200">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
+                  </thead>
+                  <tbody className="divide-y divide-yellow-100 dark:divide-yellow-800">
+                    {pendingAccounts.map((account) => (
+                      <tr key={account.id} className="hover:bg-yellow-50/50 dark:hover:bg-yellow-900/20 transition-colors" data-testid={`row-pending-${account.id}`}>
+                        <td className="p-4 pl-6">
+                          <span className="font-medium text-slate-900 dark:text-foreground">{account.name}</span>
+                        </td>
+                        <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
+                          {account.document ? `${account.documentType?.toUpperCase()}: ${account.document}` : 'Não informado'}
+                        </td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {account.createdAt ? new Date(account.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
+                        </td>
+                        <td className="p-4 pr-6 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleApprove(account.id, account.name)}
+                              disabled={isApproving}
+                              data-testid={`button-approve-${account.id}`}
+                            >
+                              <CheckCircle className="mr-1 h-4 w-4" /> Aprovar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive border-destructive/30"
+                              onClick={() => handleReject(account.id, account.name)}
+                              disabled={isRejecting}
+                              data-testid={`button-reject-${account.id}`}
+                            >
+                              <XCircle className="mr-1 h-4 w-4" /> Rejeitar
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
             </Card>
           </section>
         )}
@@ -676,49 +709,60 @@ export default function AdminDashboard() {
         {suspendedAccounts.length > 0 && (
           <section id="admin-suspended-accounts">
             <Card className="mb-8 border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-950/20">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Pause className="h-5 w-5 text-red-600 dark:text-red-500" />
-                Contas Suspensas ({suspendedAccounts.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <table className="w-full">
-                <thead className="bg-red-100/50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800">
-                  <tr>
-                    <th className="text-left p-4 pl-6 text-sm font-medium text-red-800 dark:text-red-200">Nome da Conta</th>
-                    <th className="text-left p-4 text-sm font-medium text-red-800 dark:text-red-200">Documento</th>
-                    <th className="text-left p-4 text-sm font-medium text-red-800 dark:text-red-200">Quota</th>
-                    <th className="text-right p-4 pr-6 text-sm font-medium text-red-800 dark:text-red-200">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-red-100 dark:divide-red-800">
-                  {suspendedAccounts.map((account) => (
-                    <tr key={account.id} className="hover:bg-red-50/50 dark:hover:bg-red-900/20 transition-colors" data-testid={`row-suspended-${account.id}`}>
-                      <td className="p-4 pl-6">
-                        <span className="font-medium text-slate-900 dark:text-foreground">{account.name}</span>
-                      </td>
-                      <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
-                        {account.document ? `${account.documentType?.toUpperCase()}: ${account.document}` : 'Não informado'}
-                      </td>
-                      <td className="p-4 text-sm">
-                        <span className="font-medium">{account.storageQuotaGB || 100} GB</span>
-                      </td>
-                      <td className="p-4 pr-6 text-right">
-                        <Button
-                          size="sm"
-                          onClick={() => handleReactivate(account.id, account.name)}
-                          disabled={isReactivating}
-                          data-testid={`button-reactivate-${account.id}`}
-                        >
-                          <Play className="mr-1 h-4 w-4" /> Reativar
-                        </Button>
-                      </td>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Pause className="h-5 w-5 text-red-600 dark:text-red-500" />
+                  Contas Suspensas ({suspendedAccounts.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <table className="w-full">
+                  <thead className="bg-red-100/50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800">
+                    <tr>
+                      <th className="text-left p-4 pl-6 text-sm font-medium text-red-800 dark:text-red-200">Nome da Conta</th>
+                      <th className="text-left p-4 text-sm font-medium text-red-800 dark:text-red-200">Documento</th>
+                      <th className="text-left p-4 text-sm font-medium text-red-800 dark:text-red-200">Quota</th>
+                      <th className="text-right p-4 pr-6 text-sm font-medium text-red-800 dark:text-red-200">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
+                  </thead>
+                  <tbody className="divide-y divide-red-100 dark:divide-red-800">
+                    {suspendedAccounts.map((account) => (
+                      <tr key={account.id} className="hover:bg-red-50/50 dark:hover:bg-red-900/20 transition-colors" data-testid={`row-suspended-${account.id}`}>
+                        <td className="p-4 pl-6">
+                          <span className="font-medium text-slate-900 dark:text-foreground">{account.name}</span>
+                        </td>
+                        <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
+                          {account.document ? `${account.documentType?.toUpperCase()}: ${account.document}` : 'Não informado'}
+                        </td>
+                        <td className="p-4 text-sm">
+                          <span className="font-medium">{account.storageQuotaGB || 100} GB</span>
+                        </td>
+                        <td className="p-4 pr-6 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleReactivate(account.id, account.name)}
+                              disabled={isReactivating}
+                              data-testid={`button-reactivate-${account.id}`}
+                            >
+                              <Play className="mr-1 h-4 w-4" /> Reativar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteAccount(account.id, account.name)}
+                              disabled={isDeletingAccount}
+                              data-testid={`button-delete-account-${account.id}`}
+                            >
+                              <Trash2 className="mr-1 h-4 w-4" /> Excluir
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
             </Card>
           </section>
         )}
@@ -847,6 +891,7 @@ export default function AdminDashboard() {
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Uso / Quota</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Criado em</th>
+                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -906,6 +951,17 @@ export default function AdminDashboard() {
                         <td className="p-4 text-sm text-muted-foreground">
                           {account.createdAt ? new Date(account.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
                         </td>
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => openQuotaDialog(account)} title="Ajustar Quota / Degustação">
+                              <HardDrive className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => openSubscriptionDialog(account)} title="Gerenciar Assinatura (Pré-pago)">
+                              <DollarSign className="h-4 w-4" />
+                            </Button>
+                            {/* Other actions if needed */}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -916,17 +972,58 @@ export default function AdminDashboard() {
         </section>
       </main>
 
-      <Dialog open={quotaDialogOpen} onOpenChange={setQuotaDialogOpen}>
+      {/* Subscription Dialog */}
+      <Dialog open={subscriptionDialogOpen} onOpenChange={setSubscriptionDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ajustar Quota de Armazenamento</DialogTitle>
+            <DialogTitle>Gerenciar Assinatura (Pré-pago)</DialogTitle>
             <DialogDescription>
-              Ajuste a quota de armazenamento para {selectedAccount?.name}. Quota atual: {selectedAccount?.storageQuotaGB || 100} GB
+              Defina a data de término do período pago. Se a data for futura, a taxa mensal base será isenta nas faturas geradas.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="quota">Nova Quota (GB)</Label>
+              <Label>Assinatura Atual</Label>
+              <div className="p-3 bg-muted rounded-md text-sm">
+                {(selectedAccount as any)?.subscription?.product?.name || "Plano desconhecido"}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="periodEnd">Pago Até (Data de Término)</Label>
+              <Input
+                id="periodEnd"
+                type="date"
+                value={newPeriodEnd}
+                onChange={(e) => setNewPeriodEnd(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Dica: Para contratos anuais (ex: Agesa), defina a data para o final do contrato.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSubscriptionDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleUpdateSubscription} disabled={isUpdatingSubscription}>
+              {isUpdatingSubscription && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={quotaDialogOpen} onOpenChange={setQuotaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajustar Quota / Armazenamento Incluso</DialogTitle>
+            <DialogDescription>
+              Ajuste a quota de armazenamento para {selectedAccount?.name}.
+              <br />
+              <strong>Nota:</strong> Esta quota atua como o limite de "Armazenamento Gratuito/Incluso". O cliente só será cobrado pelo armazenamento que exceder este valor.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="quota">Nova Quota / Limite Incluso (GB)</Label>
               <Input
                 id="quota"
                 type="number"
@@ -936,6 +1033,19 @@ export default function AdminDashboard() {
                 placeholder="Digite a quota em GB"
                 data-testid="input-quota"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bandwidth">Tráfego Usado Manual (GB - Opcional)</Label>
+              <Input
+                id="bandwidth"
+                type="number"
+                min="0"
+                step="0.01"
+                value={newBandwidthGB}
+                onChange={(e) => setNewBandwidthGB(e.target.value)}
+                placeholder="Ex: 5.5 (Deixe em branco para não alterar)"
+              />
+              <p className="text-xs text-muted-foreground">Útil para testes de cobrança de largura de banda.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="reason">Motivo do ajuste</Label>

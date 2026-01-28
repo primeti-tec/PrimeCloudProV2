@@ -105,10 +105,18 @@ export async function registerRoutes(
     }
   });
 
+  const envSuperAdmins = (process.env.SUPER_ADMINS || "")
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+  const defaultSuperAdmins = ["sergio.louzan@gmail.com", "admin@primecloudpro.com"];
+  const superAdmins = envSuperAdmins.length > 0 ? envSuperAdmins : defaultSuperAdmins;
+  const isSuperAdmin = (email?: string | null) => !!email && superAdmins.includes(email);
+
   app.get("/api/auth/user", requireAuth(), async (req: any, res) => {
     const { userId } = getAuth(req);
     const user = req.currentUser || (userId ? await authStorage.getUser(userId) : null);
-    res.json(user ?? null);
+    res.json({ user: user ?? null, isSuperAdmin: isSuperAdmin(user?.email) });
   });
 
   // --- Protected Routes ---
@@ -484,10 +492,6 @@ export async function registerRoutes(
   // No, that's insecure. I'll check if the user is the FIRST user or specific email.
   // I'll just check if email contains "@admin.com" for demo purposes or "admin" role in a special way.
   // Better: I'll hardcode a "isSuperAdmin" check function.
-  // Admin Routes Logic
-  const SUPER_ADMINS = ["sergio.louzan@gmail.com", "admin@primecloudpro.com"];
-  const isSuperAdmin = (email?: string) => email ? SUPER_ADMINS.includes(email) : false;
-
   app.get(api.admin.listAccounts.path, requireAuth(), async (req: any, res) => {
     if (!isSuperAdmin(req.currentUser?.email)) {
       return res.status(403).json({ message: "Forbidden: Admin access required" });
@@ -600,7 +604,13 @@ export async function registerRoutes(
       const input = api.admin.adjustQuota.input.parse(req.body);
       const previousAccount = await storage.getAccount(accountId);
       const previousQuota = previousAccount?.storageQuotaGB || 100;
-      const account = await storage.updateAccount(accountId, { storageQuotaGB: input.quotaGB });
+
+      const updateData: Partial<typeof accounts.$inferInsert> = { storageQuotaGB: input.quotaGB };
+      if (input.manualBandwidthGB !== undefined) {
+        updateData.bandwidthUsed = input.manualBandwidthGB * 1024 * 1024 * 1024;
+      }
+
+      const account = await storage.updateAccount(accountId, updateData);
       await storage.createAuditLog({
         accountId,
         userId,
@@ -828,6 +838,22 @@ export async function registerRoutes(
     res.json({ success: true, message: 'Pricing configs seeded' });
   });
 
+  // Update Subscription (Admin) - e.g. for prepaid date adjustments
+  app.patch('/api/admin/subscriptions/:id', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const subId = parseInt(req.params.id);
+      const data = req.body; // { currentPeriodEnd, status, etc. }
+      const updated = await storage.updateSubscription(subId, data);
+      res.json(updated);
+    } catch (err: any) {
+      console.error('[Admin Subscription] Error updating:', err);
+      res.status(500).json({ message: "Failed to update subscription" });
+    }
+  });
+
   // === ADMIN BUCKETS MANAGEMENT ===
   // List all buckets across all accounts (Super Admin only)
   app.get('/api/admin/buckets', requireAuth(), async (req: any, res) => {
@@ -917,6 +943,10 @@ export async function registerRoutes(
 
       const invoice = await storage.markInvoicePaid(invoiceId, paymentMethod);
 
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
       await storage.createAuditLog({
         userId: userId!,
         action: 'INVOICE_PAID',
@@ -950,6 +980,114 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error('[Admin Invoices] Error updating invoice status:', err);
       res.status(500).json({ message: err.message || "Failed to update invoice" });
+    }
+  });
+
+  // Delete Invoice (Admin)
+  app.delete('/api/admin/invoices/:id', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const { userId } = getAuth(req);
+      const invoiceId = parseInt(req.params.id);
+      await storage.deleteInvoice(invoiceId);
+      await storage.createAuditLog({
+        userId: userId!,
+        action: 'INVOICE_DELETED',
+        resource: 'invoice',
+        details: { invoiceId },
+        severity: 'warning'
+      });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to delete invoice" });
+    }
+  });
+
+  // Admin Order Management
+  app.patch('/api/admin/orders/:id/deny', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const { userId } = getAuth(req);
+      const orderId = parseInt(req.params.id);
+      const { reason } = req.body;
+      const order = await storage.denyOrder(orderId, reason);
+      await storage.createAuditLog({
+        userId: userId!,
+        action: 'ORDER_DENIED',
+        resource: 'order',
+        details: { orderId, reason }
+      });
+      res.json(order);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch('/api/admin/orders/:id/cancel', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const { userId } = getAuth(req);
+      const orderId = parseInt(req.params.id);
+      const { reason } = req.body;
+      const order = await storage.updateOrder(orderId, { status: 'canceled', cancelReason: reason, canceledAt: new Date() });
+
+      await storage.createAuditLog({
+        userId: userId!,
+        action: 'ORDER_CANCELED',
+        resource: 'order',
+        details: { orderId, reason }
+      });
+      res.json(order);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete('/api/admin/orders/:id', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const { userId } = getAuth(req);
+      const orderId = parseInt(req.params.id);
+      await storage.deleteOrder(orderId);
+      await storage.createAuditLog({
+        userId: userId!,
+        action: 'ORDER_DELETED',
+        resource: 'order',
+        details: { orderId }
+      });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Admin Account Deletion
+  app.delete('/api/admin/accounts/:id', requireAuth(), async (req: any, res) => {
+    if (!isSuperAdmin(req.currentUser?.email)) {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    try {
+      const { userId } = getAuth(req);
+      const accountId = parseInt(req.params.id);
+      await storage.deleteAccount(accountId);
+      await storage.createAuditLog({
+        userId: userId!,
+        action: 'ACCOUNT_DELETED',
+        resource: 'account',
+        details: { accountId },
+        severity: 'warning'
+      });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to delete account" });
     }
   });
 

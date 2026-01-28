@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useClerk, useUser } from "@clerk/clerk-react";
 
 type AuthUser = {
@@ -7,6 +8,11 @@ type AuthUser = {
   firstName?: string | null;
   lastName?: string | null;
   profileImageUrl?: string;
+};
+
+type AuthProfile = {
+  user: AuthUser | null;
+  isSuperAdmin: boolean;
 };
 
 export function useAuth() {
@@ -34,10 +40,24 @@ export function useAuth() {
     }
   };
 
+  const { data: authProfile, isLoading: isProfileLoading } = useQuery<AuthProfile>({
+    queryKey: ["auth", "profile"],
+    enabled: !!user,
+    queryFn: async () => {
+      const res = await fetch("/api/auth/user", { credentials: "include" });
+      if (res.status === 401) return { user: null, isSuperAdmin: false };
+      if (!res.ok) throw new Error("Failed to fetch auth profile");
+      return res.json();
+    },
+  });
+
+  const isLoading = !isLoaded || (!!user && isProfileLoading);
+
   return {
     user: mappedUser,
-    isLoading: !isLoaded,
+    isLoading,
     isAuthenticated: !!mappedUser,
+    isSuperAdmin: authProfile?.isSuperAdmin ?? false,
     logout,
     isLoggingOut,
   };

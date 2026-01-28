@@ -264,7 +264,7 @@ export const orders = pgTable("orders", {
   productId: integer("product_id").references(() => products.id),
   orderNumber: text("order_number").notNull().unique(),
   orderType: text("order_type").default("product"), // product, vps, dedicated, storage
-  status: text("status").default("pending"), // pending, quoting, approved, provisioning, completed, canceled, refunded
+  status: text("status").default("pending"), // pending, quoting, approved, provisioning, completed, canceled, refunded, denied
   quantity: integer("quantity").default(1),
   unitPrice: integer("unit_price").notNull(), // cents
   totalAmount: integer("total_amount").notNull(), // cents
@@ -601,3 +601,6 @@ export interface AccountWithDetails extends Account {
   subscription?: Subscription & { product: Product };
   role?: string; // Role of the current user in this account
 }
+
+export type AccountRole = "owner" | "admin" | "developer" | "external_client";
+export type AccountWithRole = Account & { role: AccountRole };

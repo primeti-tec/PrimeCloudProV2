@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
 import { useBranding } from "@/components/branding-provider";
 import { useMyAccounts } from "@/hooks/use-accounts";
-import { useCurrentRole } from "@/hooks/use-current-account";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   useBuckets,
   useBucketObjects,
@@ -61,6 +61,10 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
+import type { Bucket } from "@shared/schema";
+
+type BucketWithPermission = Bucket & { userPermission?: "read" | "write" | "read-write" };
 
 // File type detection helpers
 function getFileExtension(filename: string): string {
@@ -336,7 +340,7 @@ export default function BucketBrowser() {
   const { bucketId } = useParams<{ bucketId: string }>();
   const [location, setLocation] = useLocation();
   const { data: accounts, isLoading: isAccountsLoading } = useMyAccounts();
-  const { isExternalClient } = useCurrentRole();
+  const { isExternalClient } = usePermissions();
   const branding = useBranding();
   const bucketIdInt = parseInt(bucketId || "0");
 
@@ -344,16 +348,16 @@ export default function BucketBrowser() {
   // In a multi-account scenario, we should find the account that owns this bucket
   const currentAccount = accounts?.[0];
 
-  const { data: buckets, isLoading: isBucketsLoading } = useBuckets(currentAccount?.id) as any;
-  const bucket = buckets?.find((b: any) => b.id === bucketIdInt);
+  const { data: buckets, isLoading: isBucketsLoading } = useBuckets(currentAccount?.id);
+  const bucket = (buckets as BucketWithPermission[] | undefined)?.find((b) => b.id === bucketIdInt);
 
   // Debug logs
-  console.log(`[BucketBrowser] Render: bucketId=${bucketIdInt}, isExternal=${isExternalClient}`);
-  console.log(`[BucketBrowser] Accounts:`, accounts?.length);
-  console.log(`[BucketBrowser] Current Account:`, currentAccount?.id);
-  console.log(`[BucketBrowser] Buckets in Current Account:`, buckets?.length);
-  console.log(`[BucketBrowser] Target Bucket Found:`, !!bucket);
-  if (bucket) console.log(`[BucketBrowser] Bucket Permission:`, bucket.userPermission);
+  logger.log(`[BucketBrowser] Render: bucketId=${bucketIdInt}, isExternal=${isExternalClient}`);
+  logger.log(`[BucketBrowser] Accounts:`, accounts?.length);
+  logger.log(`[BucketBrowser] Current Account:`, currentAccount?.id);
+  logger.log(`[BucketBrowser] Buckets in Current Account:`, buckets?.length);
+  logger.log(`[BucketBrowser] Target Bucket Found:`, !!bucket);
+  if (bucket) logger.log(`[BucketBrowser] Bucket Permission:`, bucket.userPermission);
 
   const [currentPrefix, setCurrentPrefix] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -416,14 +420,14 @@ export default function BucketBrowser() {
     const originalPush = history.pushState;
     const originalReplace = history.replaceState;
 
-    history.pushState = function (this: History, ...args) {
-      const result = originalPush.apply(this, args as any);
+    history.pushState = function (this: History, ...args: Parameters<History["pushState"]>) {
+      const result = originalPush.apply(this, args);
       updateView();
       return result;
     } as History["pushState"];
 
-    history.replaceState = function (this: History, ...args) {
-      const result = originalReplace.apply(this, args as any);
+    history.replaceState = function (this: History, ...args: Parameters<History["replaceState"]>) {
+      const result = originalReplace.apply(this, args);
       updateView();
       return result;
     } as History["replaceState"];

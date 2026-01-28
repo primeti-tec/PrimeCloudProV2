@@ -30,6 +30,21 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("/react/") || id.includes("/react-dom/")) return "react";
+          if (id.includes("/@clerk/")) return "clerk";
+          if (id.includes("/@radix-ui/")) return "radix";
+          if (id.includes("/recharts/")) return "recharts";
+          if (id.includes("/framer-motion/")) return "framer-motion";
+          if (id.includes("/date-fns/")) return "date-fns";
+          if (id.includes("/lucide-react/")) return "lucide";
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     fs: {

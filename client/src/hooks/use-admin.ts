@@ -76,9 +76,9 @@ export function useReactivateAccount() {
 export function useAdjustQuota() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, quotaGB, reason }: { id: number; quotaGB: number; reason: string }) => {
+    mutationFn: async ({ id, quotaGB, manualBandwidthGB, reason }: { id: number; quotaGB: number; manualBandwidthGB?: number; reason: string }) => {
       const url = buildUrl(api.admin.adjustQuota.path, { id });
-      const res = await apiRequest(api.admin.adjustQuota.method, url, { quotaGB, reason });
+      const res = await apiRequest(api.admin.adjustQuota.method, url, { quotaGB, manualBandwidthGB, reason });
       return res.json();
     },
     onSuccess: () => {
@@ -86,6 +86,25 @@ export function useAdjustQuota() {
     },
   });
 }
+
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      // Direct fetch since delete route might not be in shared/api yet
+      const res = await fetch(`/api/admin/accounts/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error("Failed to delete account");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });
+    },
+  });
+}
+
 export function useAdminStats() {
   return useQuery({
     queryKey: [api.admin.getStats.path],
@@ -93,6 +112,25 @@ export function useAdminStats() {
       const res = await fetch(api.admin.getStats.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch admin statistics");
       return api.admin.getStats.responses[200].parse(await res.json());
+    },
+  });
+}
+
+export function useUpdateSubscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const res = await fetch(`/api/admin/subscriptions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Failed to update subscription");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.admin.listAccounts.path] });
     },
   });
 }

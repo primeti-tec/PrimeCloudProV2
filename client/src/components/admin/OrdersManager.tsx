@@ -1,17 +1,22 @@
 import { useState } from 'react';
-import { useAdminOrders, useAdminUpdateOrder } from '@/hooks/use-orders';
+import { useAdminOrders, useAdminUpdateOrder, useAdminDenyOrder, useAdminDeleteOrder } from '@/hooks/use-orders';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, ShoppingCart, Eye, CheckCircle, XCircle, FileText, Server, Cloud, Database } from 'lucide-react';
+import { Loader2, ShoppingCart, Eye, CheckCircle, XCircle, FileText, Server, Cloud, Database, Trash2 } from 'lucide-react';
 import { OrderWithDetails } from '@shared/schema';
+import { useToast } from '@/hooks/use-toast';
 
 export function OrdersManager() {
     const { data: orders, isLoading, refetch } = useAdminOrders();
     const updateOrder = useAdminUpdateOrder();
+    const denyOrder = useAdminDenyOrder();
+    const deleteOrder = useAdminDeleteOrder();
+    const { toast } = useToast();
+
     const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
     const [responseNote, setResponseNote] = useState('');
 
@@ -37,6 +42,8 @@ export function OrdersManager() {
                 return <Badge variant="default" className="bg-green-100 text-green-800">Concluído</Badge>;
             case 'canceled':
                 return <Badge variant="destructive">Cancelado</Badge>;
+            case 'denied':
+                return <Badge variant="destructive" className="bg-red-100 text-red-800">Recusado</Badge>;
             default:
                 return <Badge variant="outline">{s}</Badge>;
         }
@@ -75,6 +82,34 @@ export function OrdersManager() {
             return JSON.stringify(parsed, null, 2);
         } catch (e) {
             return str;
+        }
+    };
+
+    const handleDeny = async () => {
+        if (!selectedOrder) return;
+        if (!confirm('Tem certeza que deseja recusar este pedido?')) return;
+
+        try {
+            await denyOrder.mutateAsync({
+                orderId: selectedOrder.id,
+                reason: responseNote || 'Pedido recusado pelo administrador'
+            });
+            toast({ title: "Pedido recusado", description: "O pedido foi marcado como recusado." });
+            setSelectedOrder(null);
+        } catch (error) {
+            toast({ title: "Erro", description: "Falha ao recusar pedido.", variant: "destructive" });
+        }
+    };
+
+    const handleDelete = async (orderId: number) => {
+        if (!confirm('Tem certeza que deseja EXCLUIR este pedido permanentemente? Esta ação não pode ser desfeita.')) return;
+
+        try {
+            await deleteOrder.mutateAsync(orderId);
+            toast({ title: "Pedido excluído", description: "O pedido foi removido permanentemente." });
+            if (selectedOrder?.id === orderId) setSelectedOrder(null);
+        } catch (error) {
+            toast({ title: "Erro", description: "Falha ao excluir pedido.", variant: "destructive" });
         }
     };
 
@@ -132,10 +167,24 @@ export function OrdersManager() {
                                         <TableCell>{formatCurrency(order.totalAmount)}</TableCell>
                                         <TableCell>{formatDate(order.createdAt)}</TableCell>
                                         <TableCell className="text-right">
-                                            <Button size="sm" variant="outline" onClick={() => setSelectedOrder(order)}>
-                                                <Eye className="h-4 w-4 mr-2" />
-                                                Detalhes
-                                            </Button>
+                                            <div className="flex justify-end gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => setSelectedOrder(order)}>
+                                                    <Eye className="h-4 w-4 mr-2" />
+                                                    Detalhes
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDelete(order.id);
+                                                    }}
+                                                    disabled={deleteOrder.isPending}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -193,27 +242,37 @@ export function OrdersManager() {
                         </div>
                     </div>
 
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setSelectedOrder(null)}>Fechar</Button>
+                    <DialogFooter className="flex justify-between sm:justify-between items-center w-full">
                         <Button
-                            variant="default"
-                            className="bg-green-600 hover:bg-green-700"
-                            onClick={() => {
-                                if (selectedOrder && selectedOrder.accountId) {
-                                    updateOrder.mutate({
-                                        accountId: selectedOrder.accountId,
-                                        orderId: selectedOrder.id,
-                                        status: 'processing',
-                                        notes: responseNote || undefined
-                                    });
-                                    setSelectedOrder(null);
-                                }
-                            }}
-                            disabled={updateOrder.isPending}
+                            variant="destructive"
+                            onClick={handleDeny}
+                            disabled={denyOrder.isPending}
                         >
-                            {updateOrder.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                            Aprovar e Gerar Fatura
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Recusar Pedido
                         </Button>
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => setSelectedOrder(null)}>Fechar</Button>
+                            <Button
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => {
+                                    if (selectedOrder && selectedOrder.accountId) {
+                                        updateOrder.mutate({
+                                            accountId: selectedOrder.accountId,
+                                            orderId: selectedOrder.id,
+                                            status: 'processing',
+                                            notes: responseNote || undefined
+                                        });
+                                        setSelectedOrder(null);
+                                    }
+                                }}
+                                disabled={updateOrder.isPending}
+                            >
+                                {updateOrder.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                                Aprovar e Gerar Fatura
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

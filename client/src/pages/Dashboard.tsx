@@ -1,11 +1,10 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect, useState, type ComponentType } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { TopNavigation } from "@/components/TopNavigation";
 import { useAccount, useMyAccounts } from "@/hooks/use-accounts";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui-custom";
 import { useLocation } from "wouter";
 import { Loader2, HardDrive, ArrowUpRight, Activity, Users, DollarSign, Plus, Key, UserPlus, AlertTriangle } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -13,21 +12,14 @@ import { useBuckets } from "@/hooks/use-buckets";
 import { useMembers } from "@/hooks/use-members";
 import { useUsageSummary } from "@/hooks/use-billing";
 
-const data = [
-  { name: 'Jan', storage: 10, transfer: 24 },
-  { name: 'Fev', storage: 15, transfer: 35 },
-  { name: 'Mar', storage: 25, transfer: 45 },
-  { name: 'Abr', storage: 35, transfer: 60 },
-  { name: 'Mai', storage: 45, transfer: 55 },
-  { name: 'Jun', storage: 60, transfer: 80 },
-  { name: 'Jul', storage: 75, transfer: 95 },
-];
+const DashboardCharts = lazy(() => import("@/pages/DashboardCharts"));
 
 export default function Dashboard() {
   const { data: accounts, isLoading: accountsLoading } = useMyAccounts();
   const [, setLocation] = useLocation();
   const currentAccount = accounts?.[0];
   const { data: accountDetails, isLoading: detailsLoading } = useAccount(currentAccount?.id);
+  const [showAlerts, setShowAlerts] = useState(false);
 
   // Real Data Hooks
   const { data: usage, isLoading: usageLoading } = useUsageSummary(currentAccount?.id);
@@ -46,6 +38,11 @@ export default function Dashboard() {
     }
   }, [accountsLoading, accounts, setLocation]);
 
+  useEffect(() => {
+    const id = window.setTimeout(() => setShowAlerts(true), 0);
+    return () => window.clearTimeout(id);
+  }, []);
+
   if (accountsLoading || detailsLoading || usageLoading) {
     return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
@@ -57,9 +54,9 @@ export default function Dashboard() {
   const storageQuota = accountDetails?.subscription?.product?.storageLimit || 100;
   const transferQuota = accountDetails?.subscription?.product?.transferLimit || 500;
 
-  const storagePercentage = ((usage?.storageUsedGB || 0) / storageQuota) * 100;
+  const storagePercentage = storageQuota > 0 ? ((usage?.storageUsedGB || 0) / storageQuota) * 100 : 0;
   // Bandwidth calculation might be missing in UsageSummary if not fully implemented in backend yet, defaulting to 0 for safety
-  const bandwidthPercentage = ((usage?.bandwidthUsedGB || 0) / transferQuota) * 100;
+  const bandwidthPercentage = transferQuota > 0 ? ((usage?.bandwidthUsedGB || 0) / transferQuota) * 100 : 0;
 
   const totalEstimatedCost = usage?.projectedCost || 0;
 
@@ -99,7 +96,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {showCriticalBanner && (
+        {showAlerts && showCriticalBanner && (
           <Alert className="mb-6 border-red-500 bg-red-50 dark:bg-red-950/30" data-testid="alert-storage-critical">
             <AlertTriangle className="h-4 w-4 text-red-600" />
             <AlertTitle className="text-red-800 dark:text-red-400">Crítico: Limite de Armazenamento Quase Atingido</AlertTitle>
@@ -112,7 +109,7 @@ export default function Dashboard() {
           </Alert>
         )}
 
-        {showWarningBanner && (
+        {showAlerts && showWarningBanner && (
           <Alert className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30" data-testid="alert-storage-warning">
             <AlertTriangle className="h-4 w-4 text-yellow-600" />
             <AlertTitle className="text-yellow-800 dark:text-yellow-400">Aviso: Uso de Armazenamento Alto</AlertTitle>
@@ -219,49 +216,15 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <Card className="shadow-md border-border/60">
-            <CardHeader>
-              <CardTitle className="text-lg">Crescimento de Armazenamento</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data}>
-                  <defs>
-                    <linearGradient id="colorStorage" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Area type="monotone" dataKey="storage" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorStorage)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md border-border/60">
-            <CardHeader>
-              <CardTitle className="text-lg">Uso de Transferência</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data}>
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Line type="monotone" dataKey="transfer" stroke="#10b981" strokeWidth={3} dot={{ strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+        <Suspense
+          fallback={
+            <div className="h-80 w-full flex items-center justify-center">
+              <Loader2 className="animate-spin h-6 w-6 text-primary" />
+            </div>
+          }
+        >
+          <DashboardCharts />
+        </Suspense>
 
         <Card>
           <CardHeader>
@@ -280,7 +243,29 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, subtitle, icon: Icon, trend, color, bgColor }: any) {
+type StatCardProps = {
+  title: string;
+  value: number;
+  subtitle?: string;
+  icon: ComponentType<{ className?: string }>;
+  trend?: string | null;
+  color: string;
+  bgColor: string;
+};
+
+type StatCardWithProgressProps = {
+  title: string;
+  usedValue: number;
+  totalValue: number;
+  unit: string;
+  icon: ComponentType<{ className?: string }>;
+  trend?: string | null;
+  color: string;
+  bgColor: string;
+  progressColor: string;
+};
+
+function StatCard({ title, value, subtitle, icon: Icon, trend, color, bgColor }: StatCardProps) {
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-6">
@@ -304,8 +289,12 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color, bgColor }:
   );
 }
 
-function StatCardWithProgress({ title, usedValue, totalValue, unit, icon: Icon, trend, color, bgColor, progressColor }: any) {
-  const percentage = (usedValue / totalValue) * 100;
+function StatCardWithProgress({ title, usedValue, totalValue, unit, icon: Icon, trend, color, bgColor, progressColor }: StatCardWithProgressProps) {
+  const safeUsed = Math.max(0, usedValue);
+  const safeTotal = totalValue > 0 ? totalValue : 0;
+  const percentage = safeTotal ? (safeUsed / safeTotal) * 100 : 0;
+  const totalLabel = safeTotal ? `${safeTotal} ${unit}` : "—";
+  const percentageLabel = safeTotal ? `${percentage.toFixed(0)}%` : "—";
 
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow" data-testid={`card-stat-${title.toLowerCase().replace(/\s+/g, '-')}`}>
@@ -324,7 +313,7 @@ function StatCardWithProgress({ title, usedValue, totalValue, unit, icon: Icon, 
           <p className="text-sm font-medium text-muted-foreground mb-1">{title}</p>
           <h3 className="text-2xl font-bold text-foreground">{usedValue} {unit}</h3>
           <p className="text-xs text-muted-foreground mt-1">
-            de {totalValue} {unit} ({percentage.toFixed(0)}%)
+            de {totalLabel} ({percentageLabel})
           </p>
           <div className="mt-3">
             <Progress

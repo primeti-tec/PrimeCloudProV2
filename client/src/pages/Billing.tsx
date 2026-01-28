@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useOrders, useUpdateOrder, useCancelOrder } from "@/hooks/use-orders";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { logger } from "@/lib/logger";
 
 interface Invoice {
   id: number;
@@ -168,7 +169,7 @@ export default function Billing() {
       setPlanDialogOpen(false);
       toast({ title: "Plano atualizado!", description: "Seu plano foi alterado com sucesso." });
     } catch (e) {
-      console.error(e);
+      logger.error(e);
       toast({ title: "Erro", description: "Falha ao atualizar plano.", variant: "destructive" });
     } finally {
       setLoadingId(null);

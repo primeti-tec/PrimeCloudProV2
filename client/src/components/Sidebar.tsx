@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, HardDrive, ShoppingCart, Save, FolderOpen, ChevronDown, ChevronRight, Server } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranding } from "./branding-provider";
-import { useCurrentRole } from "@/hooks/use-current-account";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useMyAccounts } from "@/hooks/use-accounts";
 import { useBuckets } from "@/hooks/use-buckets";
 import { ModeToggle } from "./mode-toggle";
@@ -15,7 +15,7 @@ export function Sidebar() {
   const [location, setLocation] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
   const branding = useBranding();
-  const { isExternalClient, canViewBilling, canViewSettings, canManageMembers } = useCurrentRole();
+  const { isExternalClient, canViewBilling, canViewSettings, canManageMembers, canAccessAdmin } = usePermissions();
 
   // Get buckets for submenu
   const { data: accounts } = useMyAccounts();
@@ -65,9 +65,6 @@ export function Sidebar() {
     window.localStorage.setItem("adminMenuExpanded", String(adminExpanded));
   }, [adminExpanded]);
 
-  const SUPER_ADMINS = ["sergio.louzan@gmail.com", "admin@primecloudpro.com"];
-  const isSuperAdmin = SUPER_ADMINS.includes(user?.email || "");
-
   // Check if we're in storage section
   const isInStorageSection = location.startsWith("/dashboard/storage");
 
@@ -83,7 +80,7 @@ export function Sidebar() {
     { name: "Configurações", href: "/dashboard/settings", icon: Settings, show: canViewSettings },
   ].filter(item => item.show);
 
-  if (isSuperAdmin) {
+  if (canAccessAdmin) {
     navItems.push({ name: "Admin Portal", href: "/admin", icon: Shield, show: true });
   }
 
@@ -183,13 +180,22 @@ export function Sidebar() {
         <Link href="/dashboard" className="flex items-center gap-2">
           {/* Custom Logo or Default */}
           {branding.logo ? (
-            <img src={branding.logo} alt={branding.name} className="h-8 w-auto" />
+            <img src={branding.logo} alt={branding.name} className="h-8 w-auto" decoding="async" />
           ) : (
             <>
-              <img src="/logo.png" alt={branding.name} className="h-8 w-auto" onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-              }} />
+              <img
+                src="/logo-32.png"
+                srcSet="/logo-32.png 1x, /logo-64.png 2x"
+                alt={branding.name}
+                className="h-8 w-auto"
+                width={32}
+                height={32}
+                decoding="async"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                }}
+              />
               <div className="hidden h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">{branding.name[0]}</span>
               </div>
@@ -374,7 +380,7 @@ export function Sidebar() {
           );
         })}
 
-        {isSuperAdmin && (
+        {canAccessAdmin && (
           <div className="mt-6">
             <button
               type="button"
@@ -411,7 +417,14 @@ export function Sidebar() {
       <div className="p-4 border-t border-border/50 bg-accent/30">
         <div className="flex items-center gap-3 mb-4 px-2">
           {user?.profileImageUrl ? (
-            <img src={user.profileImageUrl} alt="Perfil" className="h-10 w-10 rounded-full border-2 border-white shadow-sm" />
+            <img
+              src={user.profileImageUrl}
+              alt="Perfil"
+              className="h-10 w-10 rounded-full border-2 border-white shadow-sm"
+              width={40}
+              height={40}
+              decoding="async"
+            />
           ) : (
             <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
               {user?.firstName?.[0] || user?.email?.[0] || "U"}
