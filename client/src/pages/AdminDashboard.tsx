@@ -882,90 +882,92 @@ export default function AdminDashboard() {
                   <p>Nenhuma conta ainda.</p>
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-muted/50 border-b">
-                    <tr>
-                      <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Conta</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Documento</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Telefone</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Uso / Quota</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Criado em</th>
-                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {accounts?.map((account) => (
-                      <tr key={account.id} className="hover:bg-slate-50/50 dark:hover:bg-muted/30 transition-colors" data-testid={`row-account-${account.id}`}>
-                        <td className="p-4 pl-6">
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                              {account.name.charAt(0).toUpperCase()}
-                            </div>
-                            <span className="font-medium">{account.name}</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
-                          {account.document ? (
-                            <span className="font-mono text-xs">{account.documentType?.toUpperCase()}: {account.document}</span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </td>
-                        <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
-                          {account.phone || <span className="text-muted-foreground">-</span>}
-                        </td>
-                        <td className="p-4">
-                          {account.status === 'active' ? (
-                            <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Ativo</Badge>
-                          ) : account.status === 'suspended' ? (
-                            <Badge variant="destructive">Suspenso</Badge>
-                          ) : account.status === 'rejected' ? (
-                            <Badge variant="destructive">Rejeitado</Badge>
-                          ) : (
-                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300">Pendente</Badge>
-                          )}
-                        </td>
-                        <td className="p-4 text-sm">
-                          {(() => {
-                            const usedGB = ((account.storageUsed || 0) / (1024 * 1024 * 1024));
-                            const quotaGB = account.storageQuotaGB || 100;
-                            const percentage = Math.min(100, (usedGB / quotaGB) * 100);
-                            const isWarning = percentage >= 80;
-                            const isCritical = percentage >= 95;
-                            return (
-                              <div className="flex flex-col gap-1">
-                                <span className={`font-medium ${isCritical ? 'text-red-600' : isWarning ? 'text-yellow-600' : ''}`}>
-                                  {usedGB.toFixed(2)} / {quotaGB} GB
-                                </span>
-                                <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full ${isCritical ? 'bg-red-500' : isWarning ? 'bg-yellow-500' : 'bg-green-500'}`}
-                                    style={{ width: `${percentage}%` }}
-                                  />
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </td>
-                        <td className="p-4 text-sm text-muted-foreground">
-                          {account.createdAt ? new Date(account.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
-                        </td>
-                        <td className="p-4 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => openQuotaDialog(account)} title="Ajustar Quota / Degustação">
-                              <HardDrive className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => openSubscriptionDialog(account)} title="Gerenciar Assinatura (Pré-pago)">
-                              <DollarSign className="h-4 w-4" />
-                            </Button>
-                            {/* Other actions if needed */}
-                          </div>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[800px]">
+                    <thead className="bg-slate-50 dark:bg-muted/50 border-b">
+                      <tr>
+                        <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Conta</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Documento</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Telefone</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Uso / Quota</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Criado em</th>
+                        <th className="text-right p-4 text-sm font-medium text-muted-foreground">Ações</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y">
+                      {accounts?.map((account) => (
+                        <tr key={account.id} className="hover:bg-slate-50/50 dark:hover:bg-muted/30 transition-colors" data-testid={`row-account-${account.id}`}>
+                          <td className="p-4 pl-6">
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                                {account.name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium">{account.name}</span>
+                            </div>
+                          </td>
+                          <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
+                            {account.document ? (
+                              <span className="font-mono text-xs">{account.documentType?.toUpperCase()}: {account.document}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-sm text-slate-600 dark:text-muted-foreground">
+                            {account.phone || <span className="text-muted-foreground">-</span>}
+                          </td>
+                          <td className="p-4">
+                            {account.status === 'active' ? (
+                              <Badge variant="default" className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Ativo</Badge>
+                            ) : account.status === 'suspended' ? (
+                              <Badge variant="destructive">Suspenso</Badge>
+                            ) : account.status === 'rejected' ? (
+                              <Badge variant="destructive">Rejeitado</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300">Pendente</Badge>
+                            )}
+                          </td>
+                          <td className="p-4 text-sm">
+                            {(() => {
+                              const usedGB = ((account.storageUsed || 0) / (1024 * 1024 * 1024));
+                              const quotaGB = account.storageQuotaGB || 100;
+                              const percentage = Math.min(100, (usedGB / quotaGB) * 100);
+                              const isWarning = percentage >= 80;
+                              const isCritical = percentage >= 95;
+                              return (
+                                <div className="flex flex-col gap-1">
+                                  <span className={`font-medium ${isCritical ? 'text-red-600' : isWarning ? 'text-yellow-600' : ''}`}>
+                                    {usedGB.toFixed(2)} / {quotaGB} GB
+                                  </span>
+                                  <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${isCritical ? 'bg-red-500' : isWarning ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td className="p-4 text-sm text-muted-foreground">
+                            {account.createdAt ? new Date(account.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => openQuotaDialog(account)} title="Ajustar Quota / Degustação">
+                                <HardDrive className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => openSubscriptionDialog(account)} title="Gerenciar Assinatura (Pré-pago)">
+                                <DollarSign className="h-4 w-4" />
+                              </Button>
+                              {/* Other actions if needed */}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </CardContent>
           </Card>

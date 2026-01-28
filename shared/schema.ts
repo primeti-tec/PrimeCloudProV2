@@ -41,6 +41,11 @@ export const accounts = pgTable("accounts", {
   brandingFavicon: text("branding_favicon"), // URL to custom favicon
   brandingPrimaryColor: text("branding_primary_color"), // Hex/HSL color for primary actions
   brandingSidebarColor: text("branding_sidebar_color"), // Color for sidebar background
+  // White Label PWA Specifics
+  brandingAppName: text("branding_app_name"), // Short name for App Icon
+  brandingIconUrl: text("branding_icon_url"), // URL for processed square icon
+  brandingThemeColor: text("branding_theme_color"), // Meta theme-color
+  brandingBgColor: text("branding_bg_color"), // Splash screen background color
   // Custom Domain
   customDomain: text("custom_domain"), // Custom domain/subdomain (e.g., backup.empresa.com)
   domainStatus: text("domain_status").default("pending"), // pending, active, failed

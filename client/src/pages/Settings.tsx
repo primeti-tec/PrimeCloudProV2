@@ -21,6 +21,7 @@ import { User, Building, Bell, Shield, Loader2, Palette, Globe, CheckCircle2, XC
 import { validateDocument } from "@/lib/document-validation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { AppBranding } from "@/components/settings/AppBranding";
 
 const accountUpdateSchema = z.object({
   name: z.string().min(2, "Nome da organização é obrigatório"),
@@ -716,6 +717,14 @@ export default function Settings() {
               </Card>
             )}
 
+
+
+// ... (imports)
+
+            // Inside Settings component:
+
+            // ...
+
             {/* Branding Section - White Label */}
             {selectedAccount && ['owner', 'admin'].includes(selectedAccount.role) && (
               <Card>
@@ -725,238 +734,139 @@ export default function Settings() {
                     <CardTitle>Branding (White Label)</CardTitle>
                   </div>
                   <CardDescription>
-                    Personalize a aparência da aplicação com sua marca
+                    Personalize o ícone, nome e cores do aplicativo instalável (PWA).
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="branding-name">Nome da Aplicação</Label>
-                    <Input
-                      id="branding-name"
-                      value={brandingName}
-                      onChange={(e) => setBrandingName(e.target.value)}
-                      placeholder="Prime Cloud Pro"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Deixe em branco para usar o nome padrão
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="branding-logo">URL do Logo</Label>
-                    <Input
-                      id="branding-logo"
-                      type="url"
-                      value={brandingLogo}
-                      onChange={(e) => setBrandingLogo(e.target.value)}
-                      placeholder="https://exemplo.com/logo.png"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      URL pública para o logo da sua marca (recomendado: 32x32px ou maior)
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="branding-favicon">URL do Favicon</Label>
-                    <Input
-                      id="branding-favicon"
-                      type="url"
-                      value={brandingFavicon}
-                      onChange={(e) => setBrandingFavicon(e.target.value)}
-                      placeholder="https://exemplo.com/favicon.ico"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      URL pública para o favicon (ícone da aba do navegador)
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="branding-primary">Cor Primária</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="branding-primary"
-                          type="color"
-                          value={brandingPrimaryColor}
-                          onChange={(e) => setBrandingPrimaryColor(e.target.value)}
-                          className="h-10 w-16 p-1 cursor-pointer"
-                        />
-                        <Input
-                          type="text"
-                          value={brandingPrimaryColor}
-                          onChange={(e) => setBrandingPrimaryColor(e.target.value)}
-                          placeholder="#2563eb"
-                          className="flex-1"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Cor dos botões e elementos de destaque
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="branding-sidebar">Cor da Sidebar</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="branding-sidebar"
-                          type="color"
-                          value={brandingSidebarColor}
-                          onChange={(e) => setBrandingSidebarColor(e.target.value)}
-                          className="h-10 w-16 p-1 cursor-pointer"
-                        />
-                        <Input
-                          type="text"
-                          value={brandingSidebarColor}
-                          onChange={(e) => setBrandingSidebarColor(e.target.value)}
-                          placeholder="#1e293b"
-                          className="flex-1"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Cor de fundo da barra lateral
-                      </p>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="flex justify-between items-center pt-2">
-                    <p className="text-sm text-muted-foreground">
-                      As mudanças serão aplicadas após salvar e recarregar a página
-                    </p>
-                    <Button
-                      onClick={handleBrandingSave}
-                      disabled={updateBranding.isPending}
-                    >
-                      {updateBranding.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Salvando...
-                        </>
-                      ) : (
-                        "Salvar Branding"
-                      )}
-                    </Button>
-                  </div>
+                <CardContent>
+                  <AppBranding
+                    accountId={selectedAccount.id}
+                    initialData={{
+                      brandingAppName: selectedAccount.brandingAppName || selectedAccount.brandingName,
+                      brandingIconUrl: selectedAccount.brandingIconUrl || selectedAccount.brandingLogo,
+                      brandingThemeColor: selectedAccount.brandingThemeColor || selectedAccount.brandingPrimaryColor,
+                      brandingBgColor: selectedAccount.brandingBgColor || "#ffffff"
+                    }}
+                  />
                 </CardContent>
               </Card>
             )}
-
             {/* Custom Domain Section */}
-            {selectedAccount && ['owner', 'admin'].includes(selectedAccount.role) && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-5 w-5 text-primary" />
-                    <CardTitle>Domínio Personalizado</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Configure seu próprio domínio para acessar a plataforma
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="custom-domain">Domínio ou Subdomínio</Label>
-                    <Input
-                      id="custom-domain"
-                      value={customDomain}
-                      onChange={(e) => setCustomDomain(e.target.value)}
-                      placeholder="backup.suaempresa.com.br"
-                      disabled={!!(selectedAccount.customDomain && domainStatus === "active")}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Digite o domínio completo (ex: storage.minhaempresa.com)
-                    </p>
-                  </div>
+            {
+              selectedAccount && ['owner', 'admin'].includes(selectedAccount.role) && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-5 w-5 text-primary" />
+                      <CardTitle>Domínio Personalizado</CardTitle>
+                    </div>
+                    <CardDescription>
+                      Configure seu próprio domínio para acessar a plataforma
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="custom-domain">Domínio ou Subdomínio</Label>
+                      <Input
+                        id="custom-domain"
+                        value={customDomain}
+                        onChange={(e) => setCustomDomain(e.target.value)}
+                        placeholder="backup.suaempresa.com.br"
+                        disabled={!!(selectedAccount.customDomain && domainStatus === "active")}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Digite o domínio completo (ex: storage.minhaempresa.com)
+                      </p>
+                    </div>
 
-                  {selectedAccount.customDomain && (
-                    <div className="rounded-lg border p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Status do Domínio:</span>
-                        <Badge variant={domainStatus === "active" ? "default" : domainStatus === "failed" ? "destructive" : "secondary"}>
-                          {domainStatus === "active" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                          {domainStatus === "failed" && <XCircle className="h-3 w-3 mr-1" />}
-                          {domainStatus === "pending" && <AlertCircle className="h-3 w-3 mr-1" />}
-                          {domainStatus === "active" ? "Ativo" : domainStatus === "failed" ? "Falhou" : "Pendente"}
-                        </Badge>
-                      </div>
+                    {selectedAccount.customDomain && (
+                      <div className="rounded-lg border p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Status do Domínio:</span>
+                          <Badge variant={domainStatus === "active" ? "default" : domainStatus === "failed" ? "destructive" : "secondary"}>
+                            {domainStatus === "active" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                            {domainStatus === "failed" && <XCircle className="h-3 w-3 mr-1" />}
+                            {domainStatus === "pending" && <AlertCircle className="h-3 w-3 mr-1" />}
+                            {domainStatus === "active" ? "Ativo" : domainStatus === "failed" ? "Falhou" : "Pendente"}
+                          </Badge>
+                        </div>
 
-                      {domainStatus !== "active" && (
-                        <>
-                          <Separator />
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium">Instruções de Configuração DNS:</p>
-                            <div className="bg-muted p-3 rounded text-sm space-y-2">
-                              <p className="font-mono">
-                                <strong>Opção 1 (CNAME):</strong> Aponte {customDomain} para app.primecloudpro.com.br
-                              </p>
-                              <p className="font-mono text-xs break-all">
-                                <strong>Opção 2 (TXT):</strong> Adicione TXT: primecloudpro-verification={verificationToken}
+                        {domainStatus !== "active" && (
+                          <>
+                            <Separator />
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium">Instruções de Configuração DNS:</p>
+                              <div className="bg-muted p-3 rounded text-sm space-y-2">
+                                <p className="font-mono">
+                                  <strong>Opção 1 (CNAME):</strong> Aponte {customDomain} para app.primecloudpro.com.br
+                                </p>
+                                <p className="font-mono text-xs break-all">
+                                  <strong>Opção 2 (TXT):</strong> Adicione TXT: primecloudpro-verification={verificationToken}
+                                </p>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Após configurar o DNS, aguarde alguns minutos e clique em "Verificar DNS"
                               </p>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              Após configurar o DNS, aguarde alguns minutos e clique em "Verificar DNS"
-                            </p>
-                          </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    <div className="flex gap-2 flex-wrap">
+                      {!selectedAccount.customDomain ? (
+                        <Button
+                          onClick={handleDomainSave}
+                          disabled={configureDomain.isPending || !customDomain}
+                        >
+                          {configureDomain.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Configurando...
+                            </>
+                          ) : (
+                            "Configurar Domínio"
+                          )}
+                        </Button>
+                      ) : (
+                        <>
+                          {domainStatus !== "active" && (
+                            <Button
+                              onClick={handleDomainVerify}
+                              disabled={verifyDomain.isPending}
+                            >
+                              {verifyDomain.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Verificando...
+                                </>
+                              ) : (
+                                "Verificar DNS"
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            variant="destructive"
+                            onClick={handleDomainRemove}
+                            disabled={removeDomain.isPending}
+                          >
+                            {removeDomain.isPending ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Removendo...
+                              </>
+                            ) : (
+                              "Remover Domínio"
+                            )}
+                          </Button>
                         </>
                       )}
                     </div>
-                  )}
-
-                  <Separator />
-
-                  <div className="flex gap-2 flex-wrap">
-                    {!selectedAccount.customDomain ? (
-                      <Button
-                        onClick={handleDomainSave}
-                        disabled={configureDomain.isPending || !customDomain}
-                      >
-                        {configureDomain.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Configurando...
-                          </>
-                        ) : (
-                          "Configurar Domínio"
-                        )}
-                      </Button>
-                    ) : (
-                      <>
-                        {domainStatus !== "active" && (
-                          <Button
-                            onClick={handleDomainVerify}
-                            disabled={verifyDomain.isPending}
-                          >
-                            {verifyDomain.isPending ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Verificando...
-                              </>
-                            ) : (
-                              "Verificar DNS"
-                            )}
-                          </Button>
-                        )}
-                        <Button
-                          variant="destructive"
-                          onClick={handleDomainRemove}
-                          disabled={removeDomain.isPending}
-                        >
-                          {removeDomain.isPending ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Removendo...
-                            </>
-                          ) : (
-                            "Remover Domínio"
-                          )}
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                  </CardContent>
+                </Card>
+              )
+            }
 
             <Card>
               <CardHeader>
@@ -1001,165 +911,167 @@ export default function Settings() {
             </Card>
 
             {/* SMTP Email Configuration Section */}
-            {selectedAccount && ['owner', 'admin'].includes(selectedAccount.role) && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-5 w-5 text-primary" />
-                    <CardTitle>Configuração de E-mail (SMTP)</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Configure seu próprio servidor SMTP para envio de e-mails
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="smtp-enabled">Ativar SMTP Personalizado</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Usar seu próprio servidor SMTP para enviar e-mails
-                      </p>
+            {
+              selectedAccount && ['owner', 'admin'].includes(selectedAccount.role) && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-5 w-5 text-primary" />
+                      <CardTitle>Configuração de E-mail (SMTP)</CardTitle>
                     </div>
-                    <Switch
-                      id="smtp-enabled"
-                      checked={smtpEnabled}
-                      onCheckedChange={setSmtpEnabled}
-                    />
-                  </div>
-
-                  {smtpEnabled && (
-                    <>
-                      <Separator />
-                      <div className="grid gap-4">
-                        <div className="grid gap-2 grid-cols-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="smtp-host">Servidor SMTP *</Label>
-                            <Input
-                              id="smtp-host"
-                              value={smtpHost}
-                              onChange={(e) => setSmtpHost(e.target.value)}
-                              placeholder="smtp.gmail.com"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="smtp-port">Porta *</Label>
-                            <Input
-                              id="smtp-port"
-                              type="number"
-                              value={smtpPort}
-                              onChange={(e) => setSmtpPort(parseInt(e.target.value) || 587)}
-                              placeholder="587"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="smtp-encryption">Criptografia</Label>
-                          <Select value={smtpEncryption} onValueChange={(value: any) => setSmtpEncryption(value)}>
-                            <SelectTrigger id="smtp-encryption">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Nenhuma</SelectItem>
-                              <SelectItem value="tls">TLS (STARTTLS)</SelectItem>
-                              <SelectItem value="ssl">SSL/TLS</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-muted-foreground">
-                            Porta 587 geralmente usa TLS. Porta 465 usa SSL/TLS.
-                          </p>
-                        </div>
-
-                        <div className="grid gap-2 grid-cols-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="smtp-user">Usuário SMTP *</Label>
-                            <Input
-                              id="smtp-user"
-                              value={smtpUser}
-                              onChange={(e) => setSmtpUser(e.target.value)}
-                              placeholder="seu-email@exemplo.com"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="smtp-pass">Senha SMTP *</Label>
-                            <Input
-                              id="smtp-pass"
-                              type="password"
-                              value={smtpPass}
-                              onChange={(e) => setSmtpPass(e.target.value)}
-                              placeholder="••••••••"
-                            />
-                          </div>
-                        </div>
-
-                        <Separator />
-
-                        <div className="grid gap-2 grid-cols-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="smtp-from-email">E-mail Remetente</Label>
-                            <Input
-                              id="smtp-from-email"
-                              type="email"
-                              value={smtpFromEmail}
-                              onChange={(e) => setSmtpFromEmail(e.target.value)}
-                              placeholder="noreply@suaempresa.com"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="smtp-from-name">Nome do Remetente</Label>
-                            <Input
-                              id="smtp-from-name"
-                              value={smtpFromName}
-                              onChange={(e) => setSmtpFromName(e.target.value)}
-                              placeholder="Sua Empresa"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-                          <p className="text-sm font-medium">⚠️ Informações Importantes:</p>
-                          <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                            <li>Gmail: Use senha de aplicativo, não sua senha normal</li>
-                            <li>Office 365: smtp.office365.com, porta 587, TLS</li>
-                            <li>O envio de e-mails usará estas configurações quando ativado</li>
-                          </ul>
-                        </div>
-
-                        <div className="flex gap-2 flex-wrap">
-                          <Button
-                            onClick={handleSmtpSave}
-                            disabled={saveSmtpConfig.isPending}
-                          >
-                            {saveSmtpConfig.isPending ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Salvando...
-                              </>
-                            ) : (
-                              "Salvar Configuração"
-                            )}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={handleTestConnection}
-                            disabled={testSmtpConnection.isPending || !smtpHost}
-                          >
-                            {testSmtpConnection.isPending ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Testando...
-                              </>
-                            ) : (
-                              "Testar Conexão"
-                            )}
-                          </Button>
-                        </div>
+                    <CardDescription>
+                      Configure seu próprio servidor SMTP para envio de e-mails
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="smtp-enabled">Ativar SMTP Personalizado</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Usar seu próprio servidor SMTP para enviar e-mails
+                        </p>
                       </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+                      <Switch
+                        id="smtp-enabled"
+                        checked={smtpEnabled}
+                        onCheckedChange={setSmtpEnabled}
+                      />
+                    </div>
+
+                    {smtpEnabled && (
+                      <>
+                        <Separator />
+                        <div className="grid gap-4">
+                          <div className="grid gap-2 grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="smtp-host">Servidor SMTP *</Label>
+                              <Input
+                                id="smtp-host"
+                                value={smtpHost}
+                                onChange={(e) => setSmtpHost(e.target.value)}
+                                placeholder="smtp.gmail.com"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="smtp-port">Porta *</Label>
+                              <Input
+                                id="smtp-port"
+                                type="number"
+                                value={smtpPort}
+                                onChange={(e) => setSmtpPort(parseInt(e.target.value) || 587)}
+                                placeholder="587"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="smtp-encryption">Criptografia</Label>
+                            <Select value={smtpEncryption} onValueChange={(value: any) => setSmtpEncryption(value)}>
+                              <SelectTrigger id="smtp-encryption">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Nenhuma</SelectItem>
+                                <SelectItem value="tls">TLS (STARTTLS)</SelectItem>
+                                <SelectItem value="ssl">SSL/TLS</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              Porta 587 geralmente usa TLS. Porta 465 usa SSL/TLS.
+                            </p>
+                          </div>
+
+                          <div className="grid gap-2 grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="smtp-user">Usuário SMTP *</Label>
+                              <Input
+                                id="smtp-user"
+                                value={smtpUser}
+                                onChange={(e) => setSmtpUser(e.target.value)}
+                                placeholder="seu-email@exemplo.com"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="smtp-pass">Senha SMTP *</Label>
+                              <Input
+                                id="smtp-pass"
+                                type="password"
+                                value={smtpPass}
+                                onChange={(e) => setSmtpPass(e.target.value)}
+                                placeholder="••••••••"
+                              />
+                            </div>
+                          </div>
+
+                          <Separator />
+
+                          <div className="grid gap-2 grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="smtp-from-email">E-mail Remetente</Label>
+                              <Input
+                                id="smtp-from-email"
+                                type="email"
+                                value={smtpFromEmail}
+                                onChange={(e) => setSmtpFromEmail(e.target.value)}
+                                placeholder="noreply@suaempresa.com"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="smtp-from-name">Nome do Remetente</Label>
+                              <Input
+                                id="smtp-from-name"
+                                value={smtpFromName}
+                                onChange={(e) => setSmtpFromName(e.target.value)}
+                                placeholder="Sua Empresa"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                            <p className="text-sm font-medium">⚠️ Informações Importantes:</p>
+                            <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                              <li>Gmail: Use senha de aplicativo, não sua senha normal</li>
+                              <li>Office 365: smtp.office365.com, porta 587, TLS</li>
+                              <li>O envio de e-mails usará estas configurações quando ativado</li>
+                            </ul>
+                          </div>
+
+                          <div className="flex gap-2 flex-wrap">
+                            <Button
+                              onClick={handleSmtpSave}
+                              disabled={saveSmtpConfig.isPending}
+                            >
+                              {saveSmtpConfig.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Salvando...
+                                </>
+                              ) : (
+                                "Salvar Configuração"
+                              )}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={handleTestConnection}
+                              disabled={testSmtpConnection.isPending || !smtpHost}
+                            >
+                              {testSmtpConnection.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Testando...
+                                </>
+                              ) : (
+                                "Testar Conexão"
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            }
 
             <Card>
               <CardHeader>
@@ -1181,9 +1093,9 @@ export default function Settings() {
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </div>
-      </main>
-    </div>
+          </div >
+        </div >
+      </main >
+    </div >
   );
 }

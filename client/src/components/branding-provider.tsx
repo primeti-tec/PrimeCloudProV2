@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, ReactNode } from "react";
+import { createContext, useContext, useEffect } from "react";
+import type { ReactNode } from "react";
 import { useCurrentAccount } from "@/hooks/use-current-account";
 
 interface BrandingConfig {
@@ -7,6 +8,8 @@ interface BrandingConfig {
   favicon: string | null;
   primaryColor: string;
   sidebarColor: string;
+  iconUrl?: string | null;
+  themeColor?: string | null;
 }
 
 const defaultBranding: BrandingConfig = {
@@ -15,6 +18,8 @@ const defaultBranding: BrandingConfig = {
   favicon: null,
   primaryColor: "#2563eb", // blue-600
   sidebarColor: "#1e293b", // slate-800
+  iconUrl: null,
+  themeColor: "#2563eb",
 };
 
 const BrandingContext = createContext<BrandingConfig>(defaultBranding);
@@ -37,6 +42,8 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
     favicon: account.brandingFavicon || defaultBranding.favicon,
     primaryColor: account.brandingPrimaryColor || defaultBranding.primaryColor,
     sidebarColor: account.brandingSidebarColor || defaultBranding.sidebarColor,
+    iconUrl: account.brandingIconUrl || defaultBranding.iconUrl,
+    themeColor: account.brandingThemeColor || account.brandingPrimaryColor || defaultBranding.themeColor,
   } : defaultBranding;
 
   // Inject CSS variables for colors
@@ -85,6 +92,22 @@ export function BrandingProvider({ children }: BrandingProviderProps) {
       const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
       if (link) {
         link.href = branding.favicon;
+      }
+    }
+
+    // Update Apple Touch Icon
+    if (branding.iconUrl) {
+      const appleIcon = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
+      if (appleIcon) {
+        appleIcon.href = branding.iconUrl;
+      }
+    }
+
+    // Update Meta Theme Color
+    if (branding.themeColor) {
+      const metaTheme = document.querySelector("meta[name='theme-color']") as HTMLMetaElement;
+      if (metaTheme) {
+        metaTheme.content = branding.themeColor;
       }
     }
 

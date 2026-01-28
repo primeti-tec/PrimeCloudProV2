@@ -688,12 +688,72 @@ export class MinioService {
             };
         }
     }
+
+
+    /**
+     * Upload a public system asset (e.g. branding icon)
+     */
+    async uploadPublicAsset(filename: string, buffer: Buffer, mimetype: string): Promise<string> {
+        const bucketName = "primecloud-assets";
+
+        if (!isMinioAvailable) {
+            console.log(`[MOCK] Uploading public asset: ${filename}`);
+            return `/mock-assets/${filename}`;
+        }
+
+        try {
+            const exists = await minioClient.bucketExists(bucketName);
+            if (!exists) {
+                await minioClient.makeBucket(bucketName, "us-east-1");
+                // Set public policy
+                const policy = {
+                    Version: "2012-10-17",
+                    Statement: [
+                        {
+                            Effect: "Allow",
+                            Principal: { AWS: ["*"] },
+                            Action: ["s3:GetObject"],
+                            Resource: [`arn:aws:s3:::${bucketName}/*`],
+                        },
+                    ],
+                };
+                await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy));
+            }
+
+            await minioClient.putObject(bucketName, filename, buffer, buffer.length, {
+                "Content-Type": mimetype,
+            });
+
+            return filename;
+        } catch (error) {
+            console.error(`❌ Failed to upload public asset: ${filename}`, error);
+            throw new Error(`Failed to upload asset: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Get a stream for a public asset
+     */
+    async getPublicAssetStream(filename: string): Promise<any> {
+        const bucketName = "primecloud-assets";
+
+        if (!isMinioAvailable) {
+            throw new Error("MinIO not available");
+        }
+
+        try {
+            return await minioClient.getObject(bucketName, filename);
+        } catch (error) {
+            console.error(`❌ Failed to get asset stream: ${filename}`, error);
+            throw error;
+        }
+    }
 }
 
 /**
  * Get S3 endpoint configuration for clients
  */
-export function getS3EndpointConfig(): {
+export function getMinioConfig(): {
     endpoint: string;
     region: string;
     port: number;

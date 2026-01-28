@@ -1,6 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
 import { Sidebar } from "@/components/Sidebar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { useBranding } from "@/components/branding-provider";
 import { useMyAccounts } from "@/hooks/use-accounts";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -33,6 +36,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import {
   Loader2,
@@ -56,6 +67,8 @@ import {
   Bell,
   List,
   Plus,
+  Menu,
+  MoreVertical,
   Share2,
   User,
   ExternalLink,
@@ -339,6 +352,7 @@ function FilePreviewModal({
 export default function BucketBrowser() {
   const { bucketId } = useParams<{ bucketId: string }>();
   const [location, setLocation] = useLocation();
+  const { user } = useAuth();
   const { data: accounts, isLoading: isAccountsLoading } = useMyAccounts();
   const { isExternalClient } = usePermissions();
   const branding = useBranding();
@@ -445,7 +459,7 @@ export default function BucketBrowser() {
   const allowedViews = ["all", "recent", "favorites", "shared-with-you", "shared-by-link", "tags"];
   const activeView = allowedViews.includes(viewParam) ? viewParam : "all";
   const listPrefix = activeView === "all" ? currentPrefix : "";
-  const listRecursive = activeView !== "all";
+  const listRecursive = activeView !== "all" || !!searchTerm;
   const cacheKey = currentAccount?.id && bucket?.id
     ? `bucketObjects:${currentAccount.id}:${bucket.id}:${activeView}`
     : null;
@@ -552,8 +566,8 @@ export default function BucketBrowser() {
   const displayPrefixes = activeView === "all" ? filteredPrefixes : [];
   const displayObjects = activeView === "recent"
     ? [...filteredObjects]
-        .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
-        .slice(0, 10)
+      .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
+      .slice(0, 10)
     : activeView === "favorites"
       ? filteredObjects.filter((obj) => favoriteSet.has(obj.name))
       : activeView === "shared-by-link"
@@ -792,8 +806,8 @@ export default function BucketBrowser() {
   if (isAccountsLoading || isBucketsLoading) {
     return (
       <div className="flex min-h-screen bg-background">
-        <Sidebar />
-        <main className="flex-1 ml-72 p-8">
+        <Sidebar className="hidden md:flex" />
+        <main className="flex-1 md:ml-72 p-8 pb-20 md:pb-8">
           <div className="flex items-center gap-4 mb-8">
             <Skeleton className="h-10 w-10 rounded-full" />
             <div className="space-y-2">
@@ -820,6 +834,7 @@ export default function BucketBrowser() {
             </div>
           </div>
         </main>
+        <MobileBottomNav />
       </div>
     );
   }
@@ -827,8 +842,8 @@ export default function BucketBrowser() {
   if (!bucket) {
     return (
       <div className="flex min-h-screen bg-background">
-        <Sidebar />
-        <main className="flex-1 ml-72 p-8">
+        <Sidebar className="hidden md:flex" />
+        <main className="flex-1 md:ml-72 p-8 pb-20 md:pb-8">
           <div className="flex flex-col items-center justify-center h-[60vh]">
             <FolderOpen className="h-16 w-16 text-muted-foreground mb-4 opacity-20" />
             <h2 className="text-xl font-semibold mb-2">Bucket não encontrado</h2>
@@ -838,6 +853,7 @@ export default function BucketBrowser() {
             </Button>
           </div>
         </main>
+        <MobileBottomNav />
       </div>
     );
   }
@@ -849,469 +865,474 @@ export default function BucketBrowser() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 ml-72 flex flex-col min-h-screen">
-          <header className="h-14 flex items-center justify-end px-6 text-white" style={{ backgroundColor: branding.primaryColor }}>
-            <div className="flex items-center gap-5">
+      <Sidebar className="hidden md:flex" />
+      <main className="flex-1 md:ml-72 flex flex-col min-h-screen pb-16 md:pb-0">
+        <header className="h-14 flex items-center justify-between px-6 text-white" style={{ backgroundColor: branding.primaryColor }}>
+          <div className="flex items-center gap-3">
+            <div className="md:hidden">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="-ml-3 text-white hover:bg-white/10">
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-72 border-r">
+                  <Sidebar className="w-full relative h-full" />
+                </SheetContent>
+              </Sheet>
+            </div>
+            <span className="text-lg md:text-xl font-bold text-white tracking-wide truncate">
+              {user?.displayName || branding.name || "Cliente"}
+            </span>
+          </div>
+          {!isExternalClient && (
+            <div className="flex items-center gap-5 ml-auto">
               <Search className="h-4 w-4" />
               <Bell className="h-4 w-4" />
               <div className="h-8 w-8 rounded-full bg-white/70 dark:bg-white/20 flex items-center justify-center text-slate-700">
                 <User className="h-4 w-4" />
               </div>
             </div>
-          </header>
+          )}
+        </header>
 
-          <div className="px-6 py-4 bg-card border-b border-border flex items-center justify-between">
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground"
-                onClick={() => setLocation("/dashboard/storage")}
-                title="Voltar para Armazenamento"
-              >
-                <Home className="h-4 w-4" />
-              </button>
-              <span className="text-slate-300">|</span>
-              <span className="text-sm font-semibold text-foreground">{branding.name || bucket.name}</span>
-              {branding.name && branding.name !== bucket.name && (
-                <span className="text-xs text-muted-foreground">{bucket.name}</span>
-              )}
-              <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
-                {viewLabelMap[activeView] || "Todos os arquivos"}
-              </span>
-              {isExternalClient && (
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${
-                    bucket.userPermission === "read-write"
-                      ? "bg-green-100 text-green-700"
-                      : bucket.userPermission === "write"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-slate-100 text-slate-700"
-                  }`}
-                >
-                  {bucket.userPermission === "read-write"
-                    ? "Leitura e Escrita"
-                    : bucket.userPermission === "write"
-                      ? "Somente Escrita"
-                      : "Somente Leitura"}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  if (canWrite) fileInputRef.current?.click();
-                }}
-                className="h-8 w-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground"
-                disabled={!canWrite}
-                title={canWrite ? "Upload" : "Sem permissão"}
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex items-center gap-4 text-muted-foreground">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4" />
-                <Input
-                  placeholder="Buscar"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 h-8 text-sm bg-background"
-                />
-              </div>
-              <button type="button" className="text-muted-foreground">
-                <List className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => refetch()}
-                className="text-muted-foreground"
-                title="Atualizar"
-              >
-                <RefreshCw className={`h-4 w-4 ${isObjectsLoading ? "animate-spin" : ""}`} />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 bg-muted/30 dark:bg-background/40 p-6 overflow-y-auto">
-            {uploadProgress !== null && (
-              <div className="mb-4 flex items-center gap-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-700">Enviando arquivo...</p>
-                  <Progress value={uploadProgress} className="h-2 mt-1" />
-                </div>
-                <span className="text-sm text-blue-600">{Math.round(uploadProgress)}%</span>
-              </div>
+        <div className="px-6 py-4 bg-card border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => setLocation("/dashboard/storage")}
+              title="Voltar para Armazenamento"
+            >
+              <Home className="h-4 w-4" />
+            </button>
+            {!isExternalClient && (
+              <>
+                {/* Info removed for cleaner UI */}
+              </>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                if (canWrite) fileInputRef.current?.click();
+              }}
+              className="h-8 w-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground"
+              disabled={!canWrite}
+              title={canWrite ? "Upload" : "Sem permissão"}
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex items-center gap-4 text-muted-foreground">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4" />
+              <Input
+                placeholder="Buscar"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 h-8 text-sm bg-background"
+              />
+            </div>
+            <button type="button" className="text-muted-foreground">
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="text-muted-foreground"
+              title="Atualizar"
+            >
+              <RefreshCw className={`h-4 w-4 ${isObjectsLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+        </div>
 
-            <div className="bg-card shadow-sm border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-muted-foreground border-b">
-                    <th className="w-10 p-4">
-                      <input type="checkbox" />
-                    </th>
-                    <th className="p-4">Nome</th>
-                    <th className="p-4 hidden md:table-cell">Tamanho</th>
-                    <th className="p-4 hidden md:table-cell">Modificado</th>
-                    <th className="p-4 text-right"> </th>
+        <div className="flex-1 bg-muted/30 dark:bg-background/40 p-6 overflow-y-auto">
+          {uploadProgress !== null && (
+            <div className="mb-4 flex items-center gap-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-700">Enviando arquivo...</p>
+                <Progress value={uploadProgress} className="h-2 mt-1" />
+              </div>
+              <span className="text-sm text-blue-600">{Math.round(uploadProgress)}%</span>
+            </div>
+          )}
+
+          <div className="bg-card shadow-sm border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground border-b">
+                  <th className="w-10 p-4">
+                    <input type="checkbox" />
+                  </th>
+                  <th className="p-4">Nome</th>
+                  <th className="p-4 hidden md:table-cell">Tamanho</th>
+                  <th className="p-4 hidden md:table-cell">Modificado</th>
+                  <th className="p-4 text-right"> </th>
+                </tr>
+              </thead>
+              <tbody>
+                {isObjectsLoading ? (
+                  <tr>
+                    <td colSpan={5} className="p-6">
+                      <div className="space-y-3">
+                        {[1, 2, 3, 4].map((i) => (
+                          <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {isObjectsLoading ? (
-                    <tr>
-                      <td colSpan={5} className="p-6">
-                        <div className="space-y-3">
-                          {[1, 2, 3, 4].map((i) => (
-                            <Skeleton key={i} className="h-10 w-full" />
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ) : objectsError ? (
-                    <tr>
-                      <td colSpan={5} className="p-8 text-center text-destructive">
-                        <p>Erro ao carregar arquivos: {(objectsError as Error).message}</p>
-                        <Button variant="outline" className="mt-4" onClick={() => refetch()}>
-                          Tentar Novamente
+                ) : objectsError ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-destructive">
+                      <p>Erro ao carregar arquivos: {(objectsError as Error).message}</p>
+                      <Button variant="outline" className="mt-4" onClick={() => refetch()}>
+                        Tentar Novamente
+                      </Button>
+                    </td>
+                  </tr>
+                ) : (displayPrefixes.length === 0 && displayObjects.length === 0) || isFilteredEmpty ? (
+                  <tr>
+                    <td colSpan={5} className="p-12 text-center text-muted-foreground">
+                      <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                      <p>
+                        {isFilteredEmpty
+                          ? "Nenhum item para este filtro."
+                          : currentPrefix
+                            ? "Esta pasta está vazia."
+                            : "Nenhum arquivo neste bucket ainda."}
+                      </p>
+                      {canWrite && (
+                        <Button variant="outline" className="mt-4" onClick={() => fileInputRef.current?.click()}>
+                          <Upload className="h-4 w-4 mr-2" /> Fazer Upload
                         </Button>
-                      </td>
-                    </tr>
-                  ) : (displayPrefixes.length === 0 && displayObjects.length === 0) || isFilteredEmpty ? (
-                    <tr>
-                      <td colSpan={5} className="p-12 text-center text-muted-foreground">
-                        <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                        <p>
-                          {isFilteredEmpty
-                            ? "Nenhum item para este filtro."
-                            : currentPrefix
-                              ? "Esta pasta está vazia."
-                              : "Nenhum arquivo neste bucket ainda."}
-                        </p>
-                        {canWrite && (
-                          <Button variant="outline" className="mt-4" onClick={() => fileInputRef.current?.click()}>
-                            <Upload className="h-4 w-4 mr-2" /> Fazer Upload
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ) : (
-                    <>
-                      {currentPrefix && activeView === "all" && (
-                        <tr className="hover:bg-muted/20 transition-colors cursor-pointer" onClick={navigateUp}>
-                          <td className="p-4">
-                            <input type="checkbox" />
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <FolderOpen className="h-4 w-4 text-blue-500" />
-                              <span className="font-medium">..</span>
-                            </div>
-                          </td>
-                          <td className="p-4 hidden md:table-cell text-muted-foreground">—</td>
-                          <td className="p-4 hidden md:table-cell text-muted-foreground">—</td>
-                          <td className="p-4 text-right text-muted-foreground">
-                            <Share2 className="h-4 w-4 inline" />
-                          </td>
-                        </tr>
                       )}
+                    </td>
+                  </tr>
+                ) : (
+                  <>
+                    {currentPrefix && activeView === "all" && (
+                      <tr className="hover:bg-muted/20 transition-colors cursor-pointer" onClick={navigateUp}>
+                        <td className="p-4">
+                          <input type="checkbox" />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <FolderOpen className="h-4 w-4 text-blue-500" />
+                            <span className="font-medium">..</span>
+                          </div>
+                        </td>
+                        <td className="p-4 hidden md:table-cell text-muted-foreground">—</td>
+                        <td className="p-4 hidden md:table-cell text-muted-foreground">—</td>
+                        <td className="p-4 text-right text-muted-foreground">
+                          <Share2 className="h-4 w-4 inline" />
+                        </td>
+                      </tr>
+                    )}
 
-                      {displayPrefixes.map((prefix) => (
-                        <tr
-                          key={prefix}
-                          className="hover:bg-muted/20 transition-colors cursor-pointer"
-                          onClick={() => navigateToFolder(prefix)}
-                        >
-                          <td className="p-4">
-                            <input type="checkbox" />
-                          </td>
-                          <td className="p-4">
+                    {displayPrefixes.map((prefix) => (
+                      <tr
+                        key={prefix}
+                        className="hover:bg-muted/20 transition-colors cursor-pointer"
+                        onClick={() => navigateToFolder(prefix)}
+                      >
+                        <td className="p-4">
+                          <input type="checkbox" />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <FolderOpen className="h-4 w-4 text-blue-500" />
+                            <span className="font-medium">
+                              {getDisplayName(prefix, currentPrefix)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4 hidden md:table-cell text-muted-foreground">0 KB</td>
+                        <td className="p-4 hidden md:table-cell text-muted-foreground">—</td>
+                        <td className="p-4 text-right text-muted-foreground">
+                          <Share2 className="h-4 w-4 inline" />
+                        </td>
+                      </tr>
+                    ))}
+
+                    {displayObjects.map((obj) => (
+                      <tr key={obj.name} className="hover:bg-muted/20 transition-colors">
+                        <td className="p-4">
+                          <input type="checkbox" />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-col">
                             <div className="flex items-center gap-3">
-                              <FolderOpen className="h-4 w-4 text-blue-500" />
-                              <span className="font-medium">
-                                {getDisplayName(prefix, currentPrefix)}
+                              {getFileIcon(obj.name)}
+                              <span className="font-medium truncate break-all whitespace-normal min-w-0" style={{ wordBreak: "break-word" }}>
+                                {obj.name.split("/").pop()}
                               </span>
                             </div>
-                          </td>
-                          <td className="p-4 hidden md:table-cell text-muted-foreground">0 KB</td>
-                          <td className="p-4 hidden md:table-cell text-muted-foreground">—</td>
-                          <td className="p-4 text-right text-muted-foreground">
-                            <Share2 className="h-4 w-4 inline" />
-                          </td>
-                        </tr>
-                      ))}
-
-                      {displayObjects.map((obj) => (
-                        <tr key={obj.name} className="hover:bg-muted/20 transition-colors">
-                          <td className="p-4">
-                            <input type="checkbox" />
-                          </td>
-                          <td className="p-4">
-                            <div className="flex flex-col">
-                              <div className="flex items-center gap-3">
-                                {getFileIcon(obj.name)}
-                                <span className="font-medium">
-                                  {getDisplayName(obj.name, currentPrefix)}
-                                </span>
+                            {(tagsMap.get(obj.name) || []).length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {(tagsMap.get(obj.name) || []).map((tag) => (
+                                  <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                    {tag}
+                                  </span>
+                                ))}
                               </div>
-                              {(tagsMap.get(obj.name) || []).length > 0 && (
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {(tagsMap.get(obj.name) || []).map((tag) => (
-                                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                                      {tag}
-                                    </span>
-                                  ))}
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4 hidden md:table-cell text-muted-foreground">
+                          {formatBytes(obj.size)}
+                        </td>
+                        <td className="p-4 hidden md:table-cell text-muted-foreground">
+                          {formatDate(obj.lastModified)}
+                        </td>
+                        <td className="p-4 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuLabel>Detalhes</DropdownMenuLabel>
+                              <div className="px-2 py-1.5 text-xs text-muted-foreground space-y-1">
+                                <div className="flex justify-between">
+                                  <span>Tamanho:</span>
+                                  <span className="font-medium text-foreground">{formatBytes(obj.size)}</span>
                                 </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-4 hidden md:table-cell text-muted-foreground">
-                            {formatBytes(obj.size)}
-                          </td>
-                          <td className="p-4 hidden md:table-cell text-muted-foreground">
-                            {formatDate(obj.lastModified)}
-                          </td>
-                          <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-2 text-muted-foreground">
+                                <div className="flex justify-between">
+                                  <span>Tipo:</span>
+                                  <span className="font-medium text-foreground">{getFileExtension(obj.name).toUpperCase()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Modificado:</span>
+                                  <span className="font-medium text-foreground">{new Date(obj.lastModified).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
                               {canRead && (
                                 <>
-                                  <button
-                                    type="button"
-                                    title={favoriteSet.has(obj.name) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-                                    onClick={() => handleToggleFavorite(obj)}
-                                    className={favoriteSet.has(obj.name) ? "text-yellow-500" : ""}
-                                  >
-                                    <Star className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    title="Tags"
-                                    onClick={() => handleOpenTags(obj)}
-                                  >
-                                    <Tag className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    title="Compartilhar"
-                                    onClick={() => handleOpenShare(obj)}
-                                  >
-                                    <Share2 className="h-4 w-4" />
-                                  </button>
-                                </>
-                              )}
-                              {canRead && (
-                                <>
-                                  <button
-                                    type="button"
-                                    title={isPreviewable(obj.name) ? "Visualizar" : "Abrir"}
-                                    onClick={() => handlePreview(obj)}
-                                    disabled={isLoadingPreview}
-                                  >
-                                    {isLoadingPreview && previewFile?.name === obj.name ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Eye className="h-4 w-4" />
-                                    )}
-                                  </button>
-                                  <button type="button" title="Download" onClick={() => handleDownload(obj)}>
-                                    <Download className="h-4 w-4" />
-                                  </button>
+                                  <DropdownMenuItem onClick={() => handleToggleFavorite(obj)}>
+                                    <Star className={`mr-2 h-4 w-4 ${favoriteSet.has(obj.name) ? "text-yellow-500 fill-yellow-500" : ""}`} />
+                                    <span>Favorito</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleOpenTags(obj)}>
+                                    <Tag className="mr-2 h-4 w-4" />
+                                    <span>Tags</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleOpenShare(obj)}>
+                                    <Share2 className="mr-2 h-4 w-4" />
+                                    <span>Compartilhar</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handlePreview(obj)} disabled={isLoadingPreview && previewFile?.name === obj.name}>
+                                    {isLoadingPreview && previewFile?.name === obj.name ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
+                                    <span>Visualizar</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDownload(obj)}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    <span>Baixar</span>
+                                  </DropdownMenuItem>
                                 </>
                               )}
                               {canWrite && (
-                                <button
-                                  type="button"
-                                  title="Excluir"
-                                  onClick={() => {
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => {
                                     setObjectToDelete(obj);
                                     setDeleteDialogOpen(true);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </button>
+                                  }} className="text-destructive focus:text-destructive">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Excluir</span>
+                                  </DropdownMenuItem>
+                                </>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+              </tbody>
+            </table>
           </div>
+        </div>
 
-          <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
+        <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
 
-          {/* File Preview Modal */}
-          <FilePreviewModal
-            isOpen={previewOpen}
-            onClose={handleClosePreview}
-            file={previewFile}
-            previewUrl={previewUrl}
-            onDownload={() => previewFile && handleDownload(previewFile)}
-          />
+        {/* File Preview Modal */}
+        <FilePreviewModal
+          isOpen={previewOpen}
+          onClose={handleClosePreview}
+          file={previewFile}
+          previewUrl={previewUrl}
+          onDownload={() => previewFile && handleDownload(previewFile)}
+        />
 
-          {/* Share Dialog */}
-          <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Compartilhar Arquivo</DialogTitle>
-                <DialogDescription>
-                  Gere um link de compartilhamento ou envie para um email.
-                </DialogDescription>
-              </DialogHeader>
-              {shareTarget && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    {getFileIcon(shareTarget.name)}
-                    <div>
-                      <p className="font-medium">{getDisplayName(shareTarget.name, currentPrefix)}</p>
-                      <p className="text-sm text-muted-foreground">{formatBytes(shareTarget.size)}</p>
-                    </div>
-                  </div>
-
+        {/* Share Dialog */}
+        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Compartilhar Arquivo</DialogTitle>
+              <DialogDescription>
+                Gere um link de compartilhamento ou envie para um email.
+              </DialogDescription>
+            </DialogHeader>
+            {shareTarget && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                  {getFileIcon(shareTarget.name)}
                   <div>
-                    <label className="text-sm font-medium text-slate-700">Email (opcional)</label>
+                    <p className="font-medium">{getDisplayName(shareTarget.name, currentPrefix)}</p>
+                    <p className="text-sm text-muted-foreground">{formatBytes(shareTarget.size)}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Email (opcional)</label>
+                  <Input
+                    value={shareEmail}
+                    onChange={(e) => setShareEmail(e.target.value)}
+                    placeholder="cliente@empresa.com"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Acesso</label>
+                    <select
+                      value={shareAccess}
+                      onChange={(e) => setShareAccess(e.target.value as "read" | "download")}
+                      className="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="read">Visualizar</option>
+                      <option value="download">Download</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Expira em (dias)</label>
                     <Input
-                      value={shareEmail}
-                      onChange={(e) => setShareEmail(e.target.value)}
-                      placeholder="cliente@empresa.com"
+                      type="number"
+                      value={shareExpiresDays}
+                      onChange={(e) => setShareExpiresDays(e.target.value)}
+                      min={1}
+                      placeholder="Opcional"
                       className="mt-1"
                     />
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-slate-700">Acesso</label>
-                      <select
-                        value={shareAccess}
-                        onChange={(e) => setShareAccess(e.target.value as "read" | "download")}
-                        className="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm"
-                      >
-                        <option value="read">Visualizar</option>
-                        <option value="download">Download</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-slate-700">Expira em (dias)</label>
-                      <Input
-                        type="number"
-                        value={shareExpiresDays}
-                        onChange={(e) => setShareExpiresDays(e.target.value)}
-                        min={1}
-                        placeholder="Opcional"
-                        className="mt-1"
-                      />
+                {shareUrl && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Link gerado</label>
+                    <div className="flex gap-2">
+                      <Input value={shareUrl} readOnly className="bg-background" />
+                      <Button variant="outline" onClick={handleCopyShare}>Copiar</Button>
                     </div>
                   </div>
-
-                  {shareUrl && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700">Link gerado</label>
-                      <div className="flex gap-2">
-                        <Input value={shareUrl} readOnly className="bg-background" />
-                        <Button variant="outline" onClick={handleCopyShare}>Copiar</Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              <DialogFooter className="flex justify-between">
-                {currentShare && (
-                  <Button
-                    variant="outline"
-                    onClick={() => handleRevokeShare(currentShare.id)}
-                  >
-                    Revogar link
-                  </Button>
                 )}
-                <Button onClick={handleCreateShare}>Gerar link</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Tags Dialog */}
-          <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Tags do Arquivo</DialogTitle>
-                <DialogDescription>Adicione ou remova tags para este arquivo.</DialogDescription>
-              </DialogHeader>
-              {tagTarget && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    {getFileIcon(tagTarget.name)}
-                    <div>
-                      <p className="font-medium">{getDisplayName(tagTarget.name, currentPrefix)}</p>
-                      <p className="text-sm text-muted-foreground">{formatBytes(tagTarget.size)}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Input
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      placeholder="Nova tag"
-                      className="bg-background"
-                    />
-                    <Button onClick={handleAddTag}>Adicionar</Button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {currentTags.length === 0 && (
-                      <span className="text-sm text-muted-foreground">Nenhuma tag cadastrada.</span>
-                    )}
-                    {currentTags.map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => handleRemoveTag(tag)}
-                        className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground hover:bg-muted/70"
-                      >
-                        {tag} <span className="ml-1">×</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              </div>
+            )}
+            <DialogFooter className="flex justify-between">
+              {currentShare && (
+                <Button
+                  variant="outline"
+                  onClick={() => handleRevokeShare(currentShare.id)}
+                >
+                  Revogar link
+                </Button>
               )}
-            </DialogContent>
-          </Dialog>
+              <Button onClick={handleCreateShare}>Gerar link</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-          {/* Delete Confirmation Dialog */}
-          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Excluir Arquivo</DialogTitle>
-                <DialogDescription>
-                  Tem certeza que deseja excluir este arquivo? Esta ação não pode ser desfeita.
-                </DialogDescription>
-              </DialogHeader>
-              {objectToDelete && (
+        {/* Tags Dialog */}
+        <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Tags do Arquivo</DialogTitle>
+              <DialogDescription>Adicione ou remova tags para este arquivo.</DialogDescription>
+            </DialogHeader>
+            {tagTarget && (
+              <div className="space-y-4">
                 <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                  {getFileIcon(objectToDelete.name)}
+                  {getFileIcon(tagTarget.name)}
                   <div>
-                    <p className="font-medium">
-                      {getDisplayName(objectToDelete.name, currentPrefix)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatBytes(objectToDelete.size)}
-                    </p>
+                    <p className="font-medium">{getDisplayName(tagTarget.name, currentPrefix)}</p>
+                    <p className="text-sm text-muted-foreground">{formatBytes(tagTarget.size)}</p>
                   </div>
                 </div>
-              )}
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
-                  {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Excluir
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-      </main>
-    </div>
+
+                <div className="flex gap-2">
+                  <Input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    placeholder="Nova tag"
+                    className="bg-background"
+                  />
+                  <Button onClick={handleAddTag}>Adicionar</Button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {currentTags.length === 0 && (
+                    <span className="text-sm text-muted-foreground">Nenhuma tag cadastrada.</span>
+                  )}
+                  {currentTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => handleRemoveTag(tag)}
+                      className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground hover:bg-muted/70"
+                    >
+                      {tag} <span className="ml-1">×</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Excluir Arquivo</DialogTitle>
+              <DialogDescription>
+                Tem certeza que deseja excluir este arquivo? Esta ação não pode ser desfeita.
+              </DialogDescription>
+            </DialogHeader>
+            {objectToDelete && (
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                {getFileIcon(objectToDelete.name)}
+                <div>
+                  <p className="font-medium">
+                    {getDisplayName(objectToDelete.name, currentPrefix)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatBytes(objectToDelete.size)}
+                  </p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+                {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Excluir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </main >
+      <MobileBottomNav />
+    </div >
   );
 }

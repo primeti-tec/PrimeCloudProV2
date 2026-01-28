@@ -10,6 +10,14 @@ import * as domainService from "./services/domain-service";
 import * as smtpRoutes from "./routes/smtp";
 import { sendInvitationEmail, sendEmail } from "./services/email";
 import crypto from "crypto";
+import multer from "multer";
+import sharp from "sharp";
+import { minioService } from "./services/minio.service";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -45,6 +53,145 @@ export async function registerRoutes(
   app.get(api.products.list.path, async (req, res) => {
     const products = await storage.getProducts();
     res.json(products);
+  });
+
+  // --- Dynamic PWA Manifest ---
+  app.get("/manifest.webmanifest", async (req: any, res) => {
+    const tenant = req.tenantAccount; // Populated by middleware
+
+    // Default Manifest (PrimeCloud Pro)
+    const defaultManifest = {
+      name: "PrimeCloud Pro",
+      short_name: "PrimeCloud",
+      description: "Secure Cloud Storage & Backup Solution",
+      theme_color: "#ffffff",
+      background_color: "#ffffff",
+      display: "standalone",
+      orientation: "portrait",
+      start_url: "/",
+      scope: "/",
+      icons: [
+        {
+          src: "/pwa-192x192.png",
+          sizes: "192x192",
+          type: "image/png",
+        },
+        {
+          src: "/pwa-512x512.png",
+          sizes: "512x512",
+          type: "image/png",
+        },
+        {
+          src: "/pwa-512x512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any maskable",
+        },
+      ],
+    };
+
+    if (!tenant || !tenant.brandingAppName) {
+      return res.json(defaultManifest);
+    }
+
+    // Tenant Overrides
+    const manifest = {
+      ...defaultManifest,
+      name: tenant.brandingAppName,
+      short_name: tenant.brandingAppName,
+      description: `App exclusivo ${tenant.brandingAppName}`,
+      theme_color: tenant.brandingThemeColor || defaultManifest.theme_color,
+      background_color: tenant.brandingBgColor || defaultManifest.background_color,
+      icons: tenant.brandingIconUrl
+        ? [
+          {
+            src: tenant.brandingIconUrl, // We will process this URL to return various sizes if possible, or just use one for now
+            sizes: "192x192 512x512", // Allowing one icon to serve both if high res
+            type: "image/png",
+          },
+        ]
+        : defaultManifest.icons,
+    };
+
+    res.json(manifest);
+  });
+
+  // --- White Label Asset Routes ---
+
+  // Proxy for Public Assets (Icons)
+  app.get("/api/branding/assets/:filename", async (req, res) => {
+    try {
+      const { filename } = req.params;
+      const stream = await minioService.getPublicAssetStream(filename);
+      const extension = filename.split('.').pop();
+      const mimeType = extension === 'png' ? 'image/png' : 'application/octet-stream';
+
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+      stream.pipe(res);
+    } catch (error) {
+      console.error("Asset proxy error:", error);
+      res.status(404).send("Asset not found");
+    }
+  });
+
+  // Upload Branding Icon (Account Specific Route)
+  app.post("/api/accounts/:id/branding", upload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.auth || !req.auth.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const accountId = parseInt(req.params.id);
+      if (isNaN(accountId)) {
+        return res.status(400).json({ message: "Invalid Account ID" });
+      }
+
+      const { appName, themeColor, bgColor } = req.body;
+      let iconUrl = null;
+
+      // Only process icon if file is uploaded
+      if (req.file && req.file.buffer) {
+        const buffer = req.file.buffer;
+
+        // 1. Process 192x192
+        const icon192 = await sharp(buffer)
+          .resize(192, 192, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+          .png()
+          .toBuffer();
+        const filename192 = `tenant-${accountId}-icon-192.png`;
+        await minioService.uploadPublicAsset(filename192, icon192, "image/png");
+
+        // 2. Process 512x512
+        const icon512 = await sharp(buffer)
+          .resize(512, 512, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+          .png()
+          .toBuffer();
+        const filename512 = `tenant-${accountId}-icon-512.png`;
+        await minioService.uploadPublicAsset(filename512, icon512, "image/png");
+
+        iconUrl = `/api/branding/assets/${filename192}`;
+      }
+
+      // 3. Update Account in DB
+      const updateData: any = {
+        brandingAppName: appName,
+        brandingThemeColor: themeColor,
+        brandingBgColor: bgColor,
+      };
+
+      // Only update icon URL if a new one was generated
+      if (iconUrl) {
+        updateData.brandingIconUrl = iconUrl;
+      }
+
+      await storage.updateAccount(accountId, updateData);
+
+      res.json({ success: true, iconUrl });
+    } catch (error) {
+      console.error("Icon upload failed:", error);
+      res.status(500).json({ message: "Failed to process icon" });
+    }
   });
 
   app.get("/api/shares/:token/download", async (req, res) => {

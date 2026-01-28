@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { useMyAccounts } from "@/hooks/use-accounts";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useBuckets, useCreateBucket, useDeleteBucket, useUpdateBucketVersioning, useBucketLifecycle, useAddLifecycleRule, useDeleteLifecycleRule, useUpdateBucketLimit } from "@/hooks/use-buckets";
@@ -8,7 +10,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input, Dialog,
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Database, Plus, Trash2, Globe, Lock, MapPin, Copy, Clock, Settings2, Edit2, Eye, Upload } from "lucide-react";
+import { Loader2, Database, Plus, Trash2, Globe, Lock, MapPin, Copy, Clock, Settings2, Edit2, Eye, Upload, Menu } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Bucket, LifecycleRule } from "@shared/schema";
 
@@ -431,18 +433,42 @@ export default function Storage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+
+
+
+
+
+
+
+
+
+
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 ml-72 p-8">
+      <Sidebar className="hidden md:flex" />
+      <main className="flex-1 md:ml-72 p-4 md:p-8 pb-20 md:pb-8 w-full">
         <header className="flex justify-between items-center mb-8 gap-4 flex-wrap">
-          <div>
-            <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-page-title">
-              Buckets de Armazenamento
-            </h1>
-            <p className="text-muted-foreground">
-              {currentAccount?.brandingName || currentAccount?.name || "Sua conta"}: gerencie seus buckets de armazenamento S3-compatible.
-            </p>
+          <div className="flex items-center gap-4">
+            <div className="md:hidden">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="-ml-2">
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-72 border-r">
+                  <Sidebar className="w-full relative h-full" />
+                </SheetContent>
+              </Sheet>
+            </div>
+            <div>
+              <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-page-title">
+                Buckets de Armazenamento
+              </h1>
+              <p className="text-muted-foreground hidden sm:block">
+                {currentAccount?.brandingName || currentAccount?.name || "Sua conta"}: gerencie seus buckets de armazenamento S3-compatible.
+              </p>
+            </div>
           </div>
           {canManageBucket() && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -656,7 +682,8 @@ export default function Storage() {
             )}
           </CardContent>
         </Card>
-      </main >
-    </div >
+      </main>
+      <MobileBottomNav />
+    </div>
   );
 }

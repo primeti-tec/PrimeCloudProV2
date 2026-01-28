@@ -1,10 +1,11 @@
 import { Suspense, lazy, useEffect, useState, type ComponentType } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TopNavigation } from "@/components/TopNavigation";
 import { useAccount, useMyAccounts } from "@/hooks/use-accounts";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui-custom";
 import { useLocation } from "wouter";
-import { Loader2, HardDrive, ArrowUpRight, Activity, Users, DollarSign, Plus, Key, UserPlus, AlertTriangle } from "lucide-react";
+import { Loader2, HardDrive, ArrowUpRight, Activity, Users, DollarSign, Plus, Key, UserPlus, AlertTriangle, Menu } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -80,12 +81,26 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 ml-72 p-8 overflow-y-auto">
+      <Sidebar className="hidden md:flex" />
+      <main className="flex-1 md:ml-72 p-4 md:p-8 overflow-y-auto w-full">
         <header className="flex justify-between items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Visão geral de <span className="font-semibold text-foreground">{currentAccount?.name}</span></p>
+          <div className="flex items-center gap-4">
+            <div className="md:hidden">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="-ml-2">
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-72 border-r">
+                  <Sidebar className="w-full relative h-full" />
+                </SheetContent>
+              </Sheet>
+            </div>
+            <div>
+              <h1 className="text-3xl font-display font-bold text-foreground">Dashboard</h1>
+              <p className="text-muted-foreground hidden sm:block">Visão geral de <span className="font-semibold text-foreground">{currentAccount?.name}</span></p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <TopNavigation />

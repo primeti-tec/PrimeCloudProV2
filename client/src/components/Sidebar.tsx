@@ -11,7 +11,9 @@ import { Button } from "./ui-custom";
 import { queryClient } from "@/lib/queryClient";
 import { buildUrl, api } from "@shared/routes";
 
-export function Sidebar() {
+import { cn } from "@/lib/utils";
+
+export function Sidebar({ className }: { className?: string }) {
   const [location, setLocation] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
   const branding = useBranding();
@@ -175,7 +177,7 @@ export function Sidebar() {
   const isBucketActive = (bucketId: number) => location.startsWith(`/dashboard/storage/${bucketId}`);
 
   return (
-    <div className="h-screen w-72 bg-card border-r border-border flex flex-col fixed left-0 top-0 z-20">
+    <div className={cn("h-screen w-72 bg-card border-r border-border flex flex-col fixed left-0 top-0 z-20", className)}>
       <div className="p-8 border-b border-border/50" style={{ backgroundColor: branding.sidebarColor ? `${branding.sidebarColor}15` : undefined }}>
         <Link href="/dashboard" className="flex items-center gap-2">
           {/* Custom Logo or Default */}
