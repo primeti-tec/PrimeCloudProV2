@@ -76,9 +76,9 @@ export function useReactivateAccount() {
 export function useAdjustQuota() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, quotaGB, manualBandwidthGB, reason }: { id: number; quotaGB: number; manualBandwidthGB?: number; reason: string }) => {
+    mutationFn: async ({ id, quotaGB, manualBandwidthGB, imperiusLicenseCount, reason }: { id: number; quotaGB: number; manualBandwidthGB?: number; imperiusLicenseCount?: number; reason: string }) => {
       const url = buildUrl(api.admin.adjustQuota.path, { id });
-      const res = await apiRequest(api.admin.adjustQuota.method, url, { quotaGB, manualBandwidthGB, reason });
+      const res = await apiRequest(api.admin.adjustQuota.method, url, { quotaGB, manualBandwidthGB, imperiusLicenseCount, reason });
       return res.json();
     },
     onSuccess: () => {

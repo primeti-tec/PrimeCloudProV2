@@ -14,6 +14,7 @@ export const products = pgTable("products", {
   price: integer("price").notNull(), // in cents
   pricePerStorageGB: integer("price_per_storage_gb").default(15), // in cents per GB
   pricePerTransferGB: integer("price_per_transfer_gb").default(40), // in cents per GB
+  imperiusPriceCents: integer("imperius_price_cents").default(5900), // R$ 59,00 default
   storageLimit: integer("storage_limit_gb").notNull(),
   transferLimit: integer("transfer_limit_gb"),
   isPublic: boolean("is_public").default(true),
@@ -35,6 +36,7 @@ export const accounts = pgTable("accounts", {
   storageUsed: bigint("storage_used", { mode: "number" }).default(0),
   bandwidthUsed: bigint("bandwidth_used", { mode: "number" }).default(0),
   storageQuotaGB: integer("storage_quota_gb").default(100), // Manual quota override
+  imperiusLicenseCount: integer("imperius_license_count").default(0), // Number of licenses
   // White Label Branding
   brandingName: text("branding_name"), // Custom application name
   brandingLogo: text("branding_logo"), // URL to custom logo
@@ -66,10 +68,50 @@ export const accounts = pgTable("accounts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === CUSTOMERS (CLIENT REGISTRY & BILLING) ===
+export const customers = pgTable("customers", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").references(() => accounts.id), // Provider Account (PrimeTI)
+  name: text("name").notNull(),
+  document: text("document"), // CNPJ/CPF
+  emailAdmin: text("email_admin"), // Tech Contact
+  emailFinancial: text("email_financial"), // Billing Contact
+  phone: text("phone"),
+  address: text("address"),
+  notes: text("notes"),
+  // Status & Trial
+  status: text("status").default("active"), // active, suspended, trial
+  trialEndsAt: timestamp("trial_ends_at"),
+  // Billing Rules
+  billingDay: integer("billing_day").default(10), // Preferred invoice day
+  discountPercent: integer("discount_percent").default(0),
+  billingModel: text("billing_model").default("usage"), // fixed, usage, hybrid
+  contractedStorageGB: integer("contracted_storage_gb").default(0),
+  priceFixedCents: integer("price_fixed_cents").default(0), // Monthly fixed cost
+  priceOveragePerGB: integer("price_overage_per_gb").default(15), // Cents per GB over limit
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === CUSTOMER INVOICES ===
+export const customerInvoices = pgTable("customer_invoices", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  invoiceNumber: text("invoice_number").unique(), // Optional custom number
+  amountCents: integer("amount_cents").notNull(),
+  status: text("status").default("pending"), // pending, paid, overdue, canceled
+  type: text("type").default("manual"), // manual, auto, usage
+  description: text("description"),
+  dueDate: timestamp("due_date").notNull(),
+  paidAt: timestamp("paid_at"),
+  pdfUrl: text("pdf_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === BUCKETS (MOCK S3 STORAGE) ===
 export const buckets = pgTable("buckets", {
   id: serial("id").primaryKey(),
   accountId: integer("account_id").references(() => accounts.id),
+  customerId: integer("customer_id").references(() => customers.id), // Link to specific client
   name: text("name").notNull(),
   region: text("region").default("us-east-1"),
   isPublic: boolean("is_public").default(false),
@@ -78,6 +120,7 @@ export const buckets = pgTable("buckets", {
   storageLimitGB: integer("storage_limit_gb").default(50), // Individual bucket limit
   versioningEnabled: boolean("versioning_enabled").default(false),
   lifecycleRules: jsonb("lifecycle_rules").default([]),
+  isImperiusBackup: boolean("is_imperius_backup").default(false), // Flag for Imperius license usage
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -467,6 +510,26 @@ export const bucketsRelations = relations(buckets, ({ one }) => ({
     fields: [buckets.accountId],
     references: [accounts.id],
   }),
+  customer: one(customers, {
+    fields: [buckets.customerId],
+    references: [customers.id],
+  }),
+}));
+
+export const customersRelations = relations(customers, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [customers.accountId],
+    references: [accounts.id],
+  }),
+  buckets: many(buckets),
+  invoices: many(customerInvoices),
+}));
+
+export const customerInvoicesRelations = relations(customerInvoices, ({ one }) => ({
+  customer: one(customers, {
+    fields: [customerInvoices.customerId],
+    references: [customers.id],
+  }),
 }));
 
 export const accessKeysRelations = relations(accessKeys, ({ one }) => ({
@@ -543,6 +606,11 @@ export const insertVpsConfigSchema = createInsertSchema(vpsConfigs).omit({ id: t
 export const insertPricingConfigSchema = createInsertSchema(pricingConfigs).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPricingHistorySchema = createInsertSchema(pricingHistory).omit({ id: true, createdAt: true });
 
+export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true, accountId: true }).extend({
+  bucketIds: z.array(z.number()).optional(),
+});
+export const insertCustomerInvoiceSchema = createInsertSchema(customerInvoices).omit({ id: true, createdAt: true, paidAt: true });
+
 // === TYPES ===
 export type Product = typeof products.$inferSelect;
 export type Order = typeof orders.$inferSelect;
@@ -565,6 +633,8 @@ export type ObjectTag = typeof objectTags.$inferSelect;
 export type ObjectShare = typeof objectShares.$inferSelect;
 export type PricingConfig = typeof pricingConfigs.$inferSelect;
 export type PricingHistory = typeof pricingHistory.$inferSelect;
+export type Customer = typeof customers.$inferSelect;
+export type CustomerInvoice = typeof customerInvoices.$inferSelect;
 
 export type CreateAccountRequest = z.infer<typeof insertAccountSchema>;
 export type UpdateAccountRequest = Partial<CreateAccountRequest>;
@@ -600,6 +670,10 @@ export type CreateVpsOrderRequest = {
 export type CreateVpsConfigRequest = z.infer<typeof insertVpsConfigSchema>;
 export type CreatePricingConfigRequest = z.infer<typeof insertPricingConfigSchema>;
 export type UpdatePricingConfigRequest = Partial<Omit<CreatePricingConfigRequest, 'category' | 'resourceKey'>>;
+
+export type CreateCustomerRequest = z.infer<typeof insertCustomerSchema>;
+export type UpdateCustomerRequest = Partial<CreateCustomerRequest>;
+export type CreateCustomerInvoiceRequest = z.infer<typeof insertCustomerInvoiceSchema>;
 
 // Detailed types for frontend
 export interface AccountWithDetails extends Account {

@@ -42,6 +42,7 @@ export default function AdminDashboard() {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [newQuotaGB, setNewQuotaGB] = useState("");
   const [newBandwidthGB, setNewBandwidthGB] = useState("");
+  const [newImperiusCount, setNewImperiusCount] = useState("");
   const [quotaReason, setQuotaReason] = useState("");
 
   const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
@@ -65,6 +66,7 @@ export default function AdminDashboard() {
     price: 0,
     pricePerStorageGB: 15,
     pricePerTransferGB: 40,
+    imperiusPriceCents: 5900,
     storageLimit: 100,
     transferLimit: 0,
     isPublic: true,
@@ -132,6 +134,7 @@ export default function AdminDashboard() {
     setNewQuotaGB(String(account.storageQuotaGB || 100));
     const bwGB = (account.bandwidthUsed || 0) / (1024 * 1024 * 1024);
     setNewBandwidthGB(bwGB > 0 ? bwGB.toFixed(2) : "");
+    setNewImperiusCount(String((account as any).imperiusLicenseCount || 0));
     setQuotaReason("");
     setQuotaDialogOpen(true);
   };
@@ -189,7 +192,10 @@ export default function AdminDashboard() {
       }
     }
 
-    adjustQuota({ id: selectedAccount.id, quotaGB: quotaValue, manualBandwidthGB, reason: quotaReason.trim() }, {
+    const imperiusCount = parseInt(newImperiusCount);
+    const validImperiusCount = !isNaN(imperiusCount) && imperiusCount >= 0 ? imperiusCount : undefined;
+
+    adjustQuota({ id: selectedAccount.id, quotaGB: quotaValue, manualBandwidthGB, imperiusLicenseCount: validImperiusCount, reason: quotaReason.trim() }, {
       onSuccess: () => {
         toast({ title: "Quota/Uso Ajustado", description: `Quota de ${selectedAccount.name} atualizada.` });
         setQuotaDialogOpen(false);
@@ -220,6 +226,7 @@ export default function AdminDashboard() {
         price: product.price,
         pricePerStorageGB: product.pricePerStorageGB || 15,
         pricePerTransferGB: product.pricePerTransferGB || 40,
+        imperiusPriceCents: product.imperiusPriceCents || 5900,
         storageLimit: product.storageLimit,
         transferLimit: product.transferLimit || 0,
         isPublic: product.isPublic ?? true,
@@ -232,6 +239,7 @@ export default function AdminDashboard() {
         price: 0,
         pricePerStorageGB: 15,
         pricePerTransferGB: 40,
+        imperiusPriceCents: 5900,
         storageLimit: 100,
         transferLimit: 0,
         isPublic: true,
@@ -256,6 +264,7 @@ export default function AdminDashboard() {
       price: productForm.price,
       pricePerStorageGB: productForm.pricePerStorageGB,
       pricePerTransferGB: productForm.pricePerTransferGB,
+      imperiusPriceCents: productForm.imperiusPriceCents,
       storageLimit: productForm.storageLimit,
       transferLimit: productForm.transferLimit || undefined,
       isPublic: productForm.isPublic,
@@ -1048,6 +1057,18 @@ export default function AdminDashboard() {
                 placeholder="Ex: 5.5 (Deixe em branco para não alterar)"
               />
               <p className="text-xs text-muted-foreground">Útil para testes de cobrança de largura de banda.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="imperius">Licenças Imperius</Label>
+              <Input
+                id="imperius"
+                type="number"
+                min="0"
+                value={newImperiusCount}
+                onChange={(e) => setNewImperiusCount(e.target.value)}
+                placeholder="Quantidade de licenças"
+              />
+              <p className="text-xs text-muted-foreground">Adicione licenças do Imperius Backup para este cliente.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="reason">Motivo do ajuste</Label>

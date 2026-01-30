@@ -29,6 +29,13 @@ export interface EmailOptions {
   text?: string;
 }
 
+export interface BrandingOptions {
+  name?: string;
+  logoUrl?: string; // Should correspond to iconUrl (preferred) or logo
+  primaryColor?: string;
+  footerText?: string;
+}
+
 export interface AccountSmtpConfig {
   smtpEnabled?: boolean;
   smtpHost?: string | null;
@@ -38,6 +45,7 @@ export interface AccountSmtpConfig {
   smtpFromEmail?: string | null;
   smtpFromName?: string | null;
   smtpEncryption?: string | null;
+  branding?: BrandingOptions; // Attached branding config
 }
 
 /**
@@ -60,7 +68,7 @@ if (process.env.SENDGRID_API_KEY) {
  * Uses account's custom SMTP if configured, otherwise falls back to SendGrid or console log.
  * 
  * @param options - Email options containing recipient, subject, and content
- * @param accountSmtpConfig - Optional SMTP configuration for the account
+ * @param accountSmtpConfig - Optional SMTP configuration for the account (includes branding)
  */
 export async function sendEmail(
   options: EmailOptions,
@@ -189,6 +197,13 @@ export async function sendInvitationEmail(
   inviteUrl: string,
   accountSmtpConfig?: AccountSmtpConfig
 ): Promise<void> {
+  const branding = accountSmtpConfig?.branding || {};
+  const primaryColor = branding.primaryColor || '#6300FF';
+  const logoHtml = branding.logoUrl
+    ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${branding.logoUrl}" alt="${branding.name || 'Logo'}" style="max-height: 50px; max-width: 200px;"></div>`
+    : '';
+  const footerName = branding.name || 'Prime Cloud Pro';
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -197,21 +212,22 @@ export async function sendInvitationEmail(
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #6300FF; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .header { background-color: ${primaryColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
     .content { background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }
-    .button { display: inline-block; background-color: #6300FF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
-    .footer { color: #666; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; }
+    .button { display: inline-block; background-color: ${primaryColor}; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
+    .footer { color: #666; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      ${logoHtml}
       <h1>📨 Você Foi Convidado!</h1>
     </div>
     <div class="content">
       <p>Olá,</p>
       
-      <p><strong>${inviterName}</strong> convidou você para participar da organização <strong>${accountName}</strong> no Prime Cloud Pro.</p>
+      <p><strong>${inviterName}</strong> convidou você para participar da organização <strong>${accountName}</strong> no ${footerName}.</p>
       
       <p>Clique no botão abaixo para aceitar o convite e começar:</p>
       
@@ -222,11 +238,11 @@ export async function sendInvitationEmail(
       
       <p>Este convite expira em 7 dias.</p>
       
-      <p>Att,<br>Equipe Prime Cloud Pro</p>
+      <p>Att,<br>Equipe ${footerName}</p>
     </div>
     <div class="footer">
       <p>Se você não esperava este convite, pode ignorar este email com segurança.</p>
-      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>${footerName} - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -254,7 +270,18 @@ Se você não esperava este convite, pode ignorar este email.`;
 /**
  * Send a verification email with a code
  */
-export async function sendVerificationEmail(email: string, code: string): Promise<void> {
+export async function sendVerificationEmail(
+  email: string,
+  code: string,
+  accountSmtpConfig?: AccountSmtpConfig
+): Promise<void> {
+  const branding = accountSmtpConfig?.branding || {};
+  const primaryColor = branding.primaryColor || '#6300FF';
+  const logoHtml = branding.logoUrl
+    ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${branding.logoUrl}" alt="${branding.name || 'Logo'}" style="max-height: 50px; max-width: 200px;"></div>`
+    : '';
+  const footerName = branding.name || 'Prime Cloud Pro';
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -263,15 +290,16 @@ export async function sendVerificationEmail(email: string, code: string): Promis
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #6300FF; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .header { background-color: ${primaryColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
     .content { background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }
     .code-box { background-color: #1e293b; color: #f1f5f9; padding: 20px; border-radius: 6px; text-align: center; font-size: 32px; letter-spacing: 5px; font-weight: bold; font-family: monospace; margin: 20px 0; }
-    .footer { color: #666; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; }
+    .footer { color: #666; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      ${logoHtml}
       <h1>🔐 Verifique Seu Email</h1>
     </div>
     <div class="content">
@@ -285,11 +313,11 @@ export async function sendVerificationEmail(email: string, code: string): Promis
       
       <p>Se você não solicitou esta verificação, pode ignorar este email.</p>
       
-      <p>Att,<br>Equipe Prime Cloud Pro</p>
+      <p>Att,<br>Equipe ${footerName}</p>
     </div>
     <div class="footer">
       <p>Nunca compartilhe este código com ninguém. Nós nunca pediremos isso.</p>
-      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>${footerName} - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -306,16 +334,29 @@ Se você não solicitou esta verificação, pode ignorar este email.`;
 
   await sendEmail({
     to: email,
-    subject: "Verifique seu endereço de email - Prime Cloud Pro",
+    subject: `Verifique seu endereço de email - ${footerName}`,
     html,
     text,
-  });
+  }, accountSmtpConfig);
 }
 
 /**
  * Send a welcome email to a new user
  */
-export async function sendWelcomeEmail(email: string, userName: string): Promise<void> {
+export async function sendWelcomeEmail(
+  email: string,
+  userName: string,
+  accountSmtpConfig?: AccountSmtpConfig
+): Promise<void> {
+  const branding = accountSmtpConfig?.branding || {};
+  const primaryColor = branding.primaryColor || '#10b981'; // Default green for welcome, or use primary
+  // Use primary color if provided, otherwise default green
+  const headerColor = branding.primaryColor || '#10b981';
+  const logoHtml = branding.logoUrl
+    ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${branding.logoUrl}" alt="${branding.name || 'Logo'}" style="max-height: 50px; max-width: 200px;"></div>`
+    : '';
+  const footerName = branding.name || 'Prime Cloud Pro';
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -324,19 +365,20 @@ export async function sendWelcomeEmail(email: string, userName: string): Promise
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #10b981; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .header { background-color: ${headerColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
     .content { background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }
-    .button { display: inline-block; background-color: #6300FF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
+    .button { display: inline-block; background-color: ${branding.primaryColor || '#6300FF'}; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
     .feature-list { list-style: none; padding: 0; }
     .feature-list li { padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
-    .feature-list li:before { content: "✓ "; color: #10b981; font-weight: bold; }
+    .feature-list li:before { content: "✓ "; color: ${headerColor}; font-weight: bold; }
     .feature-list li:last-child { border-bottom: none; }
-    .footer { color: #666; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; }
+    .footer { color: #666; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      ${logoHtml}
       <h1>🎉 Bem-vindo, ${userName}!</h1>
     </div>
     <div class="content">
@@ -361,11 +403,11 @@ export async function sendWelcomeEmail(email: string, userName: string): Promise
       
       <p>Dúvidas? Responda este email ou acesse nosso suporte.</p>
       
-      <p>Att,<br>Equipe Prime Cloud Pro</p>
+      <p>Att,<br>Equipe ${footerName}</p>
     </div>
     <div class="footer">
       <p>Esta é uma mensagem automática. Por favor, não responda diretamente.</p>
-      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>${footerName} - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -389,20 +431,32 @@ O que você poderá fazer:
 Dúvidas? Responda este email ou acesse nosso suporte.
 
 Att,
-Equipe Prime Cloud Pro`;
+Equipe ${footerName}`;
 
   await sendEmail({
     to: email,
-    subject: `Bem-vindo ao Prime Cloud Pro, ${userName}!`,
+    subject: `Bem-vindo ao ${footerName}, ${userName}!`,
     html,
     text,
-  });
+  }, accountSmtpConfig);
 }
 
 /**
  * Send a password reset email
  */
-export async function sendPasswordResetEmail(email: string, resetUrl: string): Promise<void> {
+export async function sendPasswordResetEmail(
+  email: string,
+  resetUrl: string,
+  accountSmtpConfig?: AccountSmtpConfig
+): Promise<void> {
+  const branding = accountSmtpConfig?.branding || {};
+  const primaryColor = branding.primaryColor || '#f59e0b'; // Amber warning color default, or branding
+  const buttonColor = branding.primaryColor || '#6300FF';
+  const logoHtml = branding.logoUrl
+    ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${branding.logoUrl}" alt="${branding.name || 'Logo'}" style="max-height: 50px; max-width: 200px;"></div>`
+    : '';
+  const footerName = branding.name || 'Prime Cloud Pro';
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -411,16 +465,17 @@ export async function sendPasswordResetEmail(email: string, resetUrl: string): P
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #f59e0b; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .header { background-color: ${primaryColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
     .content { background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }
     .warning { background-color: #fef3c7; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b; margin: 20px 0; }
-    .button { display: inline-block; background-color: #6300FF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
-    .footer { color: #666; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; }
+    .button { display: inline-block; background-color: ${buttonColor}; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
+    .footer { color: #666; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      ${logoHtml}
       <h1>🔑 Redefinir Sua Senha</h1>
     </div>
     <div class="content">
@@ -437,11 +492,11 @@ export async function sendPasswordResetEmail(email: string, resetUrl: string): P
         <strong>⚠️ Aviso de Segurança:</strong> Este link expira em 1 hora. Se você não solicitou a redefinição de senha, ignore este email ou entre em contato com nosso suporte imediatamente.
       </div>
       
-      <p>Att,<br>Equipe Prime Cloud Pro</p>
+      <p>Att,<br>Equipe ${footerName}</p>
     </div>
     <div class="footer">
       <p>Por segurança, nunca compartilhe este link com ninguém. Nós nunca pediremos sua senha por email.</p>
-      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>${footerName} - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -457,14 +512,14 @@ Este link expira em 1 hora.
 Se você não solicitou esta redefinição, ignore este email.
 
 Att,
-Equipe Prime Cloud Pro`;
+Equipe ${footerName}`;
 
   await sendEmail({
     to: email,
-    subject: "Redefinir sua senha - Prime Cloud Pro",
+    subject: `Redefinir sua senha - ${footerName}`,
     html,
     text,
-  });
+  }, accountSmtpConfig);
 }
 
 /**
@@ -473,8 +528,16 @@ Equipe Prime Cloud Pro`;
 export async function sendAccountApprovalEmail(
   email: string,
   userName: string,
-  credentials: { endpoint: string; region: string; accessKeyId: string; secretAccessKey: string }
+  credentials: { endpoint: string; region: string; accessKeyId: string; secretAccessKey: string },
+  accountSmtpConfig?: AccountSmtpConfig
 ): Promise<void> {
+  const branding = accountSmtpConfig?.branding || {};
+  const primaryColor = branding.primaryColor || '#10b981';
+  const logoHtml = branding.logoUrl
+    ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${branding.logoUrl}" alt="${branding.name || 'Logo'}" style="max-height: 50px; max-width: 200px;"></div>`
+    : '';
+  const footerName = branding.name || 'Prime Cloud Pro';
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -483,24 +546,25 @@ export async function sendAccountApprovalEmail(
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #10b981; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .header { background-color: ${primaryColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
     .content { background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }
     .credentials-box { background-color: #1e293b; color: #f1f5f9; padding: 20px; border-radius: 8px; font-family: monospace; margin: 20px 0; }
     .credentials-box code { display: block; margin: 5px 0; }
     .warning { background-color: #fef3c7; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b; margin: 20px 0; }
-    .button { display: inline-block; background-color: #6300FF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
-    .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+    .button { display: inline-block; background-color: ${branding.primaryColor || '#6300FF'}; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
+    .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      ${logoHtml}
       <h1>✅ Conta Aprovada!</h1>
     </div>
     <div class="content">
       <p>Olá <strong>${userName}</strong>,</p>
       
-      <p>Sua conta foi aprovada! Você já pode começar a usar o Prime Cloud Pro.</p>
+      <p>Sua conta foi aprovada! Você já pode começar a usar o ${footerName}.</p>
       
       <h3>Suas Credenciais S3:</h3>
       <div class="credentials-box">
@@ -526,7 +590,7 @@ export async function sendAccountApprovalEmail(
       <p>Dúvidas? Responda este email ou acesse nossa documentação.</p>
     </div>
     <div class="footer">
-      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>${footerName} - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -537,7 +601,7 @@ export async function sendAccountApprovalEmail(
 
 Olá ${userName},
 
-Sua conta foi aprovada! Você já pode começar a usar o Prime Cloud Pro.
+Sua conta foi aprovada! Você já pode começar a usar o ${footerName}.
 
 CREDENCIAIS S3:
 Endpoint: ${credentials.endpoint}
@@ -551,10 +615,10 @@ Acesse: https://app.cloudstoragepro.com.br/dashboard`;
 
   await sendEmail({
     to: email,
-    subject: "✅ Conta Aprovada - Prime Cloud Pro",
+    subject: `✅ Conta Aprovada - ${footerName}`,
     html,
     text,
-  });
+  }, accountSmtpConfig);
 }
 
 /**
@@ -563,8 +627,15 @@ Acesse: https://app.cloudstoragepro.com.br/dashboard`;
 export async function sendAccountRejectionEmail(
   email: string,
   userName: string,
-  reason?: string
+  reason?: string,
+  accountSmtpConfig?: AccountSmtpConfig
 ): Promise<void> {
+  const branding = accountSmtpConfig?.branding || {};
+  const logoHtml = branding.logoUrl
+    ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${branding.logoUrl}" alt="${branding.name || 'Logo'}" style="max-height: 50px; max-width: 200px;"></div>`
+    : '';
+  const footerName = branding.name || 'Prime Cloud Pro';
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -573,15 +644,16 @@ export async function sendAccountRejectionEmail(
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #ef4444; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .header { background-color: #ef4444; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
     .content { background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }
     .reason-box { background-color: #fef2f2; padding: 15px; border-radius: 6px; border-left: 4px solid #ef4444; margin: 20px 0; }
-    .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+    .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      ${logoHtml}
       <h1>Cadastro Não Aprovado</h1>
     </div>
     <div class="content">
@@ -597,10 +669,10 @@ export async function sendAccountRejectionEmail(
       
       <p>Se você acredita que houve um erro ou gostaria de mais informações, responda este email.</p>
       
-      <p>Att,<br>Equipe Prime Cloud Pro</p>
+      <p>Att,<br>Equipe ${footerName}</p>
     </div>
     <div class="footer">
-      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>${footerName} - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -617,14 +689,14 @@ ${reason ? `Motivo: ${reason}` : ''}
 Se você acredita que houve um erro, responda este email.
 
 Att,
-Equipe Prime Cloud Pro`;
+Equipe ${footerName}`;
 
   await sendEmail({
     to: email,
-    subject: "Cadastro não aprovado - Prime Cloud Pro",
+    subject: `Cadastro não aprovado - ${footerName}`,
     html,
     text,
-  });
+  }, accountSmtpConfig);
 }
 
 /**
@@ -636,10 +708,18 @@ export async function sendInvoiceEmail(
   invoiceNumber: string,
   totalAmount: number,
   dueDate: Date,
-  pdfUrl?: string
+  pdfUrl?: string,
+  accountSmtpConfig?: AccountSmtpConfig
 ): Promise<void> {
+  const branding = accountSmtpConfig?.branding || {};
+  const primaryColor = branding.primaryColor || '#3b82f6';
+  const buttonColor = branding.primaryColor || '#6300FF';
   const formattedAmount = (totalAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const formattedDate = dueDate.toLocaleDateString('pt-BR');
+  const logoHtml = branding.logoUrl
+    ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${branding.logoUrl}" alt="${branding.name || 'Logo'}" style="max-height: 50px; max-width: 200px;"></div>`
+    : '';
+  const footerName = branding.name || 'Prime Cloud Pro';
 
   const html = `
 <!DOCTYPE html>
@@ -649,17 +729,18 @@ export async function sendInvoiceEmail(
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #3b82f6; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .header { background-color: ${primaryColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
     .content { background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }
     .invoice-box { background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0; }
     .amount { font-size: 2em; font-weight: bold; color: #1e293b; }
-    .button { display: inline-block; background-color: #6300FF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 10px 5px 10px 0; }
-    .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+    .button { display: inline-block; background-color: ${buttonColor}; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 10px 5px 10px 0; }
+    .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      ${logoHtml}
       <h1>📄 Nova Fatura Disponível</h1>
     </div>
     <div class="content">
@@ -676,10 +757,10 @@ export async function sendInvoiceEmail(
       <a href="https://app.cloudstoragepro.com.br/billing" class="button">Ver Fatura</a>
       ${pdfUrl ? `<a href="${pdfUrl}" class="button" style="background-color: #64748b;">Baixar PDF</a>` : ''}
       
-      <p>Att,<br>Equipe Prime Cloud Pro</p>
+      <p>Att,<br>Equipe ${footerName}</p>
     </div>
     <div class="footer">
-      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>${footerName} - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -696,14 +777,14 @@ Vencimento: ${formattedDate}
 Acesse: https://app.cloudstoragepro.com.br/billing
 
 Att,
-Equipe Prime Cloud Pro`;
+Equipe ${footerName}`;
 
   await sendEmail({
     to: email,
     subject: `Fatura ${invoiceNumber} - ${formattedAmount}`,
     html,
     text,
-  });
+  }, accountSmtpConfig);
 }
 
 /**
@@ -714,11 +795,18 @@ export async function sendQuotaWarningEmail(
   userName: string,
   usedGB: number,
   quotaGB: number,
-  usagePercent: number
+  usagePercent: number,
+  accountSmtpConfig?: AccountSmtpConfig
 ): Promise<void> {
+  const branding = accountSmtpConfig?.branding || {};
   const isUrgent = usagePercent >= 95;
-  const headerColor = isUrgent ? '#ef4444' : '#f59e0b';
+  const headerColor = branding.primaryColor || (isUrgent ? '#ef4444' : '#f59e0b');
   const title = isUrgent ? '🚨 Quota Crítica!' : '⚠️ Alerta de Quota';
+  const logoHtml = branding.logoUrl
+    ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${branding.logoUrl}" alt="${branding.name || 'Logo'}" style="max-height: 50px; max-width: 200px;"></div>`
+    : '';
+  const footerName = branding.name || 'Prime Cloud Pro';
+  const buttonColor = branding.primaryColor || '#6300FF';
 
   const html = `
 <!DOCTYPE html>
@@ -728,18 +816,19 @@ export async function sendQuotaWarningEmail(
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: ${headerColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .header { background-color: ${headerColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
     .content { background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }
     .usage-box { background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0; }
     .progress-bar { background-color: #e2e8f0; border-radius: 9999px; height: 20px; overflow: hidden; }
     .progress-fill { background-color: ${headerColor}; height: 100%; border-radius: 9999px; }
-    .button { display: inline-block; background-color: #6300FF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
-    .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+    .button { display: inline-block; background-color: ${buttonColor}; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
+    .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      ${logoHtml}
       <h1>${title}</h1>
     </div>
     <div class="content">
@@ -760,10 +849,10 @@ export async function sendQuotaWarningEmail(
       
       <a href="https://app.cloudstoragepro.com.br/billing" class="button">Fazer Upgrade</a>
       
-      <p>Att,<br>Equipe Prime Cloud Pro</p>
+      <p>Att,<br>Equipe ${footerName}</p>
     </div>
     <div class="footer">
-      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>${footerName} - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -784,14 +873,14 @@ Uso Atual: ${usedGB.toFixed(2)} GB de ${quotaGB} GB (${usagePercent.toFixed(1)}%
 Faça upgrade: https://app.cloudstoragepro.com.br/billing
 
 Att,
-Equipe Prime Cloud Pro`;
+Equipe ${footerName}`;
 
   await sendEmail({
     to: email,
     subject: `${title} - ${usagePercent.toFixed(0)}% utilizado`,
     html,
     text,
-  });
+  }, accountSmtpConfig);
 }
 
 /**
@@ -802,8 +891,16 @@ export async function sendPaymentConfirmationEmail(
   userName: string,
   invoiceNumber: string,
   amount: number,
-  paymentMethod: string
+  paymentMethod: string,
+  accountSmtpConfig?: AccountSmtpConfig
 ): Promise<void> {
+  const branding = accountSmtpConfig?.branding || {};
+  const primaryColor = branding.primaryColor || '#10b981';
+  const buttonColor = branding.primaryColor || '#6300FF';
+  const logoHtml = branding.logoUrl
+    ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${branding.logoUrl}" alt="${branding.name || 'Logo'}" style="max-height: 50px; max-width: 200px;"></div>`
+    : '';
+  const footerName = branding.name || 'Prime Cloud Pro';
   const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const paymentMethodLabels: Record<string, string> = {
@@ -821,17 +918,18 @@ export async function sendPaymentConfirmationEmail(
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #10b981; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .header { background-color: ${primaryColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
     .content { background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }
     .payment-box { background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0; text-align: center; }
-    .amount { font-size: 2em; font-weight: bold; color: #10b981; }
-    .button { display: inline-block; background-color: #6300FF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
-    .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+    .amount { font-size: 2em; font-weight: bold; color: ${primaryColor}; }
+    .button { display: inline-block; background-color: ${buttonColor}; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
+    .footer { color: #666; font-size: 12px; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      ${logoHtml}
       <h1>💳 Pagamento Confirmado!</h1>
     </div>
     <div class="content">
@@ -849,10 +947,10 @@ export async function sendPaymentConfirmationEmail(
       
       <a href="https://app.cloudstoragepro.com.br/billing" class="button">Ver Histórico de Pagamentos</a>
       
-      <p>Att,<br>Equipe Prime Cloud Pro</p>
+      <p>Att,<br>Equipe ${footerName}</p>
     </div>
     <div class="footer">
-      <p>Prime Cloud Pro - Armazenamento em Nuvem S3-Compatible</p>
+      <p>${footerName} - Armazenamento em Nuvem S3-Compatible</p>
     </div>
   </div>
 </body>
@@ -873,12 +971,12 @@ Data: ${new Date().toLocaleDateString('pt-BR')}
 Obrigado!
 
 Att,
-Equipe Prime Cloud Pro`;
+Equipe ${footerName}`;
 
   await sendEmail({
     to: email,
     subject: `Pagamento Confirmado - ${formattedAmount}`,
     html,
     text,
-  });
+  }, accountSmtpConfig);
 }

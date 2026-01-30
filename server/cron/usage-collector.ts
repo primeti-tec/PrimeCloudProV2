@@ -169,6 +169,9 @@ async function runMonthlyBilling(): Promise<void> {
     }
 }
 
+// Concurrency lock
+let isCollecting = false;
+
 /**
  * Start all cron jobs
  */
@@ -176,8 +179,17 @@ export function startCronJobs(): void {
     console.log("⏰ Starting cron jobs...");
 
     // Usage collection - every hour
-    usageCollectorInterval = setInterval(() => {
-        collectUsageMetrics().catch(console.error);
+    usageCollectorInterval = setInterval(async () => {
+        if (isCollecting) {
+            console.log("⚠️ Usage collection already running, skipping...");
+            return;
+        }
+        isCollecting = true;
+        try {
+            await collectUsageMetrics().catch(console.error);
+        } finally {
+            isCollecting = false;
+        }
     }, 60 * 60 * 1000); // 1 hour
 
     // Daily checks - every 24 hours
@@ -186,13 +198,20 @@ export function startCronJobs(): void {
         runMonthlyBilling().catch(console.error);
     }, 24 * 60 * 60 * 1000); // 24 hours
 
-    // Run initial collection after 10 seconds (allow server to start)
-    setTimeout(() => {
-        collectUsageMetrics().catch(console.error);
-    }, 10000);
+    // Run initial collection after 60 seconds (increased from 10s to prevent startup lag)
+    setTimeout(async () => {
+        if (isCollecting) return;
+        isCollecting = true;
+        console.log("🚀 Running initial usage collection...");
+        try {
+            await collectUsageMetrics().catch(console.error);
+        } finally {
+            isCollecting = false;
+        }
+    }, 60000);
 
     console.log("✅ Cron jobs started:");
-    console.log("  - Usage collection: Every hour");
+    console.log("  - Usage collection: Every hour (initial delay: 60s)");
     console.log("  - Overdue invoice check: Daily");
     console.log("  - Monthly billing: 1st of each month");
 }

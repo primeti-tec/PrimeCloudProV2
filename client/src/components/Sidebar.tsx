@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Database, CreditCard, Users, Settings, Shield, Key, HardDrive, ShoppingCart, Save, FolderOpen, ChevronDown, ChevronRight, Server } from "lucide-react";
+import { LayoutDashboard, Database, Key, Settings, Shield, LogOut, FileText, CreditCard, ShoppingCart, UserCog, History, FolderInput, Menu, Users, HardDrive, Save, FolderOpen, ChevronDown, ChevronRight, Server } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranding } from "./branding-provider";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -13,10 +13,12 @@ import { buildUrl, api } from "@shared/routes";
 
 import { cn } from "@/lib/utils";
 
-export function Sidebar({ className }: { className?: string }) {
+export function Sidebar({ className, onClose }: { className?: string, onClose?: () => void }) {
   const [location, setLocation] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
   const branding = useBranding();
+  // ... rest of imports
+
   const { isExternalClient, canViewBilling, canViewSettings, canManageMembers, canAccessAdmin } = usePermissions();
 
   // Get buckets for submenu
@@ -29,13 +31,15 @@ export function Sidebar({ className }: { className?: string }) {
   const singleBucket = hasSingleBucket ? buckets?.[0] : undefined;
   const bucketLabel = hasSingleBucket ? branding.name : singleBucket?.name;
 
-  // Storage submenu expanded state
+  // Storage submenu expanded state - Default to false (collapsed) per user request
   const [storageExpanded, setStorageExpanded] = useState(() => {
-    if (typeof window === "undefined") return location.startsWith("/dashboard/storage");
+    if (typeof window === "undefined") return false;
     const stored = window.localStorage.getItem("storageMenuExpanded");
-    if (stored === null) return location.startsWith("/dashboard/storage");
+    // If not stored, default to false (minimized)
+    if (stored === null) return false;
     return stored === "true";
   });
+
   const [adminExpanded, setAdminExpanded] = useState(() => {
     if (typeof window === "undefined") return location.startsWith("/admin");
     const stored = window.localStorage.getItem("adminMenuExpanded");
@@ -43,12 +47,12 @@ export function Sidebar({ className }: { className?: string }) {
     return stored === "true";
   });
 
-  // Update expansion when location changes to storage section
-  useEffect(() => {
-    if (location.startsWith("/dashboard/storage")) {
-      setStorageExpanded(true);
-    }
-  }, [location]);
+  // Removed auto-expansion effect for storage menu to keep it minimized always unless manually toggled
+  // useEffect(() => {
+  //   if (location.startsWith("/dashboard/storage")) {
+  //     setStorageExpanded(true);
+  //   }
+  // }, [location]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -74,6 +78,7 @@ export function Sidebar({ className }: { className?: string }) {
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: !isExternalClient },
     { name: "Contratar Serviço", href: "/dashboard/contract", icon: Server, show: !isExternalClient },
+    { name: "Clientes", href: "/dashboard/customers", icon: Users, show: !isExternalClient },
     { name: "Acesso SFTP", href: "/dashboard/sftp", icon: HardDrive, show: !isExternalClient },
     { name: "Backup", href: "/dashboard/backup", icon: Save, show: !isExternalClient },
     { name: "Equipe", href: "/dashboard/team", icon: Users, show: canManageMembers },
@@ -179,10 +184,16 @@ export function Sidebar({ className }: { className?: string }) {
   return (
     <div className={cn("h-screen w-72 bg-card border-r border-border flex flex-col fixed left-0 top-0 z-20", className)}>
       <div className="p-8 border-b border-border/50" style={{ backgroundColor: branding.sidebarColor ? `${branding.sidebarColor}15` : undefined }}>
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2" onClick={onClose}>
           {/* Custom Logo or Default */}
-          {branding.logo ? (
-            <img src={branding.logo} alt={branding.name} className="h-8 w-auto" decoding="async" />
+          {/* Custom Logo/Icon or Default */}
+          {(branding.iconUrl || branding.logo) ? (
+            <img
+              src={branding.iconUrl || branding.logo || ""}
+              alt={branding.name}
+              className="h-8 w-8 object-contain"
+              decoding="async"
+            />
           ) : (
             <>
               <img
@@ -214,7 +225,7 @@ export function Sidebar({ className }: { className?: string }) {
 
         {/* Dashboard - only for non-external clients */}
         {!isExternalClient && (
-          <Link href="/dashboard">
+          <Link href="/dashboard" onClick={onClose}>
             <div
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer group ${location === "/dashboard"
                 ? "bg-primary/10 text-primary font-semibold"
@@ -236,7 +247,7 @@ export function Sidebar({ className }: { className?: string }) {
             <div className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${isInStorageSection ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}>
 
-              <Link href="/dashboard/storage" className="flex items-center gap-3 flex-1 cursor-pointer">
+              <Link href="/dashboard/storage" className="flex items-center gap-3 flex-1 cursor-pointer" onClick={onClose}>
                 <Database className={`h-5 w-5 transition-colors ${isInStorageSection ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
                 Armazenamento
               </Link>
@@ -258,7 +269,7 @@ export function Sidebar({ className }: { className?: string }) {
               <div className="ml-4 mt-1 space-y-1 border-l-2 border-border/50 pl-2">
                 {buckets && buckets.slice(0, 5).map(bucket => (
                   <div key={bucket.id}>
-                    <Link href={`/dashboard/storage/${bucket.id}`}>
+                    <Link href={`/dashboard/storage/${bucket.id}`} onClick={onClose}>
                       <div
                         onMouseEnter={() => prefetchBucketObjects(bucket.id)}
                         className={`flex items-start gap-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer text-sm ${isBucketActive(bucket.id)
@@ -284,7 +295,10 @@ export function Sidebar({ className }: { className?: string }) {
                             <button
                               key={`${bucket.id}-${item.id}`}
                               type="button"
-                              onClick={() => setLocation(getStorageTarget(bucket.id, item.id))}
+                              onClick={() => {
+                                setLocation(getStorageTarget(bucket.id, item.id));
+                                onClose?.();
+                              }}
                               className={`w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 text-xs ${isActive
                                 ? "bg-primary/10 text-primary font-semibold"
                                 : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -300,7 +314,7 @@ export function Sidebar({ className }: { className?: string }) {
                 ))}
 
                 {buckets && buckets.length > 5 && (
-                  <Link href="/dashboard/storage">
+                  <Link href="/dashboard/storage" onClick={onClose}>
                     <div className="text-xs text-muted-foreground hover:text-primary px-3 py-1 cursor-pointer transition-colors block">
                       +{buckets.length - 5} mais...
                     </div>
@@ -320,7 +334,7 @@ export function Sidebar({ className }: { className?: string }) {
         {/* Single bucket menu */}
         {hasSingleBucket && singleBucket && (
           <div className="mt-2">
-            <Link href={`/dashboard/storage/${singleBucket.id}`}>
+            <Link href={`/dashboard/storage/${singleBucket.id}`} onClick={onClose}>
               <div className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer border ${isInStorageSection
                 ? "bg-primary/10 text-primary border-primary/20"
                 : "text-muted-foreground hover:bg-accent hover:text-foreground border-transparent"
@@ -346,7 +360,10 @@ export function Sidebar({ className }: { className?: string }) {
                   <button
                     key={`single-${item.id}`}
                     type="button"
-                    onClick={() => setLocation(getStorageTarget(singleBucket.id, item.id))}
+                    onClick={() => {
+                      setLocation(getStorageTarget(singleBucket.id, item.id));
+                      onClose?.();
+                    }}
                     className={`w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 text-xs ${isActive
                       ? "bg-primary/10 text-primary font-semibold"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -365,7 +382,7 @@ export function Sidebar({ className }: { className?: string }) {
         {navItems.filter(item => item.name !== "Dashboard").map((item) => {
           const isActive = location === item.href;
           return (
-            <Link key={item.name} href={item.href}>
+            <Link key={item.name} href={item.href} onClick={onClose}>
               <div
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer group ${isActive
                   ? "bg-primary/10 text-primary font-semibold"
@@ -400,7 +417,10 @@ export function Sidebar({ className }: { className?: string }) {
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => navigateAdminSection(item.id)}
+                      onClick={() => {
+                        navigateAdminSection(item.id);
+                        onClose?.();
+                      }}
                       className={`w-full text-left flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 cursor-pointer group ${isActive
                         ? "bg-primary/10 text-primary font-semibold"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground"

@@ -12,6 +12,7 @@ interface AppBrandingProps {
     initialData: {
         brandingAppName?: string;
         brandingIconUrl?: string;
+        brandingPrimaryColor?: string;
         brandingThemeColor?: string;
         brandingBgColor?: string;
     };
@@ -25,6 +26,7 @@ export function AppBranding({ accountId, initialData }: AppBrandingProps) {
     // Initial State Fix: Ensure no undefined values to prevent React "uncontrolled input" warning
     const [appName, setAppName] = useState(initialData.brandingAppName || "");
     const [themeColor, setThemeColor] = useState(initialData.brandingThemeColor || "#ffffff");
+    const [primaryColor, setPrimaryColor] = useState(initialData.brandingPrimaryColor || "#2563eb");
     const [bgColor, setBgColor] = useState(initialData.brandingBgColor || "#ffffff");
     const [previewIcon, setPreviewIcon] = useState<string | null>(initialData.brandingIconUrl || null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -61,6 +63,7 @@ export function AppBranding({ accountId, initialData }: AppBrandingProps) {
         const formData = new FormData();
         formData.append("appName", appName);
         formData.append("themeColor", themeColor);
+        formData.append("primaryColor", primaryColor);
         formData.append("bgColor", bgColor);
 
         if (selectedFile) {
@@ -93,6 +96,22 @@ export function AppBranding({ accountId, initialData }: AppBrandingProps) {
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
+                        <Label>Cor Primária (UI)</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                type="color"
+                                value={primaryColor}
+                                onChange={(e) => setPrimaryColor(e.target.value)}
+                                className="w-12 h-10 p-1"
+                            />
+                            <Input
+                                value={primaryColor}
+                                onChange={(e) => setPrimaryColor(e.target.value)}
+                                className="flex-1"
+                            />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
                         <Label>Cor de Fundo (Splash)</Label>
                         <div className="flex gap-2">
                             <Input
@@ -108,21 +127,22 @@ export function AppBranding({ accountId, initialData }: AppBrandingProps) {
                             />
                         </div>
                     </div>
-                    <div className="space-y-2">
-                        <Label>Cor do Tema (Status Bar)</Label>
-                        <div className="flex gap-2">
-                            <Input
-                                type="color"
-                                value={themeColor}
-                                onChange={(e) => setThemeColor(e.target.value)}
-                                className="w-12 h-10 p-1"
-                            />
-                            <Input
-                                value={themeColor}
-                                onChange={(e) => setThemeColor(e.target.value)}
-                                className="flex-1"
-                            />
-                        </div>
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Cor do Tema (Status Bar)</Label>
+                    <div className="flex gap-2">
+                        <Input
+                            type="color"
+                            value={themeColor}
+                            onChange={(e) => setThemeColor(e.target.value)}
+                            className="w-12 h-10 p-1"
+                        />
+                        <Input
+                            value={themeColor}
+                            onChange={(e) => setThemeColor(e.target.value)}
+                            className="flex-1"
+                        />
                     </div>
                 </div>
 
@@ -157,7 +177,7 @@ export function AppBranding({ accountId, initialData }: AppBrandingProps) {
                 </Button>
             </div>
 
-            {/* Preview Section - The "Container" Strategy Visualization */}
+            {/* Preview Section */}
             <div className="flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-xl p-8">
                 <Label className="mb-4 text-muted-foreground font-semibold flex items-center gap-2">
                     <Smartphone className="h-4 w-4" /> Prévia (Android/iOS)
@@ -190,7 +210,6 @@ export function AppBranding({ accountId, initialData }: AppBrandingProps) {
 
                             {/* OUR APP */}
                             <div className="flex flex-col items-center gap-1 animate-in zoom-in duration-500">
-                                {/* THE CONTAINER STRATEGY: White background with safe zone */}
                                 <div className="w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center p-2 relative overflow-hidden">
                                     {previewIcon ? (
                                         <img src={previewIcon} className="w-full h-full object-contain" alt="App Icon" />

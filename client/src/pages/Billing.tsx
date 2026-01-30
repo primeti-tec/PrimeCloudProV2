@@ -1,11 +1,11 @@
-import { Sidebar } from "@/components/Sidebar";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useProducts } from "@/hooks/use-products";
 import { useMyAccounts, useAccount } from "@/hooks/use-accounts";
 import { useSubscribe } from "@/hooks/use-subscriptions";
 import { useQuotaRequests, useCreateQuotaRequest } from "@/hooks/use-quota-requests";
 import { useInvoices, useUsageSummary } from "@/hooks/use-billing";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui-custom";
-import { Check, Loader2, CreditCard, Download, FileText, HardDrive, Wifi, Activity, DollarSign, ArrowUp, FileUp, Clock, CheckCircle, XCircle, AlertTriangle, ShoppingCart, Package, RefreshCw, X, Building2 } from "lucide-react";
+import { Check, Loader2, CreditCard, Download, FileText, HardDrive, Wifi, Activity, DollarSign, ArrowUp, FileUp, Clock, CheckCircle, XCircle, AlertTriangle, ShoppingCart, Package, RefreshCw, X, Building2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useOrders, useUpdateOrder, useCancelOrder } from "@/hooks/use-orders";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { StorageOverviewCard } from "@/components/billing/StorageOverviewCard";
+import { ImperiusStatsCard } from "@/components/billing/ImperiusStatsCard";
+import { BucketUsageTable } from "@/components/billing/BucketUsageTable";
+import { UpgradeRequestsCard } from "@/components/billing/UpgradeRequestsCard";
 import { logger } from "@/lib/logger";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface Invoice {
   id: number;
@@ -120,6 +126,7 @@ export default function Billing() {
   const [requestedQuota, setRequestedQuota] = useState("");
   const [quotaReason, setQuotaReason] = useState("");
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [isStorageDetailsOpen, setIsStorageDetailsOpen] = useState(false);
 
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices(currentAccount?.id);
   const { data: usage, isLoading: usageLoading } = useUsageSummary(currentAccount?.id);
@@ -231,165 +238,69 @@ export default function Billing() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 ml-72 p-8">
+    <DashboardLayout>
+      <div className="p-8">
         <header className="mb-8">
           <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-page-title">Faturamento e Planos</h1>
           <p className="text-muted-foreground">Gerencie sua assinatura, faturas e métodos de pagamento.</p>
         </header>
 
-        {/* Payment Method Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5" /> Método de Pagamento</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap justify-between items-center gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-10 w-16 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-slate-400">PIX</div>
-              <div>
-                <div className="font-semibold text-slate-900 dark:text-slate-100">Boleto/PIX</div>
-                <div className="text-sm text-muted-foreground">Fatura mensal</div>
-              </div>
-            </div>
-            <Button variant="outline" data-testid="button-update-payment">Atualizar</Button>
-          </CardContent>
-        </Card>
 
-        {/* Storage Quota Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5" /> Quota de Armazenamento
-              </CardTitle>
-              <Button onClick={openQuotaDialog} data-testid="button-request-quota">
-                <FileUp className="h-4 w-4 mr-2" />
-                Solicitar Aumento de Quota
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col gap-6 mb-6">
-              {/* Overall Usage Section */}
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`text-3xl font-bold ${textColor}`} data-testid="text-current-quota">
-                      {usageData.storageUsedGB} GB
-                    </div>
-                    <span className="text-muted-foreground">de {currentQuota} GB usados</span>
-                  </div>
-                  {statusBadge}
-                </div>
 
-                <Progress value={usagePercent} className={`h-3 ${progressColor}`} />
 
-                {isOverLimit && (
-                  <Alert variant="destructive" className="mt-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Atenção</AlertTitle>
-                    <AlertDescription>
-                      Você excedeu sua quota de armazenamento. Por favor, faça um upgrade no seu plano ou solicite um aumento de quota para evitar interrupções.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
+        {/* New Premium Billing Dashboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* 1. Storage Overview */}
+          <div className="lg:col-span-1 h-full">
+            <StorageOverviewCard
+              usedGB={usageData.storageUsedGB}
+              totalGB={currentQuota}
+              onRequestQuota={openQuotaDialog}
+              isCritical={isCritical || isOverLimit}
+            />
+          </div>
 
-              {/* Individual Client Limits Breakdown */}
-              {usageData.buckets && usageData.buckets.length > 0 && (
-                <div className="mt-4 pt-6 border-t">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <HardDrive className="h-4 w-4 text-primary" />
-                    Detalhamento por Cliente (Bucket)
-                  </h3>
-                  <div className="space-y-6">
-                    {usageData.buckets.map((bucket: any, index: number) => {
-                      // Calculate bucket specific metrics
-                      const bucketLimit = bucket.storageLimitGB || 50;
-                      // Convert sizeBytes to GB for display/calc
-                      const bucketSizeGB = Math.round(bucket.sizeBytes / (1024 * 1024 * 1024) * 100) / 100;
-                      const bucketPercent = Math.min((bucketSizeGB / bucketLimit) * 100, 100);
+          {/* 2. Imperius Stats */}
+          <div className="lg:col-span-1 h-full">
+            <ImperiusStatsCard
+              licenseCount={usageData.imperiusLicenseCount || 0}
+              linkedBuckets={usageData.buckets || []}
+              pricePerLicenseCents={5900} // TODO: Get from product/config if dynamic
+            />
+          </div>
 
-                      const isBucketCritical = bucketSizeGB >= bucketLimit * 0.95;
-                      const isBucketWarning = bucketSizeGB >= bucketLimit * 0.80;
-                      const isBucketOverLimit = bucketSizeGB > bucketLimit;
+          {/* 3. Upgrade Requests History */}
+          <div className="lg:col-span-1 h-full">
+            <UpgradeRequestsCard requests={quotaRequests || []} />
+          </div>
+        </div>
 
-                      let bucketProgressColor = "bg-primary";
-                      let bucketTextColor = "text-slate-700 dark:text-slate-300";
-
-                      if (isBucketOverLimit || isBucketCritical) {
-                        bucketProgressColor = "[&>div]:bg-destructive";
-                        bucketTextColor = "text-destructive font-bold";
-                      } else if (isBucketWarning) {
-                        bucketProgressColor = "[&>div]:bg-amber-500";
-                        bucketTextColor = "text-amber-600 dark:text-amber-500 font-bold";
-                      }
-
-                      return (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium text-slate-900 dark:text-slate-100">{bucket.name}</span>
-                            <div className="flex items-center gap-2">
-                              <span className={bucketTextColor}>
-                                {bucketSizeGB} GB
-                              </span>
-                              <span className="text-muted-foreground">
-                                / {bucketLimit} GB
-                              </span>
-                              {isBucketOverLimit && <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">Excedido</Badge>}
-                              {!isBucketOverLimit && isBucketCritical && <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">Crítico</Badge>}
-                              {!isBucketOverLimit && !isBucketCritical && isBucketWarning && <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-amber-100 text-amber-800">Atenção</Badge>}
-                            </div>
-                          </div>
-                          <Progress value={bucketPercent} className={`h-2 ${bucketProgressColor}`} />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+        {/* Detailed Bucket Usage Table - Minimized by Default */}
+        <div className="mb-8">
+          <Collapsible
+            open={isStorageDetailsOpen}
+            onOpenChange={setIsStorageDetailsOpen}
+            className="border rounded-lg bg-card shadow-sm"
+          >
+            <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setIsStorageDetailsOpen(!isStorageDetailsOpen)}>
+              <h2 className="text-xl font-bold font-display flex items-center gap-2 m-0">
+                <HardDrive className="h-5 w-5" /> Detalhes de Armazenamento
+              </h2>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-9 p-0">
+                  {isStorageDetailsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <span className="sr-only">Toggle</span>
+                </Button>
+              </CollapsibleTrigger>
             </div>
 
-            {quotaRequests && quotaRequests.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">Solicitações Anteriores</h3>
-                <div className="space-y-2">
-                  {quotaRequests.map((request) => (
-                    <div
-                      key={request.id}
-                      className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/50 rounded-lg"
-                      data-testid={`row-quota-request-${request.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {getQuotaStatusIcon(request.status)}
-                        <div>
-                          <span className="text-sm font-medium">
-                            {request.currentQuotaGB} GB → {request.requestedQuotaGB} GB
-                          </span>
-                          {request.reason && (
-                            <p className="text-xs text-muted-foreground">{request.reason}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {getQuotaStatusBadge(request.status)}
-                        <span className="text-xs text-muted-foreground">
-                          {request.createdAt ? new Date(request.createdAt).toLocaleDateString('pt-BR') : ''}
-                        </span>
-                      </div>
-                      {request.reviewNote && (
-                        <div className="w-full text-xs text-muted-foreground italic pl-7">
-                          Observação: {request.reviewNote}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            <CollapsibleContent>
+              <div className="p-4 pt-0">
+                <BucketUsageTable buckets={usageData.buckets || []} />
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
 
         {/* Usage Summary Section */}
         <h2 className="text-xl font-bold font-display mb-4 flex items-center gap-2">
@@ -601,31 +512,19 @@ export default function Billing() {
                 </Button>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Pedido #</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Mobile Card View */}
+                <div className="md:hidden divide-y">
                   {orders.slice(0, 10).map((order) => (
-                    <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
-                      <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                      <TableCell>
-                        {order.createdAt ? format(new Date(order.createdAt), "dd/MM/yyyy", { locale: ptBR }) : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {order.orderType === 'vps' ? 'VPS' : order.product?.name || 'Produto'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>R$ {((order.totalAmount || 0) / 100).toFixed(2).replace('.', ',')}</TableCell>
-                      <TableCell>
+                    <div key={order.id} className="p-4 flex flex-col gap-4" data-testid={`card-order-${order.id}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex flex-col gap-1">
+                          <div className="font-medium text-slate-900">{order.orderNumber}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-2">
+                            <Clock className="h-3 w-3" />
+                            {order.createdAt ? format(new Date(order.createdAt), "dd/MM/yyyy", { locale: ptBR }) : '-'}
+                          </div>
+                        </div>
                         <Badge variant={
                           order.status === 'completed' ? 'success' :
                             order.status === 'canceled' ? 'destructive' :
@@ -640,30 +539,109 @@ export default function Billing() {
                                     order.status === 'canceled' ? 'Cancelado' :
                                       order.status}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {order.status !== 'canceled' && order.status !== 'completed' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => cancelOrder.mutate({ orderId: order.id })}
-                            disabled={cancelOrder.isPending}
-                          >
-                            <X className="h-4 w-4 mr-1" />
-                            Cancelar
-                          </Button>
-                        )}
-                        {order.status === 'completed' && (
-                          <Badge variant="outline" className="bg-green-50">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Concluído
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Tipo/Produto</span>
+                          <Badge variant="outline" className="w-fit text-[10px] h-5 px-1.5 truncate max-w-[150px]">
+                            {order.orderType === 'vps' ? 'VPS' : order.product?.name || 'Produto'}
                           </Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                        </div>
+                        <div className="flex flex-col gap-1 text-right">
+                          <span className="text-xs text-muted-foreground">Valor</span>
+                          <span className="font-bold">R$ {((order.totalAmount || 0) / 100).toFixed(2).replace('.', ',')}</span>
+                        </div>
+                      </div>
+
+                      {order.status !== 'canceled' && order.status !== 'completed' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full border"
+                          onClick={() => cancelOrder.mutate({ orderId: order.id })}
+                          disabled={cancelOrder.isPending}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Cancelar Pedido
+                        </Button>
+                      )}
+
+                      {order.status === 'completed' && (
+                        <div className="flex items-center justify-end text-xs text-green-600 gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          Concluído
+                        </div>
+                      )}
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Desktop Table View */}
+                <Table className="hidden md:table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Pedido #</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orders.slice(0, 10).map((order) => (
+                      <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
+                        <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                        <TableCell>
+                          {order.createdAt ? format(new Date(order.createdAt), "dd/MM/yyyy", { locale: ptBR }) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {order.orderType === 'vps' ? 'VPS' : order.product?.name || 'Produto'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>R$ {((order.totalAmount || 0) / 100).toFixed(2).replace('.', ',')}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            order.status === 'completed' ? 'success' :
+                              order.status === 'canceled' ? 'destructive' :
+                                order.status === 'pending' ? 'secondary' :
+                                  'default'
+                          }>
+                            {order.status === 'pending' ? 'Pendente' :
+                              order.status === 'quoting' ? 'Em Orçamento' :
+                                order.status === 'approved' ? 'Aprovado' :
+                                  order.status === 'provisioning' ? 'Provisionando' :
+                                    order.status === 'completed' ? 'Concluído' :
+                                      order.status === 'canceled' ? 'Cancelado' :
+                                        order.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {order.status !== 'canceled' && order.status !== 'completed' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => cancelOrder.mutate({ orderId: order.id })}
+                              disabled={cancelOrder.isPending}
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Cancelar
+                            </Button>
+                          )}
+                          {order.status === 'completed' && (
+                            <Badge variant="outline" className="bg-green-50">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Concluído
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </>
             )}
           </CardContent>
         </Card>
@@ -851,7 +829,7 @@ export default function Billing() {
           </DialogContent>
         </Dialog>
 
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

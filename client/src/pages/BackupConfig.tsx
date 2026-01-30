@@ -1,5 +1,7 @@
+
 import { useState } from "react";
-import { Sidebar } from "@/components/Sidebar";
+// import { Sidebar } from "@/components/Sidebar"; // Removed
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAccount, useMyAccounts } from "@/hooks/use-accounts";
 import { useAccessKeys } from "@/hooks/use-access-keys";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui-custom";
@@ -20,6 +22,7 @@ const BACKUP_SOFTWARE = [
         icon: "⚡",
         description: "Software de backup brasileiro com suporte completo S3",
         configFile: "config.xml",
+        tutorialId: "imperius"
     },
     {
         id: "veeam",
@@ -28,6 +31,7 @@ const BACKUP_SOFTWARE = [
         icon: "🟢",
         description: "Solução enterprise líder de mercado",
         configFile: "veeam-repo.json",
+        tutorialId: "veeam"
     },
     {
         id: "acronis",
@@ -36,6 +40,7 @@ const BACKUP_SOFTWARE = [
         icon: "🔵",
         description: "Backup e recuperação de desastres",
         configFile: "acronis-cloud.xml",
+        tutorialId: "acronis"
     },
     {
         id: "duplicati",
@@ -44,6 +49,7 @@ const BACKUP_SOFTWARE = [
         icon: "📦",
         description: "Backup open-source gratuito",
         configFile: "duplicati-config.json",
+        tutorialId: "duplicati"
     },
     {
         id: "restic",
@@ -52,6 +58,7 @@ const BACKUP_SOFTWARE = [
         icon: "🔒",
         description: "Backup rápido, seguro e eficiente",
         configFile: "restic-env.sh",
+        tutorialId: "restic"
     },
     {
         id: "rclone",
@@ -60,6 +67,7 @@ const BACKUP_SOFTWARE = [
         icon: "☁️",
         description: "Rsync para armazenamento em nuvem",
         configFile: "rclone.conf",
+        tutorialId: "rclone"
     },
 ];
 
@@ -238,10 +246,8 @@ AWS_ENDPOINT_URL=https://${S3_CONFIG.endpoint}
     const selectedSoftwareData = BACKUP_SOFTWARE.find(s => s.id === selectedSoftware);
 
     return (
-        <div className="flex min-h-screen bg-background">
-            <Sidebar />
-
-            <main className="flex-1 ml-72 p-6 lg:p-8 overflow-auto">
+        <DashboardLayout>
+            <div className="p-6 lg:p-8 overflow-auto w-full">
                 <div className="max-w-5xl mx-auto space-y-8">
                     {/* Header */}
                     <div>
@@ -263,7 +269,7 @@ AWS_ENDPOINT_URL=https://${S3_CONFIG.endpoint}
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 {BACKUP_SOFTWARE.map((software) => (
                                     <button
                                         key={software.id}
@@ -506,19 +512,19 @@ AWS_ENDPOINT_URL=https://${S3_CONFIG.endpoint}
                     {/* Help Section */}
                     <Card>
                         <CardContent className="py-6">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                                 <div>
                                     <h3 className="font-medium">Precisa de ajuda?</h3>
                                     <p className="text-sm text-muted-foreground mt-1">
                                         Nossa equipe está pronta para ajudar você a configurar seu backup.
                                     </p>
                                 </div>
-                                <div className="flex gap-3">
-                                    <Button variant="outline">
+                                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                                    <Button variant="outline" className="w-full sm:w-auto">
                                         <ExternalLink className="h-4 w-4 mr-2" />
                                         Documentação
                                     </Button>
-                                    <Button>
+                                    <Button className="w-full sm:w-auto">
                                         <Cloud className="h-4 w-4 mr-2" />
                                         Falar com Suporte
                                     </Button>
@@ -527,8 +533,8 @@ AWS_ENDPOINT_URL=https://${S3_CONFIG.endpoint}
                         </CardContent>
                     </Card>
                 </div>
-            </main>
-        </div>
+            </div>
+        </DashboardLayout>
     );
 }
 

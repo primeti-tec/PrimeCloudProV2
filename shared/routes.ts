@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertAccountSchema, insertProductSchema, insertBucketSchema, insertAccessKeySchema, insertOrderSchema, accounts, products, accountMembers, subscriptions, buckets, accessKeys, invoices, usageRecords, orders, type AccountWithRole } from './schema';
+import { insertAccountSchema, insertProductSchema, insertBucketSchema, insertAccessKeySchema, insertOrderSchema, insertCustomerSchema, accounts, products, accountMembers, subscriptions, buckets, accessKeys, invoices, usageRecords, orders, customers, type AccountWithRole } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -62,6 +62,45 @@ export const api = {
       responses: {
         200: z.custom<typeof accounts.$inferSelect>(),
         403: errorSchemas.forbidden,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/accounts/:id',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  // Customers
+  customers: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/customers',
+      responses: {
+        200: z.array(z.custom<typeof customers.$inferSelect>()),
+        403: errorSchemas.forbidden,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/customers',
+      input: insertCustomerSchema,
+      responses: {
+        201: z.custom<typeof customers.$inferSelect>(),
+        400: errorSchemas.validation,
+        403: errorSchemas.forbidden,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/customers/:id',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        403: errorSchemas.forbidden,
+        404: errorSchemas.notFound,
       },
     },
   },
@@ -149,6 +188,7 @@ export const api = {
       input: z.object({
         quotaGB: z.number().min(1),
         manualBandwidthGB: z.number().optional(),
+        imperiusLicenseCount: z.number().optional(),
         reason: z.string().min(1)
       }),
       responses: {
@@ -219,6 +259,19 @@ export const api = {
       responses: {
         201: z.custom<typeof buckets.$inferSelect>(),
         400: errorSchemas.validation,
+        403: errorSchemas.forbidden,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/accounts/:accountId/buckets/:bucketId',
+      input: z.object({
+        storageLimitGB: z.number().min(1).optional(),
+        isImperiusBackup: z.boolean().optional(),
+        isPublic: z.boolean().optional()
+      }),
+      responses: {
+        200: z.custom<typeof buckets.$inferSelect>(),
         403: errorSchemas.forbidden,
       },
     },
@@ -493,10 +546,13 @@ export const api = {
           projectedCost: z.number(),
           pricePerStorageGB: z.number().optional(),
           pricePerTransferGB: z.number().optional(),
+          backupLicenseCostCents: z.number().optional(),
+          imperiusLicenseCount: z.number().optional(),
           buckets: z.array(z.object({
             name: z.string(),
             sizeBytes: z.number(),
             storageLimitGB: z.number(),
+            isImperiusBackup: z.boolean().optional(),
           })),
         }),
         403: errorSchemas.forbidden,

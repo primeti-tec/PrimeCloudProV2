@@ -42,6 +42,19 @@ export function useUpdateBucketLimit(accountId: number | undefined) {
   });
 }
 
+export function useUpdateBucket(accountId: number | undefined) {
+  return useMutation({
+    mutationFn: async ({ bucketId, data }: { bucketId: number; data: { isImperiusBackup?: boolean; storageLimitGB?: number; isPublic?: boolean } }) => {
+      if (!accountId) throw new Error('No account');
+      const res = await apiRequest('PATCH', buildUrl(api.buckets.update.path, { accountId, bucketId }), data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'buckets'] });
+    },
+  });
+}
+
 export function useDeleteBucket(accountId: number | undefined) {
   return useMutation({
     mutationFn: async (bucketId: number) => {

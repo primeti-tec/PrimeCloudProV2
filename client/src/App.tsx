@@ -17,6 +17,7 @@ const AuditLogs = lazy(() => import("@/pages/AuditLogs"));
 const SftpAccess = lazy(() => import("@/pages/SftpAccess"));
 const Orders = lazy(() => import("@/pages/Orders"));
 const ContractService = lazy(() => import("@/pages/ContractService"));
+const Customers = lazy(() => import("@/pages/Customers"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
 const AcceptInvite = lazy(() => import("@/pages/AcceptInvite"));
@@ -107,6 +108,9 @@ function Router() {
         </Route>
         <Route path="/dashboard/billing">
           <PrivateRoute component={Billing} />
+        </Route>
+        <Route path="/dashboard/customers">
+          <PrivateRoute component={Customers} />
         </Route>
         <Route path="/dashboard/api-keys">
           <PrivateRoute component={ApiKeys} />

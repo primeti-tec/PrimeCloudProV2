@@ -1,17 +1,26 @@
 import { Suspense, lazy, useEffect, useState, type ComponentType } from "react";
-import { Sidebar } from "@/components/Sidebar";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+// import { Sidebar } from "@/components/Sidebar"; // Removed as it's now in Layout
+// import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; // Removed
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { TopNavigation } from "@/components/TopNavigation";
 import { useAccount, useMyAccounts } from "@/hooks/use-accounts";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui-custom";
 import { useLocation } from "wouter";
-import { Loader2, HardDrive, ArrowUpRight, Activity, Users, DollarSign, Plus, Key, UserPlus, AlertTriangle, Menu } from "lucide-react";
+import { Loader2, HardDrive, ArrowUpRight, Activity, Users, DollarSign, Plus, Key, UserPlus, AlertTriangle, Menu, FileText } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { useBuckets } from "@/hooks/use-buckets";
 import { useMembers } from "@/hooks/use-members";
 import { useUsageSummary } from "@/hooks/use-billing";
+import { cn } from "@/lib/utils";
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(value);
+};
 
 const DashboardCharts = lazy(() => import("@/pages/DashboardCharts"));
 
@@ -66,47 +75,42 @@ export default function Dashboard() {
 
   // Calculate dynamic costs based on product settings or defaults
   // Convert cents to R$ (divide by 100)
-  const storageCostPerGB = (usage?.pricePerStorageGB || 15) / 100;
-  const bandwidthCostPerGB = (usage?.pricePerTransferGB || 40) / 100;
+  const storageCostPerGB = (usage?.pricePerStorageGB ?? 15) / 100;
+  const bandwidthCostPerGB = (usage?.pricePerTransferGB ?? 40) / 100;
 
-  const storageCost = (usage?.storageUsedGB || 0) * storageCostPerGB;
-  const bandwidthCost = (usage?.bandwidthUsedGB || 0) * bandwidthCostPerGB;
+  // Calculate costs on EXCESS usage only (Overage)
+  const includedStorage = usage?.contractedStorageGB || storageQuota;
+  const includedTransfer = transferQuota; // Backend defaults to 500 if null, matches here
+
+  const excessStorage = Math.max(0, (usage?.storageUsedGB || 0) - includedStorage);
+  const excessBandwidth = Math.max(0, (usage?.bandwidthUsedGB || 0) - includedTransfer);
+
+  const storageCost = excessStorage * storageCostPerGB;
+  const bandwidthCost = excessBandwidth * bandwidthCostPerGB;
+  const backupLicenseCost = (usage?.backupLicenseCostCents || 0) / 100;
 
   // Convert projectedCost from cents to R$
   const displayTotalCost = (usage?.projectedCost || 0) / 100;
 
   // Calculate base plan cost as the difference between total and usage costs
   // This ensures the sum displayed below matches the big number
-  const basePlanPrice = Math.max(0, displayTotalCost - storageCost - bandwidthCost);
+  const basePlanCost = Math.max(0, displayTotalCost - (storageCost + bandwidthCost + backupLicenseCost));
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar className="hidden md:flex" />
-      <main className="flex-1 md:ml-72 p-4 md:p-8 overflow-y-auto w-full">
+    <DashboardLayout>
+      <div className="p-4 md:p-8 w-full">
         <header className="flex justify-between items-center gap-4 mb-8">
           <div className="flex items-center gap-4">
-            <div className="md:hidden">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="-ml-2">
-                    <Menu className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-72 border-r">
-                  <Sidebar className="w-full relative h-full" />
-                </SheetContent>
-              </Sheet>
-            </div>
             <div>
-              <h1 className="text-3xl font-display font-bold text-foreground">Dashboard</h1>
+              <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">Dashboard</h1>
               <p className="text-muted-foreground hidden sm:block">Visão geral de <span className="font-semibold text-foreground">{currentAccount?.name}</span></p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <TopNavigation />
-            <Button onClick={() => setLocation("/dashboard/storage")} data-testid="button-create-bucket-header">
-              <Plus className="h-4 w-4 mr-2" />
-              Criar Bucket
+            <Button onClick={() => setLocation("/dashboard/storage")} data-testid="button-create-bucket-header" size="sm" className="w-9 h-9 sm:w-auto sm:h-10 px-0 sm:px-4">
+              <Plus className="h-5 w-5 sm:mr-2" />
+              <span className="hidden sm:inline">Criar Bucket</span>
             </Button>
           </div>
         </header>
@@ -141,13 +145,14 @@ export default function Dashboard() {
           <StatCardWithProgress
             title="Armazenamento"
             usedValue={usage?.storageUsedGB || 0}
-            totalValue={storageQuota}
+            totalValue={usage?.contractedStorageGB || storageQuota}
             unit="GB"
             icon={HardDrive}
             trend={null} // Removed hardcoded trend
             color="text-blue-500"
             bgColor="bg-blue-500/10"
             progressColor="bg-blue-500"
+            footerText={usage?.contractedStorageGB ? `de ${usage.contractedStorageGB} GB Contratados` : undefined}
           />
           <StatCardWithProgress
             title="Bandwidth"
@@ -179,30 +184,44 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <Card className="shadow-md border-border/60" data-testid="card-estimated-cost">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-lg">Custo Estimado</CardTitle>
-              <div className="p-2 rounded-lg bg-emerald-500/10">
-                <DollarSign className="h-5 w-5 text-emerald-500" />
+          <Card className="shadow-lg border-primary/20 bg-gradient-to-br from-card to-card/50 relative overflow-hidden group" data-testid="card-estimated-cost">
+            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+              <DollarSign className="h-24 w-24 -mr-4 -mt-4 text-primary" />
+            </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Custo Estimado</CardTitle>
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <DollarSign className="h-4 w-4" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="mb-4">
-                <h3 className="text-3xl font-bold text-foreground">R$ {displayTotalCost.toFixed(2)}</h3>
-                <p className="text-sm text-muted-foreground">Estimativa do mês atual</p>
+              <div className="text-2xl font-bold mb-1">
+                {formatCurrency(displayTotalCost)}
               </div>
-              <div className="space-y-2 text-sm border-t pt-4">
-                <div className="flex justify-between items-center text-muted-foreground">
-                  <span>Mensalidade do Plano</span>
-                  <span className="font-medium text-foreground">R$ {basePlanPrice.toFixed(2)}</span>
+              <p className="text-xs text-muted-foreground mb-4">Estimativa do mês atual</p>
+
+              <div className="space-y-2 pt-4 border-t border-border/50">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Plano: {usage?.productName || "Standard"}</span>
+                  <span className="font-medium">{formatCurrency(basePlanCost)}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Armazenamento ({usage?.storageUsedGB || 0} GB x R$ {storageCostPerGB.toFixed(2)})</span>
-                  <span className="font-medium">R$ {storageCost.toFixed(2)}</span>
+                {backupLicenseCost > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Licença Imperius ({usage?.imperiusLicenseCount || 0})</span>
+                    <span className="font-medium text-primary">{formatCurrency(backupLicenseCost)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Armazenamento ({usage?.storageUsedGB || 0} GB)</span>
+                  <span className={cn("font-medium", storageCost > 0 ? "text-primary" : "")}>
+                    {formatCurrency(storageCost)}
+                  </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Bandwidth ({usage?.bandwidthUsedGB || 0} GB x R$ {bandwidthCostPerGB.toFixed(2)})</span>
-                  <span className="font-medium">R$ {bandwidthCost.toFixed(2)}</span>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Bandwidth ({usage?.bandwidthUsedGB || 0} GB)</span>
+                  <span className={cn("font-medium", bandwidthCost > 0 ? "text-primary" : "")}>
+                    {formatCurrency(bandwidthCost)}
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -225,6 +244,10 @@ export default function Dashboard() {
                 <Button variant="outline" className="flex items-center gap-2" onClick={() => setLocation("/dashboard/team")} data-testid="button-invite-team">
                   <UserPlus className="h-4 w-4" />
                   Convidar Membro
+                </Button>
+                <Button variant="outline" className="flex items-center gap-2" onClick={() => setLocation("/dashboard/billing")} data-testid="button-view-invoices">
+                  <FileText className="h-4 w-4" />
+                  Faturas
                 </Button>
               </div>
             </CardContent>
@@ -253,8 +276,8 @@ export default function Dashboard() {
             <Badge variant="default" className="text-sm px-4 py-1">Ativo</Badge>
           </CardContent>
         </Card>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
 
@@ -278,6 +301,7 @@ type StatCardWithProgressProps = {
   color: string;
   bgColor: string;
   progressColor: string;
+  footerText?: string;
 };
 
 function StatCard({ title, value, subtitle, icon: Icon, trend, color, bgColor }: StatCardProps) {

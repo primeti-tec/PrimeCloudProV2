@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
-import { Sidebar } from '@/components/Sidebar';
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { VpsConfigurator, VpsConfigData } from '@/components/VpsConfigurator';
 import { useMyAccounts } from '@/hooks/use-accounts';
 import { useCreateVpsOrder } from '@/hooks/use-vps-order';
@@ -682,9 +682,8 @@ export default function ContractService() {
     };
 
     return (
-        <div className="flex min-h-screen bg-background">
-            <Sidebar />
-            <main className="flex-1 ml-72 p-8">
+        <DashboardLayout>
+            <div className="p-4 md:p-8 w-full">
                 <div className="max-w-6xl mx-auto space-y-6">
                     {/* Header */}
                     <div className="flex items-center gap-4">
@@ -778,7 +777,7 @@ export default function ContractService() {
                         </Card>
                     )}
                 </div>
-            </main>
-        </div>
+            </div>
+        </DashboardLayout>
     );
 }

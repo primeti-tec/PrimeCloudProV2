@@ -3,13 +3,15 @@ import { minioService } from "./services/minio.service";
 import {
   users, accounts, products, accountMembers, subscriptions, buckets, accessKeys, notifications, auditLogs, invitations, sftpCredentials, invoices, usageRecords, quotaRequests, orders, bucketPermissions, objectFavorites, objectTags, objectShares, vpsConfigs, pricingConfigs, pricingHistory,
   type Account, type Product, type Subscription, type AccountMember, type Bucket, type AccessKey,
-  type Notification, type AuditLog, type Invitation, type SftpCredential, type Invoice, type QuotaRequest, type Order, type OrderWithDetails, type VpsConfig, type PricingConfig, type PricingHistory,
+  type Notification, type AuditLog, type Invitation, type SftpCredential, type Invoice, type QuotaRequest, type Order, type OrderWithDetails, type VpsConfig, type PricingConfig, type PricingHistory, type UsageRecord,
   type CreateAccountRequest, type CreateMemberRequest, type CreateBucketRequest, type CreateAccessKeyRequest,
   type CreateNotificationRequest, type CreateAuditLogRequest, type CreateQuotaRequestRequest, type CreateOrderRequest, type UpdateOrderRequest, type CreateVpsConfigRequest, type CreatePricingConfigRequest, type UpdatePricingConfigRequest,
-  type ObjectShare
+  type ObjectShare,
+  customers, customerInvoices, type Customer, type CustomerInvoice, type CreateCustomerRequest, type UpdateCustomerRequest, type CreateCustomerInvoiceRequest
 } from "@shared/schema";
-import { eq, and, desc, count, isNull, gt, gte, lte, ilike, or } from "drizzle-orm";
+import { eq, and, desc, asc, count, isNull, gt, gte, lte, ilike, or, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
+import { appendFileSync } from "fs";
 
 export interface IStorage {
   // Products
@@ -33,14 +35,27 @@ export interface IStorage {
   getUserAccounts(userId: string | null): Promise<{ account: Account, role: string }[]>;
   removeMember(accountId: number, memberId: number): Promise<void>;
   updateMemberRole(memberId: number, role: string): Promise<AccountMember>;
+  getUserMemberships(userId: string): Promise<AccountMember[]>;
 
   // Subscriptions
   createSubscription(accountId: number, productId: number): Promise<Subscription>;
   getSubscription(accountId: number): Promise<(Subscription & { product: Product }) | undefined>;
   updateSubscription(id: number, data: Partial<Subscription>): Promise<Subscription>;
 
+  // Customers
+  listCustomers(accountId: number): Promise<Customer[]>;
+  getCustomer(id: number): Promise<Customer | undefined>;
+  createCustomer(customer: CreateCustomerRequest & { accountId: number }): Promise<Customer>;
+  updateCustomer(id: number, data: UpdateCustomerRequest): Promise<Customer>;
+  deleteCustomer(id: number): Promise<void>;
+
+  // Customer Invoices
+  listCustomerInvoices(customerId: number): Promise<CustomerInvoice[]>;
+  createCustomerInvoice(invoice: CreateCustomerInvoiceRequest): Promise<CustomerInvoice>;
+
   // Buckets
   createBucket(data: CreateBucketRequest): Promise<Bucket>;
+  updateBucket(id: number, data: Partial<Bucket>): Promise<Bucket>;
   getBuckets(accountId: number): Promise<Bucket[]>;
   getBucket(id: number): Promise<Bucket | undefined>;
   deleteBucket(id: number): Promise<void>;
@@ -223,6 +238,10 @@ export class DatabaseStorage implements IStorage {
     return results.map(r => ({ account: r.account, role: r.member.role }));
   }
 
+  async getUserMemberships(userId: string): Promise<AccountMember[]> {
+    return await db.select().from(accountMembers).where(eq(accountMembers.userId, userId));
+  }
+
   async createSubscription(accountId: number, productId: number): Promise<Subscription> {
     // Deactivate old subscriptions
     await db.update(subscriptions)
@@ -293,6 +312,11 @@ export class DatabaseStorage implements IStorage {
     // 2. Save to DB
     const [bucket] = await db.insert(buckets).values(data).returning();
     return bucket;
+  }
+
+  async updateBucket(id: number, data: Partial<Bucket>): Promise<Bucket> {
+    const [updated] = await db.update(buckets).set(data).where(eq(buckets.id, id)).returning();
+    return updated;
   }
 
   async getBuckets(accountId: number): Promise<Bucket[]> {
@@ -1008,7 +1032,11 @@ export class DatabaseStorage implements IStorage {
     projectedCost: number;
     pricePerStorageGB?: number;
     pricePerTransferGB?: number;
-    buckets: { name: string; sizeBytes: number; storageLimitGB: number }[];
+    backupLicenseCostCents?: number;
+    imperiusLicenseCount?: number;
+    productName?: string;
+    contractedStorageGB?: number;
+    buckets: { name: string; sizeBytes: number; storageLimitGB: number; isImperiusBackup: boolean }[];
   }> {
     const account = await this.getAccount(accountId);
     const subscription = await this.getSubscription(accountId);
@@ -1025,8 +1053,8 @@ export class DatabaseStorage implements IStorage {
     let baseCost = subscription?.product?.price || 2900;
 
     // Use product-specific price per GB or default to 15 cents (R$ 0.15)
-    const pricePerStorageGB = subscription?.product?.pricePerStorageGB || 15;
-    const pricePerTransferGB = subscription?.product?.pricePerTransferGB || 40;
+    const pricePerStorageGB = subscription?.product?.pricePerStorageGB ?? 15;
+    const pricePerTransferGB = subscription?.product?.pricePerTransferGB ?? 40;
 
     // Determine Included Storage: Use Account Quota if set and higher than Product Limit (for "Degustação")
     const productLimit = subscription?.product?.storageLimit || 0;
@@ -1052,7 +1080,12 @@ export class DatabaseStorage implements IStorage {
       baseCost = 0;
     }
 
-    const projectedCost = baseCost + storageCostCents + bandwidthCostCents;
+    // Imperius License Cost
+    const imperiusCount = (account as any)?.imperiusLicenseCount || 0;
+    const imperiusPrice = (subscription?.product as any)?.imperiusPriceCents || 5900;
+    const backupLicenseCostCents = imperiusCount * imperiusPrice;
+
+    const projectedCost = baseCost + storageCostCents + bandwidthCostCents + backupLicenseCostCents;
 
     return {
       storageUsedGB,
@@ -1061,10 +1094,15 @@ export class DatabaseStorage implements IStorage {
       projectedCost,
       pricePerStorageGB,
       pricePerTransferGB,
+      backupLicenseCostCents,
+      imperiusLicenseCount: imperiusCount,
+      productName: subscription?.product?.name || "Plano Gratuito",
+      contractedStorageGB: includedStorageGB,
       buckets: bucketList.map(b => ({
         name: b.name,
         sizeBytes: Number(b.sizeBytes || 0),
-        storageLimitGB: b.storageLimitGB || 50
+        storageLimitGB: b.storageLimitGB || 50,
+        isImperiusBackup: b.isImperiusBackup || false
       }))
     };
   }
@@ -1538,6 +1576,28 @@ export class DatabaseStorage implements IStorage {
   async deleteAccount(id: number): Promise<void> {
     const accountId = id;
     // Helper to delete recursively (cascade simulation)
+    // 1. Delete Orders and associated VPS Configs
+    const accountOrders = await db.select().from(orders).where(eq(orders.accountId, accountId));
+    for (const order of accountOrders) {
+      await db.delete(vpsConfigs).where(eq(vpsConfigs.orderId, order.id));
+    }
+    await db.delete(orders).where(eq(orders.accountId, accountId));
+
+    // 2. Delete Customers and associated Invoices
+    const accountCustomers = await db.select().from(customers).where(eq(customers.accountId, accountId));
+    const customerIds = accountCustomers.map(c => c.id);
+    if (customerIds.length > 0) {
+      // Delete invoices for these customers
+      await db.delete(customerInvoices).where(inArray(customerInvoices.customerId, customerIds));
+      // Unlink buckets from these customers (though buckets are deleted below, unlinking first is safer if constraint is tight)
+      // await db.update(buckets).set({ customerId: null }).where(inArray(buckets.customerId, customerIds)); 
+      // Actually buckets are deleted by accountId below, so referencing customers is fine as long as customers exist.
+      // But we delete customers AFTER buckets usually? 
+      // Current order: buckets deleted line 1581. Customers deleted... I'll add it after buckets to be safe, OR before if buckets.customerId restricts customer delete.
+      // buckets.customerId references customers.id. 
+      // If we delete buckets first (by accountId), then references are gone.
+    }
+    // Access Keys, Notifications, etc.
     await db.delete(notifications).where(eq(notifications.accountId, accountId));
     await db.delete(invitations).where(eq(invitations.accountId, accountId));
     await db.delete(accessKeys).where(eq(accessKeys.accountId, accountId));
@@ -1545,7 +1605,15 @@ export class DatabaseStorage implements IStorage {
     await db.delete(objectFavorites).where(eq(objectFavorites.accountId, accountId));
     await db.delete(objectTags).where(eq(objectTags.accountId, accountId));
     await db.delete(objectShares).where(eq(objectShares.accountId, accountId));
+
+    // Buckets (delete buckets first, this clears references to customers)
     await db.delete(buckets).where(eq(buckets.accountId, accountId));
+
+    // Now safe to delete Customers (Bucket refs are gone)
+    if (customerIds.length > 0) {
+      await db.delete(customers).where(inArray(customers.id, customerIds));
+    }
+
     await db.delete(subscriptions).where(eq(subscriptions.accountId, accountId));
     await db.delete(invoices).where(eq(invoices.accountId, accountId));
     await db.delete(usageRecords).where(eq(usageRecords.accountId, accountId));
@@ -1559,6 +1627,78 @@ export class DatabaseStorage implements IStorage {
     await db.delete(accountMembers).where(eq(accountMembers.accountId, accountId));
 
     await db.delete(accounts).where(eq(accounts.id, accountId));
+  }
+  // === CUSTOMER METHODS ===
+  async listCustomers(accountId: number): Promise<Customer[]> {
+    return await db.select().from(customers).where(eq(customers.accountId, accountId)).orderBy(desc(customers.createdAt));
+  }
+
+  async getCustomer(id: number): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer;
+  }
+
+  async createCustomer(customer: CreateCustomerRequest & { accountId: number }): Promise<Customer> {
+    try {
+      appendFileSync('debug_log.txt', `[${new Date().toISOString()}] invoke createCustomer: ${JSON.stringify(customer)}\n`);
+      const { bucketIds, ...customerData } = customer;
+
+      appendFileSync('debug_log.txt', `[${new Date().toISOString()}] inserting customer data...\n`);
+      const [newCustomer] = await db.insert(customers).values(customerData).returning();
+      appendFileSync('debug_log.txt', `[${new Date().toISOString()}] customer created: ${newCustomer.id}\n`);
+
+      if (bucketIds && bucketIds.length > 0) {
+        appendFileSync('debug_log.txt', `[${new Date().toISOString()}] linking buckets: ${JSON.stringify(bucketIds)}\n`);
+        const result = await db.update(buckets)
+          .set({ customerId: newCustomer.id })
+          .where(
+            and(
+              inArray(buckets.id, bucketIds),
+              eq(buckets.accountId, customer.accountId)
+            )
+          ).returning();
+        appendFileSync('debug_log.txt', `[${new Date().toISOString()}] buckets linked, result count: ${result.length}\n`);
+      }
+
+      return newCustomer;
+    } catch (e: any) {
+      appendFileSync('debug_log.txt', `[${new Date().toISOString()}] storage.createCustomer failed: ${e.message}\nStack: ${e.stack}\n`);
+      throw e;
+    }
+  }
+
+  async updateCustomer(id: number, data: UpdateCustomerRequest): Promise<Customer> {
+    const [updated] = await db.update(customers).set(data).where(eq(customers.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCustomer(id: number): Promise<void> {
+    // Check for linked buckets
+    // Unlink buckets first
+    await db.update(buckets).set({ customerId: null }).where(eq(buckets.customerId, id));
+    // Delete invoices first
+    await db.delete(customerInvoices).where(eq(customerInvoices.customerId, id));
+    await db.delete(customers).where(eq(customers.id, id));
+  }
+
+  // === CUSTOMER INVOICE METHODS ===
+  async listCustomerInvoices(customerId: number): Promise<CustomerInvoice[]> {
+    return await db.select().from(customerInvoices).where(eq(customerInvoices.customerId, customerId)).orderBy(desc(customerInvoices.createdAt));
+  }
+
+  async createCustomerInvoice(invoice: CreateCustomerInvoiceRequest): Promise<CustomerInvoice> {
+    const [newInvoice] = await db.insert(customerInvoices).values(invoice).returning();
+    return newInvoice;
+  }
+
+  // Get Usage History for Charts
+  // Get Usage History for Charts
+  async getUsageHistory(accountId: number, limit = 30): Promise<UsageRecord[]> {
+    return await db.select()
+      .from(usageRecords)
+      .where(eq(usageRecords.accountId, accountId))
+      .orderBy(desc(usageRecords.recordedAt))
+      .limit(limit);
   }
 }
 

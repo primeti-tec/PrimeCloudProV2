@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sidebar } from "@/components/Sidebar";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useMyAccounts } from "@/hooks/use-accounts";
 import { useAccessKeys, useCreateAccessKey, useRevokeAccessKey, useRotateAccessKey, useToggleAccessKeyActive } from "@/hooks/use-access-keys";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input, Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui-custom";
@@ -140,10 +140,9 @@ export default function ApiKeys() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 ml-72 p-8">
-        <header className="flex justify-between items-center mb-8">
+    <DashboardLayout>
+      <div className="p-4 md:p-8 w-full">
+        <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-page-title">Chaves de API</h1>
             <p className="text-muted-foreground">Gerencie suas credenciais de acesso S3.</p>
@@ -253,86 +252,172 @@ export default function ApiKeys() {
                 <p>Nenhuma Access Key ainda. Crie uma para começar.</p>
               </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-muted/50 border-b">
-                  <tr>
-                    <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Nome</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Access Key ID</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Permissões</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Criado em</th>
-                    <th className="text-right p-4 pr-6 text-sm font-medium text-muted-foreground">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+              <>
+                {/* Mobile Card View */}
+                <div className="md:hidden divide-y">
                   {keys?.map((key) => (
-                    <tr key={key.id} className="hover:bg-muted/50 transition-colors" data-testid={`row-key-${key.id}`}>
-                      <td className="p-4 pl-6 flex items-center gap-3">
-                        <Key className={`h-5 w-5 ${key.isActive ? 'text-primary' : 'text-slate-400'}`} />
-                        <span className={`font-medium ${!key.isActive ? 'text-slate-400' : ''}`}>{key.name}</span>
-                      </td>
-                      <td className={`p-4 font-mono text-sm ${key.isActive ? 'text-slate-600' : 'text-slate-400'}`}>{key.accessKeyId}</td>
-                      <td className="p-4">
-                        <Badge variant="secondary" className={`capitalize ${!key.isActive ? 'opacity-50' : ''}`}>{key.permissions}</Badge>
-                      </td>
-                      <td className="p-4">
-                        {key.isActive ? (
-                          <Badge variant="secondary" className="bg-green-100 text-green-700">Ativo</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-slate-200 text-slate-600">Inativo</Badge>
-                        )}
-                      </td>
-                      <td className={`p-4 text-sm ${key.isActive ? 'text-muted-foreground' : 'text-slate-400'}`}>
-                        {key.createdAt ? new Date(key.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
-                      </td>
-                      <td className="p-4 pr-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="flex items-center gap-2 mr-2">
+                    <div key={key.id} className="p-4 flex flex-col gap-4" data-testid={`card-key-${key.id}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <Key className={`h-8 w-8 p-1.5 rounded-full bg-muted ${key.isActive ? 'text-primary' : 'text-slate-400'}`} />
+                          <div>
+                            <div className={`font-medium ${!key.isActive ? 'text-slate-400' : ''}`}>{key.name}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="secondary" className={`capitalize text-[10px] h-5 px-1.5 ${!key.isActive ? 'opacity-50' : ''}`}>
+                                {key.permissions}
+                              </Badge>
+                              {key.isActive ? (
+                                <Badge variant="secondary" className="bg-green-100 text-green-700 text-[10px] h-5 px-1.5">Ativo</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-slate-200 text-slate-600 text-[10px] h-5 px-1.5">Inativo</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 -mr-2" data-testid={`button-actions-mobile-${key.id}`}>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => downloadEnvFormat(key.accessKeyId, key.name)}>
+                              <FileText className="h-4 w-4 mr-2" /> Download .env
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => downloadJsonFormat(key.accessKeyId, key.name)}>
+                              <FileJson className="h-4 w-4 mr-2" /> Download JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => downloadAwsCliFormat(key.accessKeyId, key.name)}>
+                              <Terminal className="h-4 w-4 mr-2" /> Download AWS CLI
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {key.isActive && (
+                              <DropdownMenuItem onClick={() => handleRotateKey(key.id)}>
+                                <RefreshCw className="h-4 w-4 mr-2" /> Rotacionar Chave
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              onClick={() => revokeKey(key.id)}
+                              disabled={isRevoking}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Revogar Chave
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <div className="space-y-3 pl-1">
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Access Key ID</span>
+                          <div className={`font-mono text-xs break-all bg-muted/50 p-2 rounded border ${key.isActive ? 'text-slate-600' : 'text-slate-400'}`}>
+                            {key.accessKeyId}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-xs text-muted-foreground">
+                            Criado em: {key.createdAt ? new Date(key.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium">Status:</span>
                             <Switch
                               checked={key.isActive ?? false}
                               onCheckedChange={() => handleToggleActive(key.id, key.isActive ?? false)}
                               disabled={isToggling}
-                              data-testid={`switch-active-${key.id}`}
+                              className="scale-75 origin-right"
                             />
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-actions-${key.id}`}>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => downloadEnvFormat(key.accessKeyId, key.name)} data-testid={`menu-download-env-${key.id}`}>
-                                <FileText className="h-4 w-4 mr-2" /> Download .env
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => downloadJsonFormat(key.accessKeyId, key.name)} data-testid={`menu-download-json-${key.id}`}>
-                                <FileJson className="h-4 w-4 mr-2" /> Download JSON
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => downloadAwsCliFormat(key.accessKeyId, key.name)} data-testid={`menu-download-awscli-${key.id}`}>
-                                <Terminal className="h-4 w-4 mr-2" /> Download AWS CLI
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {key.isActive && (
-                                <DropdownMenuItem onClick={() => handleRotateKey(key.id)} data-testid={`menu-rotate-${key.id}`}>
-                                  <RefreshCw className="h-4 w-4 mr-2" /> Rotacionar Chave
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem
-                                onClick={() => revokeKey(key.id)}
-                                disabled={isRevoking}
-                                className="text-destructive focus:text-destructive"
-                                data-testid={`menu-revoke-${key.id}`}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" /> Revogar Chave
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full min-w-[800px]">
+                    <thead className="bg-muted/50 border-b">
+                      <tr>
+                        <th className="text-left p-4 pl-6 text-sm font-medium text-muted-foreground">Nome</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Access Key ID</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Permissões</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Criado em</th>
+                        <th className="text-right p-4 pr-6 text-sm font-medium text-muted-foreground">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {keys?.map((key) => (
+                        <tr key={key.id} className="hover:bg-muted/50 transition-colors" data-testid={`row-key-${key.id}`}>
+                          <td className="p-4 pl-6 flex items-center gap-3">
+                            <Key className={`h-5 w-5 ${key.isActive ? 'text-primary' : 'text-slate-400'}`} />
+                            <span className={`font-medium ${!key.isActive ? 'text-slate-400' : ''}`}>{key.name}</span>
+                          </td>
+                          <td className={`p-4 font-mono text-sm ${key.isActive ? 'text-slate-600' : 'text-slate-400'}`}>{key.accessKeyId}</td>
+                          <td className="p-4">
+                            <Badge variant="secondary" className={`capitalize ${!key.isActive ? 'opacity-50' : ''}`}>{key.permissions}</Badge>
+                          </td>
+                          <td className="p-4">
+                            {key.isActive ? (
+                              <Badge variant="secondary" className="bg-green-100 text-green-700">Ativo</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-slate-200 text-slate-600">Inativo</Badge>
+                            )}
+                          </td>
+                          <td className={`p-4 text-sm ${key.isActive ? 'text-muted-foreground' : 'text-slate-400'}`}>
+                            {key.createdAt ? new Date(key.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
+                          </td>
+                          <td className="p-4 pr-6 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center gap-2 mr-2">
+                                <Switch
+                                  checked={key.isActive ?? false}
+                                  onCheckedChange={() => handleToggleActive(key.id, key.isActive ?? false)}
+                                  disabled={isToggling}
+                                  data-testid={`switch-active-${key.id}`}
+                                />
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="icon" variant="ghost" data-testid={`button-actions-${key.id}`}>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => downloadEnvFormat(key.accessKeyId, key.name)} data-testid={`menu-download-env-${key.id}`}>
+                                    <FileText className="h-4 w-4 mr-2" /> Download .env
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => downloadJsonFormat(key.accessKeyId, key.name)} data-testid={`menu-download-json-${key.id}`}>
+                                    <FileJson className="h-4 w-4 mr-2" /> Download JSON
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => downloadAwsCliFormat(key.accessKeyId, key.name)} data-testid={`menu-download-awscli-${key.id}`}>
+                                    <Terminal className="h-4 w-4 mr-2" /> Download AWS CLI
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  {key.isActive && (
+                                    <DropdownMenuItem onClick={() => handleRotateKey(key.id)} data-testid={`menu-rotate-${key.id}`}>
+                                      <RefreshCw className="h-4 w-4 mr-2" /> Rotacionar Chave
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={() => revokeKey(key.id)}
+                                    disabled={isRevoking}
+                                    className="text-destructive focus:text-destructive"
+                                    data-testid={`menu-revoke-${key.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" /> Revogar Chave
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -410,7 +495,8 @@ export default function ApiKeys() {
             )}
           </DialogContent>
         </Dialog>
-      </main>
-    </div>
+
+      </div >
+    </DashboardLayout >
   );
 }

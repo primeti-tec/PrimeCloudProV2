@@ -1,11 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Sidebar } from "@/components/Sidebar";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { useBranding } from "@/components/branding-provider";
-import { useMyAccounts } from "@/hooks/use-accounts";
+import { useMyAccounts, useAccount } from "@/hooks/use-accounts";
+import { useCustomer } from "@/hooks/use-customers";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   useBuckets,
@@ -23,6 +24,7 @@ import {
   useBucketSharesWithMe,
   useCreateShare,
   useRevokeShare,
+  useUpdateBucket,
   type ListObjectsResponse,
   type BucketObject,
 } from "@/hooks/use-buckets";
@@ -72,10 +74,13 @@ import {
   Share2,
   User,
   ExternalLink,
+  Settings,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
 import type { Bucket } from "@shared/schema";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 type BucketWithPermission = Bucket & { userPermission?: "read" | "write" | "read-write" };
 
@@ -365,6 +370,11 @@ export default function BucketBrowser() {
   const { data: buckets, isLoading: isBucketsLoading } = useBuckets(currentAccount?.id);
   const bucket = (buckets as BucketWithPermission[] | undefined)?.find((b) => b.id === bucketIdInt);
 
+  // Fetch bucket owner account for display
+  const { data: bucketAccount } = useAccount(bucket?.accountId);
+  // Fetch linked customer if any
+  const { data: bucketCustomer } = useCustomer(bucket?.customerId || undefined);
+
   // Debug logs
   logger.log(`[BucketBrowser] Render: bucketId=${bucketIdInt}, isExternal=${isExternalClient}`);
   logger.log(`[BucketBrowser] Accounts:`, accounts?.length);
@@ -377,7 +387,11 @@ export default function BucketBrowser() {
   const [searchTerm, setSearchTerm] = useState("");
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
   const [objectToDelete, setObjectToDelete] = useState<BucketObject | null>(null);
+
+  // Mobile Menu State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Preview state
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -397,6 +411,10 @@ export default function BucketBrowser() {
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [tagTarget, setTagTarget] = useState<BucketObject | null>(null);
   const [tagInput, setTagInput] = useState("");
+
+  // Settings State
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const { mutate: updateBucket, isPending: isUpdatingBucket } = useUpdateBucket(currentAccount?.id);
 
   useEffect(() => {
     if (!shareDialogOpen) {
@@ -805,9 +823,9 @@ export default function BucketBrowser() {
 
   if (isAccountsLoading || isBucketsLoading) {
     return (
-      <div className="flex min-h-screen bg-background">
-        <Sidebar className="hidden md:flex" />
-        <main className="flex-1 md:ml-72 p-8 pb-20 md:pb-8">
+
+      <DashboardLayout>
+        <div className="p-8 pb-20 md:pb-8">
           <div className="flex items-center gap-4 mb-8">
             <Skeleton className="h-10 w-10 rounded-full" />
             <div className="space-y-2">
@@ -833,17 +851,18 @@ export default function BucketBrowser() {
               ))}
             </div>
           </div>
-        </main>
+        </div>
         <MobileBottomNav />
-      </div>
+      </DashboardLayout>
     );
+
   }
 
   if (!bucket) {
     return (
-      <div className="flex min-h-screen bg-background">
-        <Sidebar className="hidden md:flex" />
-        <main className="flex-1 md:ml-72 p-8 pb-20 md:pb-8">
+
+      <DashboardLayout>
+        <div className="p-8 pb-20 md:pb-8">
           <div className="flex flex-col items-center justify-center h-[60vh]">
             <FolderOpen className="h-16 w-16 text-muted-foreground mb-4 opacity-20" />
             <h2 className="text-xl font-semibold mb-2">Bucket não encontrado</h2>
@@ -852,10 +871,11 @@ export default function BucketBrowser() {
               Voltar para Armazenamento
             </Button>
           </div>
-        </main>
+        </div>
         <MobileBottomNav />
-      </div>
+      </DashboardLayout>
     );
+
   }
 
   const currentShare = shareTarget
@@ -864,37 +884,11 @@ export default function BucketBrowser() {
   const currentTags = tagTarget ? tagsMap.get(tagTarget.name) || [] : [];
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar className="hidden md:flex" />
-      <main className="flex-1 md:ml-72 flex flex-col min-h-screen pb-16 md:pb-0">
-        <header className="h-14 flex items-center justify-between px-6 text-white" style={{ backgroundColor: branding.primaryColor }}>
-          <div className="flex items-center gap-3">
-            <div className="md:hidden">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="-ml-3 text-white hover:bg-white/10">
-                    <Menu className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-72 border-r">
-                  <Sidebar className="w-full relative h-full" />
-                </SheetContent>
-              </Sheet>
-            </div>
-            <span className="text-lg md:text-xl font-bold text-white tracking-wide truncate">
-              {user?.displayName || branding.name || "Cliente"}
-            </span>
-          </div>
-          {!isExternalClient && (
-            <div className="flex items-center gap-5 ml-auto">
-              <Search className="h-4 w-4" />
-              <Bell className="h-4 w-4" />
-              <div className="h-8 w-8 rounded-full bg-white/70 dark:bg-white/20 flex items-center justify-center text-slate-700">
-                <User className="h-4 w-4" />
-              </div>
-            </div>
-          )}
-        </header>
+    <DashboardLayout>
+      <div className="flex-1 flex flex-col h-full relative">
+        {/* Main Content Area */}
+
+
 
         <div className="px-6 py-4 bg-card border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -936,6 +930,16 @@ export default function BucketBrowser() {
             <button type="button" className="text-muted-foreground">
               <List className="h-4 w-4" />
             </button>
+            {!isExternalClient && (
+              <button
+                type="button"
+                onClick={() => setSettingsDialogOpen(true)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title="Configurações do Bucket"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => refetch()}
@@ -966,7 +970,11 @@ export default function BucketBrowser() {
                   <th className="w-10 p-4">
                     <input type="checkbox" />
                   </th>
-                  <th className="p-4">Nome</th>
+
+                  <th className="p-4">
+                    {bucketCustomer?.name || bucket?.name || "Bucket"}
+                    {bucketCustomer && <span className="ml-2 text-xs text-muted-foreground bg-primary/10 px-2 py-0.5 rounded-full">Cliente</span>}
+                  </th>
                   <th className="p-4 hidden md:table-cell">Tamanho</th>
                   <th className="p-4 hidden md:table-cell">Modificado</th>
                   <th className="p-4 text-right"> </th>
@@ -1331,8 +1339,66 @@ export default function BucketBrowser() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </main >
+
+        {/* Settings Dialog */}
+        <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Configurações do Bucket</DialogTitle>
+              <DialogDescription>
+                Gerencie as configurações avançadas deste bucket.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+              <div className="flex items-center justify-between space-x-2">
+                <div className="flex flex-col space-y-1">
+                  <Label htmlFor="imperius-mode" className="font-medium">Licença Imperius Backup</Label>
+                  <span className="text-sm text-muted-foreground">
+                    Vincular este bucket a uma licença Imperius para backup gerenciado.
+                  </span>
+                </div>
+                <Switch
+                  id="imperius-mode"
+                  checked={bucket?.isImperiusBackup || false}
+                  onCheckedChange={(checked) => {
+                    if (bucket) {
+                      updateBucket({
+                        bucketId: bucket.id,
+                        data: { isImperiusBackup: checked }
+                      }, {
+                        onSuccess: () => {
+                          toast({
+                            title: "Configuração Atualizada",
+                            description: `Licença Imperius ${checked ? 'ativada' : 'desativada'} para este bucket.`,
+                          });
+                        }
+                      });
+                    }
+                  }}
+                  disabled={isUpdatingBucket}
+                />
+              </div>
+
+              {/* Storage Limit (Admin Only - simplified view) - Only show if defined */}
+              {bucket?.storageLimitGB && (
+                <div className="flex flex-col space-y-2 pt-4 border-t">
+                  <Label className="font-medium">Limite de Armazenamento</Label>
+                  <div className="text-sm text-muted-foreground">
+                    {bucket.storageLimitGB} GB
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSettingsDialogOpen(false)}>Fechar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+      </div>
       <MobileBottomNav />
-    </div >
+    </DashboardLayout>
   );
 }

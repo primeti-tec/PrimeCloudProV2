@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertAccountSchema, type CreateAccountRequest } from "@shared/schema";
 import { useCreateAccount } from "@/hooks/use-accounts";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui-custom";
-import { Loader2, Rocket, Building2, Phone, FileText, AlertCircle } from "lucide-react";
+import { Loader2, Rocket, Building2, Phone, FileText, AlertCircle, ShieldCheck } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDocument, validateDocument } from "@/lib/document-validation";
@@ -136,6 +136,23 @@ export default function CreateAccount() {
                 className="h-12 font-mono"
                 data-testid="input-phone"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                Licenças Imperius Backup
+              </label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="0"
+                {...form.register("imperiusLicenseCount", { valueAsNumber: true })}
+                className="h-12"
+              />
+              <p className="text-xs text-muted-foreground">
+                Recomendamos adicionar licenças para proteção de dados (R$ 59,00/cada).
+              </p>
             </div>
 
             <div className="space-y-2">

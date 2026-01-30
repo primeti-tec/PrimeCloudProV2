@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { Sidebar } from "@/components/Sidebar";
-import { TopNavigation } from "@/components/TopNavigation";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuditLogs, type AuditLog, type AuditLogFilters } from "@/hooks/use-audit-logs";
 import { useMyAccounts } from "@/hooks/use-accounts";
 import { Card, CardContent, Button } from "@/components/ui-custom";
@@ -195,15 +194,13 @@ export default function AuditLogs() {
   const hasActiveFilters = actionFilter !== "all" || severityFilter !== "all" || searchQuery.trim() !== "";
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 ml-72 p-8">
+    <DashboardLayout>
+      <div className="p-4 md:p-8 w-full">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Logs de Auditoria</h1>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">Logs de Auditoria</h1>
             <p className="text-muted-foreground">Acompanhe todas as atividades na sua organização.</p>
           </div>
-          <TopNavigation />
         </div>
 
         {/* Filtros e Busca */}
@@ -281,96 +278,98 @@ export default function AuditLogs() {
                 </p>
               </div>
             ) : (
-              <table className="w-full" data-testid="audit-logs-table">
-                <thead className="bg-muted/50 border-b">
-                  <tr>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Data</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Usuário</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Ação</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Recurso</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Severidade</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">IP</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground pr-6">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {auditLogs.map((log) => (
-                    <tr key={log.id} className="group hover:bg-muted/50 transition-colors" data-testid={`audit-log-row-${log.id}`}>
-                      <td className="p-4 pl-6">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-foreground">
-                            {(() => {
-                              const date = new Date(log.timestamp);
-                              if (isNaN(date.getTime())) return "Data Inválida";
-                              return format(date, "d 'de' MMM, yyyy", { locale: ptBR });
-                            })()}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {(() => {
-                              const date = new Date(log.timestamp);
-                              if (isNaN(date.getTime())) return "-";
-                              return (
-                                <>
-                                  {format(date, "HH:mm", { locale: ptBR })} ({formatDistanceToNow(date, { addSuffix: true, locale: ptBR })})
-                                </>
-                              );
-                            })()}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                            {log.userName?.[0] || log.userEmail?.[0] || "S"}
-                          </div>
-                          <div>
-                            <div className="font-medium text-foreground text-sm">{log.userName || "Sistema"}</div>
-                            <div className="text-xs text-muted-foreground">{log.userEmail || log.context}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-md bg-muted">
-                            {getActionIcon(log.action)}
-                          </div>
-                          <span className="text-sm font-medium text-foreground">
-                            {formatActionLabel(log.action)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          {getResourceIcon(log.resourceType)}
-                          <div>
-                            <span className="text-sm text-foreground">{log.resourceName || "-"}</span>
-                            <span className="text-xs text-muted-foreground ml-1">({getResourceTypeLabel(log.resourceType)})</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        {getSeverityBadge(log.severity)}
-                      </td>
-                      <td className="p-4">
-                        <code className="text-sm bg-muted px-2 py-1 rounded font-mono text-muted-foreground">
-                          {log.ipAddress}
-                        </code>
-                      </td>
-                      <td className="p-4 pr-6">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedLog(log)}
-                          data-testid={`view-details-${log.id}`}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Detalhes
-                        </Button>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px]" data-testid="audit-logs-table">
+                  <thead className="bg-muted/50 border-b">
+                    <tr>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Data</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Usuário</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Ação</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Recurso</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Severidade</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">IP</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground pr-6">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y">
+                    {auditLogs.map((log) => (
+                      <tr key={log.id} className="group hover:bg-muted/50 transition-colors" data-testid={`audit-log-row-${log.id}`}>
+                        <td className="p-4 pl-6">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-foreground">
+                              {(() => {
+                                const date = new Date(log.timestamp);
+                                if (isNaN(date.getTime())) return "Data Inválida";
+                                return format(date, "d 'de' MMM, yyyy", { locale: ptBR });
+                              })()}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {(() => {
+                                const date = new Date(log.timestamp);
+                                if (isNaN(date.getTime())) return "-";
+                                return (
+                                  <>
+                                    {format(date, "HH:mm", { locale: ptBR })} ({formatDistanceToNow(date, { addSuffix: true, locale: ptBR })})
+                                  </>
+                                );
+                              })()}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                              {log.userName?.[0] || log.userEmail?.[0] || "S"}
+                            </div>
+                            <div>
+                              <div className="font-medium text-foreground text-sm">{log.userName || "Sistema"}</div>
+                              <div className="text-xs text-muted-foreground">{log.userEmail || log.context}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-md bg-muted">
+                              {getActionIcon(log.action)}
+                            </div>
+                            <span className="text-sm font-medium text-foreground">
+                              {formatActionLabel(log.action)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            {getResourceIcon(log.resourceType)}
+                            <div>
+                              <span className="text-sm text-foreground">{log.resourceName || "-"}</span>
+                              <span className="text-xs text-muted-foreground ml-1">({getResourceTypeLabel(log.resourceType)})</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          {getSeverityBadge(log.severity)}
+                        </td>
+                        <td className="p-4">
+                          <code className="text-sm bg-muted px-2 py-1 rounded font-mono text-muted-foreground">
+                            {log.ipAddress}
+                          </code>
+                        </td>
+                        <td className="p-4 pr-6">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedLog(log)}
+                            data-testid={`view-details-${log.id}`}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Detalhes
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -465,7 +464,7 @@ export default function AuditLogs() {
             )}
           </DialogContent>
         </Dialog>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

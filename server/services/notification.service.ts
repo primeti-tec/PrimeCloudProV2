@@ -11,7 +11,17 @@
 import { db } from "../db";
 import { notifications, accounts } from "@shared/schema";
 import { eq, and, gte, desc } from "drizzle-orm";
-import { sendEmail } from "./email";
+import {
+    sendEmail,
+    sendQuotaWarningEmail,
+    sendInvoiceEmail,
+    sendPaymentConfirmationEmail,
+    sendWelcomeEmail,
+    sendInvitationEmail,
+    sendAccountApprovalEmail,
+    sendAccountRejectionEmail,
+    type BrandingOptions
+} from "./email";
 
 // Notification types matching the PRD
 export type NotificationType =
@@ -62,7 +72,7 @@ export class NotificationService {
                 .limit(1);
 
             // Skip if same notification sent recently (prevent spam)
-            if (existing && !["welcome", "member_invited", "invoice_generated"].includes(payload.type)) {
+            if (existing && !["welcome", "member_invited", "invoice_generated", "payment_received"].includes(payload.type)) {
                 console.log(`Skipping duplicate notification: ${payload.type} for account ${payload.accountId}`);
                 return;
             }
@@ -92,22 +102,76 @@ export class NotificationService {
      */
     private async sendEmailNotification(payload: NotificationPayload): Promise<void> {
         try {
+            // Fetch account for branding
+            const [account] = await db.select().from(accounts).where(eq(accounts.id, payload.accountId));
+            const branding: BrandingOptions = account ? {
+                name: account.brandingAppName || undefined,
+                logoUrl: account.brandingIconUrl || undefined,
+                primaryColor: account.brandingPrimaryColor || undefined,
+            } : {};
+
+            const accountSmtpConfig = { branding };
+
+            // Dispatch to specialized email templates if available
+            if (payload.type.startsWith('quota_') && payload.metadata) {
+                await sendQuotaWarningEmail(
+                    payload.emailTo!,
+                    "Usuário", // Ideally fetch user name, but 'Usuário' works for auto-alert
+                    payload.metadata.usedGB,
+                    payload.metadata.quotaGB,
+                    payload.metadata.usagePercent,
+                    accountSmtpConfig
+                );
+                return;
+            }
+
+            if (payload.type === 'invoice_generated' && payload.metadata) {
+                await sendInvoiceEmail(
+                    payload.emailTo!,
+                    "Cliente",
+                    payload.metadata.invoiceNumber,
+                    payload.metadata.totalAmount,
+                    payload.metadata.dueDate ? new Date(payload.metadata.dueDate) : new Date(),
+                    undefined,
+                    accountSmtpConfig
+                );
+                return;
+            }
+
+            if (payload.type === 'payment_received' && payload.metadata) {
+                await sendPaymentConfirmationEmail(
+                    payload.emailTo!,
+                    "Cliente",
+                    payload.metadata.invoiceNumber,
+                    payload.metadata.amount,
+                    payload.metadata.paymentMethod || 'credit_card',
+                    accountSmtpConfig
+                );
+                return;
+            }
+
+            // Fallback for other types or if metadata missing
             await sendEmail({
                 to: payload.emailTo!,
                 subject: payload.title,
-                html: this.getEmailTemplate(payload),
+                html: this.getEmailTemplate(payload, branding),
                 text: payload.message,
-            });
+            }, accountSmtpConfig);
+
         } catch (error) {
             console.error("Failed to send email notification:", error);
         }
     }
 
     /**
-     * Get email template for notification type
+     * Get email template for notification type (Fallback)
      */
-    private getEmailTemplate(payload: NotificationPayload): string {
-        const brandColor = "#0070f3";
+    private getEmailTemplate(payload: NotificationPayload, branding: BrandingOptions): string {
+        const brandColor = branding.primaryColor || "#0070f3";
+        const logoHtml = branding.logoUrl
+            ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${branding.logoUrl}" alt="${branding.name || 'Logo'}" style="max-height: 50px; max-width: 200px;"></div>`
+            : '';
+        const footerName = branding.name || 'Prime Cloud Pro';
 
         return `
 <!DOCTYPE html>
@@ -117,21 +181,22 @@ export class NotificationService {
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: ${brandColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .header { background-color: ${brandColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
     .content { background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; }
-    .footer { color: #666; font-size: 12px; margin-top: 20px; text-align: center; }
+    .footer { color: #666; font-size: 12px; margin-top: 20px; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      ${logoHtml}
       <h1>${payload.title}</h1>
     </div>
     <div class="content">
       <p>${payload.message}</p>
     </div>
     <div class="footer">
-      <p>Prime Cloud Pro - Sua solução de armazenamento em nuvem</p>
+      <p>${footerName} - Sua solução de armazenamento em nuvem</p>
     </div>
   </div>
 </body>

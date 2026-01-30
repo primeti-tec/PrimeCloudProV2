@@ -15,7 +15,7 @@ import { useOrders, useCreateOrder, useUpdateOrder, useCancelOrder } from '@/hoo
 import { useProducts } from '@/hooks/use-products';
 import { useMyAccounts } from '@/hooks/use-accounts';
 import type { OrderWithDetails } from '@shared/schema';
-import { Sidebar } from "@/components/Sidebar";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-500/10 text-yellow-500',
@@ -163,9 +163,8 @@ export default function Orders() {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 ml-72 p-8">
+    <DashboardLayout>
+      <div className="p-8">
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div>
@@ -251,7 +250,7 @@ export default function Orders() {
             <div className="space-y-4">
               {orders?.map((order) => (
                 <Card key={order.id} data-testid={`card-order-${order.id}`}>
-                  <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-2">
+                  <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 space-y-0 pb-2">
                     <div>
                       <CardTitle className="text-lg font-medium flex items-center gap-2">
                         <Package className="h-4 w-4" />
@@ -272,8 +271,8 @@ export default function Orders() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="space-y-1 w-full sm:w-auto">
                         <p className="text-sm text-muted-foreground">
                           Produto: <span className="text-foreground font-medium">{order.product?.name || 'Desconhecido'}</span>
                         </p>
@@ -286,7 +285,7 @@ export default function Orders() {
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
                         <div className="text-right">
                           <p className="text-2xl font-bold flex items-center gap-1">
                             {formatCurrency(order.totalAmount)}
@@ -400,7 +399,8 @@ export default function Orders() {
             </DialogContent>
           </Dialog>
         </div>
-      </main>
-    </div>
+      </div>
+
+    </DashboardLayout >
   );
 }

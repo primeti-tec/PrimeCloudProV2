@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sidebar } from "@/components/Sidebar";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useMyAccounts } from "@/hooks/use-accounts";
 import { useBuckets } from "@/hooks/use-buckets";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -69,10 +69,9 @@ export default function SftpAccess() {
   const isLoading = isLoadingCredential || isLoadingBuckets;
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 ml-72 p-8">
-        <div className="max-w-4xl mx-auto">
+    <DashboardLayout>
+      <div className="p-4 md:p-8 w-full">
+        <div className="max-w-4xl mx-auto space-y-6">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="text-page-title">Acesso SFTP</h1>
             <p className="text-muted-foreground">
@@ -232,13 +231,13 @@ export default function SftpAccess() {
 
                   <div className="flex items-center gap-4 pt-4 border-t">
                     <Button
-                      variant="outline"
+                      variant="primary"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 border-0"
                       onClick={() => resetPasswordMutation.mutate()}
                       disabled={resetPasswordMutation.isPending}
                       data-testid="button-reset-password"
                     >
                       {resetPasswordMutation.isPending && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
-                      <RefreshCw className="mr-2 h-4 w-4" />
                       Redefinir Senha
                     </Button>
                     <p className="text-sm text-muted-foreground">
@@ -261,21 +260,21 @@ export default function SftpAccess() {
                       {buckets.map((bucket: Bucket) => (
                         <div
                           key={bucket.id}
-                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-muted/50 rounded-lg gap-2"
                           data-testid={`bucket-row-${bucket.id}`}
                         >
-                          <div className="flex items-center gap-3">
-                            <Database className="h-5 w-5 text-muted-foreground" />
-                            <div>
-                              <p className="font-medium" data-testid={`text-bucket-name-${bucket.id}`}>{bucket.name}</p>
+                          <div className="flex items-center gap-3 w-full sm:w-auto overflow-hidden">
+                            <Database className="h-5 w-5 text-muted-foreground shrink-0" />
+                            <div className="min-w-0">
+                              <p className="font-medium truncate" data-testid={`text-bucket-name-${bucket.id}`}>{bucket.name}</p>
                               <p className="text-xs text-muted-foreground">Região: {bucket.region}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={bucket.isPublic ? "secondary" : "outline"}>
+                          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                            <Badge variant={bucket.isPublic ? "secondary" : "outline"} className="shrink-0">
                               {bucket.isPublic ? "Público" : "Privado"}
                             </Badge>
-                            <Badge variant="outline">
+                            <Badge variant="outline" className="shrink-0 truncate max-w-full">
                               <Lock className="h-3 w-3 mr-1" />
                               /{bucket.name}
                             </Badge>
@@ -318,8 +317,9 @@ export default function SftpAccess() {
               </Card>
             </div>
           )}
+
         </div>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout >
   );
 }

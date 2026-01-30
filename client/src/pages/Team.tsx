@@ -1,4 +1,4 @@
-import { Sidebar } from "@/components/Sidebar";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useMembers, useRemoveMember, useUpdateMemberRole } from "@/hooks/use-members";
 import { useInvitations, useCreateInvitation, useCancelInvitation } from "@/hooks/use-invitations";
 import { useMyAccounts } from "@/hooks/use-accounts";
@@ -178,33 +178,30 @@ export default function Team() {
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <table className="w-full">
-            <thead className="bg-muted/50 border-b">
-              <tr>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Usuário</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Função</th>
-                {showPermissions && (
-                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">Acesso a Buckets</th>
-                )}
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Entrou em</th>
-                <th className="text-right p-4 text-sm font-medium text-muted-foreground pr-6">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y relative">
-              {membersList.map((member) => (
-                <tr key={member.id} className="group hover:bg-muted/50 transition-colors">
-                  <td className="p-4 pl-6 align-top">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                        {member.user?.firstName?.[0] || member.user?.email?.[0] || "U"}
-                      </div>
-                      <div>
-                        <div className="font-medium text-slate-900">{member.user?.firstName || "Usuário"}</div>
-                        <div className="text-xs text-muted-foreground">{member.user?.email}</div>
-                      </div>
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y">
+            {membersList.map((member) => (
+              <div key={member.id} className="p-4 flex flex-col gap-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shadow-sm">
+                      {member.user?.firstName?.[0] || member.user?.email?.[0] || "U"}
                     </div>
-                  </td>
-                  <td className="p-4 align-top">
+                    <div>
+                      <div className="font-medium text-slate-900">{member.user?.firstName || "Usuário"}</div>
+                      <div className="text-xs text-muted-foreground break-all">{member.user?.email}</div>
+                    </div>
+                  </div>
+                  {member.role !== 'owner' && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0" onClick={() => onRemove(member.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+
+                <div className="space-y-3 pl-1">
+                  <div>
+                    <span className="text-xs text-muted-foreground block mb-1">Função</span>
                     {member.role === 'owner' ? (
                       <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100">
                         {getRoleIcon(member.role)}
@@ -215,7 +212,7 @@ export default function Team() {
                         value={member.role}
                         onValueChange={(value) => onChangeRole(member.id, value)}
                       >
-                        <SelectTrigger className="w-36 h-8 text-xs">
+                        <SelectTrigger className="w-full h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -225,17 +222,20 @@ export default function Team() {
                         </SelectContent>
                       </Select>
                     )}
-                  </td>
+                  </div>
 
                   {showPermissions && (
-                    <td className="p-4 align-top">
-                      <div className="space-y-1">
+                    <div>
+                      <span className="text-xs text-muted-foreground block mb-1">Acesso a Buckets</span>
+                      <div className="space-y-2">
                         {member.bucketPermissions && member.bucketPermissions.length > 0 ? (
                           member.bucketPermissions.map(bp => (
-                            <div key={bp.bucketId} className="flex items-center gap-2 text-sm bg-muted/50 px-2 py-1 rounded-md border w-fit">
-                              <FolderOpen className="h-3 w-3 text-blue-500" />
-                              <span className="font-medium">{bp.bucketName}</span>
-                              <Badge variant="outline" className="text-[10px] h-4 px-1 py-0 ml-1 bg-background">
+                            <div key={bp.bucketId} className="flex items-center justify-between text-sm bg-muted/50 px-3 py-2 rounded-md border">
+                              <div className="flex items-center gap-2">
+                                <FolderOpen className="h-3 w-3 text-blue-500" />
+                                <span className="font-medium text-xs">{bp.bucketName}</span>
+                              </div>
+                              <Badge variant="outline" className="text-[10px] h-5 px-1 bg-background">
                                 {bp.permission === 'read-write' ? 'Full' : bp.permission === 'read' ? 'Leitura' : 'Escrita'}
                               </Badge>
                             </div>
@@ -247,38 +247,120 @@ export default function Team() {
                           </span>
                         )}
                       </div>
-                    </td>
+                    </div>
                   )}
 
-                  <td className="p-4 text-sm text-muted-foreground align-top">
-                    {member.joinedAt ? format(new Date(member.joinedAt), "dd/MM/yyyy", { locale: ptBR }) : "-"}
-                  </td>
-                  <td className="p-4 text-right pr-6 align-top">
-                    {member.role !== 'owner' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive h-8 w-8"
-                        onClick={() => onRemove(member.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </td>
+                  <div className="text-xs text-muted-foreground pt-1">
+                    Entrou em: {member.joinedAt ? format(new Date(member.joinedAt), "dd/MM/yyyy", { locale: ptBR }) : "-"}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full min-w-[1000px]">
+              <thead className="bg-muted/50 border-b">
+                <tr>
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground pl-6">Usuário</th>
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">Função</th>
+                  {showPermissions && (
+                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Acesso a Buckets</th>
+                  )}
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">Entrou em</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground pr-6">Ações</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y relative">
+                {membersList.map((member) => (
+                  <tr key={member.id} className="group hover:bg-muted/50 transition-colors">
+                    <td className="p-4 pl-6 align-top">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                          {member.user?.firstName?.[0] || member.user?.email?.[0] || "U"}
+                        </div>
+                        <div>
+                          <div className="font-medium text-slate-900">{member.user?.firstName || "Usuário"}</div>
+                          <div className="text-xs text-muted-foreground">{member.user?.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4 align-top">
+                      {member.role === 'owner' ? (
+                        <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+                          {getRoleIcon(member.role)}
+                          {getRoleLabel(member.role)}
+                        </Badge>
+                      ) : (
+                        <Select
+                          value={member.role}
+                          onValueChange={(value) => onChangeRole(member.id, value)}
+                        >
+                          <SelectTrigger className="w-36 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Administrador</SelectItem>
+                            <SelectItem value="developer">Desenvolvedor</SelectItem>
+                            <SelectItem value="external_client">Cliente Externo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </td>
+
+                    {showPermissions && (
+                      <td className="p-4 align-top">
+                        <div className="space-y-1">
+                          {member.bucketPermissions && member.bucketPermissions.length > 0 ? (
+                            member.bucketPermissions.map(bp => (
+                              <div key={bp.bucketId} className="flex items-center gap-2 text-sm bg-muted/50 px-2 py-1 rounded-md border w-fit">
+                                <FolderOpen className="h-3 w-3 text-blue-500" />
+                                <span className="font-medium">{bp.bucketName}</span>
+                                <Badge variant="outline" className="text-[10px] h-4 px-1 py-0 ml-1 bg-background">
+                                  {bp.permission === 'read-write' ? 'Full' : bp.permission === 'read' ? 'Leitura' : 'Escrita'}
+                                </Badge>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-sm text-yellow-600 flex items-center gap-1">
+                              <Database className="h-3 w-3" />
+                              Sem buckets
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    )}
+
+                    <td className="p-4 text-sm text-muted-foreground align-top">
+                      {member.joinedAt ? format(new Date(member.joinedAt), "dd/MM/yyyy", { locale: ptBR }) : "-"}
+                    </td>
+                    <td className="p-4 text-right pr-6 align-top">
+                      {member.role !== 'owner' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive h-8 w-8"
+                          onClick={() => onRemove(member.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     );
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 ml-72 p-8">
-        <div className="flex justify-between items-center mb-8">
+    <DashboardLayout>
+      <div className="p-4 md:p-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">Gestão de Equipe</h1>
             <p className="text-muted-foreground">Gerencie quem tem acesso à sua organização.</p>
@@ -430,7 +512,7 @@ export default function Team() {
             />
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

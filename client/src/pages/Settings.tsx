@@ -1,8 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Sidebar } from "@/components/Sidebar";
+// import { Sidebar } from "@/components/Sidebar"; // Removed
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { useMyAccounts, useUpdateAccount } from "@/hooks/use-accounts";
 import { useUpdateBranding } from "@/hooks/use-current-account";
@@ -17,11 +19,12 @@ import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { User, Building, Bell, Shield, Loader2, Palette, Globe, CheckCircle2, XCircle, AlertCircle, Mail } from "lucide-react";
+import { User, Building, Bell, Shield, Loader2, Palette, Globe, CheckCircle2, XCircle, AlertCircle, Mail, Trash2, RefreshCw, ExternalLink, Save, Key, Info } from "lucide-react";
 import { validateDocument } from "@/lib/document-validation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { AppBranding } from "@/components/settings/AppBranding";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const accountUpdateSchema = z.object({
   name: z.string().min(2, "Nome da organização é obrigatório"),
@@ -438,33 +441,261 @@ export default function Settings() {
 
   if (accountsLoading) {
     return (
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <main className="flex-1 p-6 bg-background flex items-center justify-center">
+      <DashboardLayout>
+        <div className="flex-1 p-6 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </main>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <main className="flex-1 ml-72 p-6 bg-background overflow-auto">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Configurações</h1>
-            <p className="text-muted-foreground">Gerencie seu perfil e configurações da organização</p>
-          </div>
+    <DashboardLayout>
+      <div className="p-4 md:p-8 space-y-8 w-full">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-display font-bold">Configurações</h1>
+          <p className="text-muted-foreground">Gerencie as configurações da sua organização e preferências.</p>
+        </div>
 
-          <div className="grid gap-6">
+        <Tabs defaultValue="account" className="space-y-6">
+          <TabsList className="bg-muted/50 p-1 rounded-xl h-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+            <TabsTrigger value="account" className="rounded-lg gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Building className="h-4 w-4" />
+              Organização
+            </TabsTrigger>
+            <TabsTrigger value="branding" className="rounded-lg gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Palette className="h-4 w-4" />
+              White Label
+            </TabsTrigger>
+            <TabsTrigger value="domain" className="rounded-lg gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Globe className="h-4 w-4" />
+              Domínio
+            </TabsTrigger>
+            <TabsTrigger value="email" className="rounded-lg gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Mail className="h-4 w-4" />
+              Email (SMTP)
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="rounded-lg gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Bell className="h-4 w-4" />
+              Notificações
+            </TabsTrigger>
+            <TabsTrigger value="security" className="rounded-lg gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Shield className="h-4 w-4" />
+              Segurança
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Account Settings */}
+          <TabsContent value="account">
             <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building className="h-5 w-5 text-primary" />
+                    <CardTitle>Configurações da Organização</CardTitle>
+                  </div>
+                  {accounts && accounts.length > 1 && (
+                    <Select
+                      value={selectedAccountId?.toString()}
+                      onValueChange={(v) => setSelectedAccountId(parseInt(v))}
+                    >
+                      <SelectTrigger className="w-[200px]" data-testid="select-organization">
+                        <SelectValue placeholder="Selecionar organização" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id.toString()}>
+                            {acc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+                <CardDescription>
+                  Informações principais da sua conta empresarial.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome da Organização</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-org-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Telefone / WhatsApp</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="(00) 00000-0000" data-testid="input-phone" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="documentType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tipo de Documento</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-document-type">
+                                  <SelectValue placeholder="Selecione..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="cnpj">CNPJ</SelectItem>
+                                <SelectItem value="cpf">CPF</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="document"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Número do Documento</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder={form.watch("documentType") === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"} data-testid="input-document" />
+                            </FormControl>
+                            <FormMessage />
+                            {documentValue && !documentValidation.valid && (
+                              <p className="text-sm text-destructive">{documentValidation.error}</p>
+                            )}
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <Separator />
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="billingEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email Financeiro</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="email" placeholder="financeiro@empresa.com" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="financialContact"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Responsável Financeiro</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="billingDay"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Dia de Vencimento</FormLabel>
+                            <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione o dia" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {[1, 5, 10, 15, 20, 25].map((day) => (
+                                  <SelectItem key={day} value={String(day)}>
+                                    Dia {day}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-4 pt-2">
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Status da Conta</Label>
+                        <Badge
+                          className={
+                            selectedAccount?.status === "active"
+                              ? "bg-green-500/10 text-green-600"
+                              : selectedAccount?.status === "suspended"
+                                ? "bg-red-500/10 text-red-600"
+                                : "bg-yellow-500/10 text-yellow-600"
+                          }
+                          data-testid="badge-account-status"
+                        >
+                          {getStatusLabel(selectedAccount?.status || '')}
+                        </Badge>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Slug</Label>
+                        <p className="text-sm font-mono" data-testid="text-account-slug">{selectedAccount?.slug}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4">
+                      <Button type="submit" className="min-w-[120px]" disabled={updateAccount.isPending} data-testid="button-save-settings">
+                        {updateAccount.isPending ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                        Salvar Alterações
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+            <div className="mt-8">
+              <Card className="border-red-200 dark:border-red-900/50">
+                <CardHeader>
+                  <CardTitle className="text-red-600 dark:text-red-400">Zona de Perigo</CardTitle>
+                  <CardDescription>Ações irreversíveis para sua conta.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between p-4 border border-red-200 dark:border-red-900/30 rounded-lg bg-red-50 dark:bg-red-950/10">
+                    <div>
+                      <h4 className="font-semibold text-red-700 dark:text-red-300">Encerrar Conta</h4>
+                      <p className="text-sm text-red-600/80 dark:text-red-400/80">Excluir permanentemente sua conta e todos os dados.</p>
+                    </div>
+                    <Button variant="destructive">Excluir Organização</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="mt-8">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <User className="h-5 w-5 text-primary" />
-                  <CardTitle>Perfil</CardTitle>
+                  <CardTitle>Perfil Pessoal</CardTitle>
                 </div>
-                <CardDescription>Informações da sua conta pessoal</CardDescription>
+                <CardDescription>Informações da sua conta de usuário.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4">
@@ -484,618 +715,277 @@ export default function Settings() {
                     )}
                   </div>
                 </div>
-                <Separator />
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-muted-foreground text-xs">ID do Usuário</Label>
-                    <p className="text-sm font-mono" data-testid="text-user-id">{user?.id}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs">Provedor de Autenticação</Label>
-                    <p className="text-sm">Prime Cloud Pro</p>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
-            {accounts && accounts.length > 0 && (
+          </TabsContent>
+
+          {/* White Label Settings */}
+          <TabsContent value="branding">
+            {selectedAccount && ['owner', 'admin'].includes(selectedAccount.role || '') ? (
+              <AppBranding
+                accountId={selectedAccount.id}
+                initialData={{
+                  brandingAppName: (selectedAccount as any).brandingAppName,
+                  brandingIconUrl: (selectedAccount as any).brandingIconUrl,
+                  brandingPrimaryColor: (selectedAccount as any).brandingPrimaryColor,
+                  brandingThemeColor: (selectedAccount as any).brandingThemeColor,
+                  brandingBgColor: (selectedAccount as any).brandingBgColor,
+                }}
+              />
+            ) : (
               <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Building className="h-5 w-5 text-primary" />
-                      <CardTitle>Configurações da Organização</CardTitle>
-                    </div>
-                    {accounts.length > 1 && (
-                      <Select
-                        value={selectedAccountId?.toString()}
-                        onValueChange={(v) => setSelectedAccountId(parseInt(v))}
-                      >
-                        <SelectTrigger className="w-[200px]" data-testid="select-organization">
-                          <SelectValue placeholder="Selecionar organização" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {accounts.map((acc) => (
-                            <SelectItem key={acc.id} value={acc.id.toString()}>
-                              {acc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
-                  <CardDescription>Gerencie os detalhes da sua organização</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nome da Organização</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Minha Empresa"
-                                data-testid="input-org-name"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="documentType"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Tipo de Documento</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-document-type">
-                                    <SelectValue placeholder="Selecione o tipo" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="cpf">CPF (Pessoa Física)</SelectItem>
-                                  <SelectItem value="cnpj">CNPJ (Pessoa Jurídica)</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="document"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Número do Documento</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  placeholder={documentType === "cpf" ? "000.000.000-00" : "00.000.000/0001-00"}
-                                  data-testid="input-document"
-                                />
-                              </FormControl>
-                              {documentValue && !documentValidation.valid && (
-                                <p className="text-sm text-destructive">{documentValidation.error}</p>
-                              )}
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <FormField
-                        control={form.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Telefone</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="+55 11 99999-9999"
-                                data-testid="input-phone"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <Separator className="my-6" />
-
-                      <div className="space-y-4">
-                        <Label className="text-base font-semibold">Dados de Cobrança</Label>
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="financialContact"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Responsável Financeiro</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="Nome do responsável" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="billingEmail"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Email de Cobrança</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="financeiro@empresa.com" type="email" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <FormField
-                          control={form.control}
-                          name="billingDay"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Dia de Vencimento Preferencial</FormLabel>
-                              <Select
-                                onValueChange={(val) => field.onChange(parseInt(val))}
-                                value={field.value?.toString()}
-                              >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Selecione o dia" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {[5, 10, 15, 20, 25].map((day) => (
-                                    <SelectItem key={day} value={day.toString()}>
-                                      Dia {day}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-4 pt-2">
-                        <div>
-                          <Label className="text-muted-foreground text-xs">Status da Conta</Label>
-                          <Badge
-                            className={
-                              selectedAccount?.status === "active"
-                                ? "bg-green-500/10 text-green-600"
-                                : selectedAccount?.status === "suspended"
-                                  ? "bg-red-500/10 text-red-600"
-                                  : "bg-yellow-500/10 text-yellow-600"
-                            }
-                            data-testid="badge-account-status"
-                          >
-                            {getStatusLabel(selectedAccount?.status || '')}
-                          </Badge>
-                        </div>
-                        <div>
-                          <Label className="text-muted-foreground text-xs">Slug</Label>
-                          <p className="text-sm font-mono" data-testid="text-account-slug">{selectedAccount?.slug}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end pt-4">
-                        <Button
-                          type="submit"
-                          disabled={updateAccount.isPending}
-                          data-testid="button-save-settings"
-                        >
-                          {updateAccount.isPending ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Salvando...
-                            </>
-                          ) : (
-                            "Salvar Alterações"
-                          )}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
+                <CardContent className="pt-6">
+                  <p>Você não tem permissão para acessar estas configurações.</p>
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
 
-
-
-// ... (imports)
-
-            // Inside Settings component:
-
-            // ...
-
-            {/* Branding Section - White Label */}
-            {selectedAccount && ['owner', 'admin'].includes(selectedAccount.role) && (
+          {/* Custom Domain Settings */}
+          <TabsContent value="domain">
+            {selectedAccount && ['owner', 'admin'].includes(selectedAccount.role || '') ? (
               <Card>
                 <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Palette className="h-5 w-5 text-primary" />
-                    <CardTitle>Branding (White Label)</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Personalize o ícone, nome e cores do aplicativo instalável (PWA).
-                  </CardDescription>
+                  <CardTitle>Domínio Personalizado</CardTitle>
+                  <CardDescription>Configure seu próprio domínio para acessar o painel (ex: painel.suaempresa.com)</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <AppBranding
-                    accountId={selectedAccount.id}
-                    initialData={{
-                      brandingAppName: selectedAccount.brandingAppName || selectedAccount.brandingName,
-                      brandingIconUrl: selectedAccount.brandingIconUrl || selectedAccount.brandingLogo,
-                      brandingThemeColor: selectedAccount.brandingThemeColor || selectedAccount.brandingPrimaryColor,
-                      brandingBgColor: selectedAccount.brandingBgColor || "#ffffff"
-                    }}
-                  />
-                </CardContent>
-              </Card>
-            )}
-            {/* Custom Domain Section */}
-            {
-              selectedAccount && ['owner', 'admin'].includes(selectedAccount.role) && (
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-5 w-5 text-primary" />
-                      <CardTitle>Domínio Personalizado</CardTitle>
-                    </div>
-                    <CardDescription>
-                      Configure seu próprio domínio para acessar a plataforma
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="custom-domain">Domínio ou Subdomínio</Label>
-                      <Input
-                        id="custom-domain"
-                        value={customDomain}
-                        onChange={(e) => setCustomDomain(e.target.value)}
-                        placeholder="backup.suaempresa.com.br"
-                        disabled={!!(selectedAccount.customDomain && domainStatus === "active")}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Digite o domínio completo (ex: storage.minhaempresa.com)
-                      </p>
-                    </div>
-
-                    {selectedAccount.customDomain && (
-                      <div className="rounded-lg border p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Status do Domínio:</span>
-                          <Badge variant={domainStatus === "active" ? "default" : domainStatus === "failed" ? "destructive" : "secondary"}>
-                            {domainStatus === "active" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                            {domainStatus === "failed" && <XCircle className="h-3 w-3 mr-1" />}
-                            {domainStatus === "pending" && <AlertCircle className="h-3 w-3 mr-1" />}
-                            {domainStatus === "active" ? "Ativo" : domainStatus === "failed" ? "Falhou" : "Pendente"}
-                          </Badge>
-                        </div>
-
-                        {domainStatus !== "active" && (
-                          <>
-                            <Separator />
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium">Instruções de Configuração DNS:</p>
-                              <div className="bg-muted p-3 rounded text-sm space-y-2">
-                                <p className="font-mono">
-                                  <strong>Opção 1 (CNAME):</strong> Aponte {customDomain} para app.primecloudpro.com.br
-                                </p>
-                                <p className="font-mono text-xs break-all">
-                                  <strong>Opção 2 (TXT):</strong> Adicione TXT: primecloudpro-verification={verificationToken}
-                                </p>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                Após configurar o DNS, aguarde alguns minutos e clique em "Verificar DNS"
-                              </p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    <Separator />
-
-                    <div className="flex gap-2 flex-wrap">
-                      {!selectedAccount.customDomain ? (
-                        <Button
-                          onClick={handleDomainSave}
-                          disabled={configureDomain.isPending || !customDomain}
-                        >
-                          {configureDomain.isPending ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Configurando...
-                            </>
-                          ) : (
-                            "Configurar Domínio"
-                          )}
-                        </Button>
-                      ) : (
-                        <>
-                          {domainStatus !== "active" && (
-                            <Button
-                              onClick={handleDomainVerify}
-                              disabled={verifyDomain.isPending}
-                            >
-                              {verifyDomain.isPending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Verificando...
-                                </>
-                              ) : (
-                                "Verificar DNS"
-                              )}
-                            </Button>
-                          )}
-                          <Button
-                            variant="destructive"
-                            onClick={handleDomainRemove}
-                            disabled={removeDomain.isPending}
-                          >
-                            {removeDomain.isPending ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Removendo...
-                              </>
-                            ) : (
-                              "Remover Domínio"
-                            )}
+                <CardContent className="space-y-6">
+                  {!customDomain ? (
+                    <div className="space-y-4">
+                      <div className="grid gap-2">
+                        <Label>Seu Domínio</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="painel.suaempresa.com"
+                            value={customDomain}
+                            onChange={(e) => setCustomDomain(e.target.value)}
+                          />
+                          <Button onClick={handleDomainSave} disabled={configureDomain.isPending}>
+                            {configureDomain.isPending ? <Loader2 className="animate-spin h-4 w-4" /> : "Configurar"}
                           </Button>
-                        </>
-                      )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Insira apenas o subdomínio/domínio sem http:// ou https://</p>
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              )
-            }
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
+                        <div className="flex items-center gap-3">
+                          <Globe className="h-5 w-5 text-primary" />
+                          <span className="font-medium text-lg">{customDomain}</span>
+                          {domainStatus === 'active' && <Badge className="bg-green-500 hover:bg-green-600">Ativo</Badge>}
+                          {domainStatus === 'pending' && <Badge variant="outline" className="text-yellow-600 border-yellow-600">Pendente</Badge>}
+                          {domainStatus === 'failed' && <Badge variant="destructive">Falhou</Badge>}
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => handleDomainRemove()} disabled={removeDomain.isPending} className="text-destructive hover:text-destructive/80 hover:bg-destructive/10">
+                          {removeDomain.isPending ? <Loader2 className="animate-spin h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+                        </Button>
+                      </div>
 
+                      {domainStatus !== 'active' && (
+                        <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900">
+                          <Info className="h-4 w-4 text-blue-600" />
+                          <AlertTitle className="text-blue-800 dark:text-blue-400">Configuração DNS Necessária</AlertTitle>
+                          <AlertDescription className="text-blue-700 dark:text-blue-300 mt-2">
+                            <p className="mb-2">Crie um registro <strong>CNAME</strong> no seu provedor de domínio apontando para:</p>
+                            <code className="px-2 py-1 bg-white/50 dark:bg-black/20 rounded font-mono block w-fit mb-3 select-all">cname.primecloudpro.com.br</code>
+                            <p className="text-xs">Após configurar, clique em Verificar DNS abaixo.</p>
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      <div className="flex justify-end gap-3">
+                        <Button variant="outline" onClick={() => window.open(`http://${customDomain}`, '_blank')}>
+                          testar Acesso
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </Button>
+                        <Button onClick={handleDomainVerify} disabled={verifyDomain.isPending || domainStatus === 'active'}>
+                          {verifyDomain.isPending ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                          Verificar DNS
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <p>Você não tem permissão para acessar estas configurações.</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* SMTP Settings */}
+          <TabsContent value="email">
+            {selectedAccount && ['owner', 'admin'].includes(selectedAccount.role || '') ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Servidor de Email (SMTP)</CardTitle>
+                  <CardDescription>Configure seu próprio servidor SMTP para envio de emails transacionais.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Usar SMTP Próprio</Label>
+                      <p className="text-sm text-muted-foreground">Desabilitado usará o servidor padrão da plataforma.</p>
+                    </div>
+                    <Switch checked={smtpEnabled} onCheckedChange={setSmtpEnabled} />
+                  </div>
+
+                  {smtpEnabled && (
+                    <div className="space-y-6 pt-4">
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label>Servidor (Host)</Label>
+                          <Input value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.exemplo.com" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Porta</Label>
+                          <Input value={smtpPort} onChange={(e) => setSmtpPort(Number(e.target.value))} placeholder="587" type="number" />
+                        </div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label>Usuário</Label>
+                          <Input value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} placeholder="email@exemplo.com" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Senha</Label>
+                          <Input value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} type="password" placeholder="••••••" />
+                        </div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label>Email do Remetente</Label>
+                          <Input value={smtpFromEmail} onChange={(e) => setSmtpFromEmail(e.target.value)} placeholder="nao-responda@exemplo.com" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Nome do Remetente</Label>
+                          <Input value={smtpFromName} onChange={(e) => setSmtpFromName(e.target.value)} placeholder="Minha Empresa" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Criptografia</Label>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant={smtpEncryption === 'none' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setSmtpEncryption('none')}
+                            className="h-9 min-w-[80px]"
+                          >Nenhuma</Button>
+                          <Button
+                            variant={smtpEncryption === 'tls' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setSmtpEncryption('tls')}
+                            className="h-9 min-w-[80px]"
+                          >TLS (Recomendado)</Button>
+                          <Button
+                            variant={smtpEncryption === 'ssl' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setSmtpEncryption('ssl')}
+                            className="h-9 min-w-[80px]"
+                          >SSL</Button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+                        <Button variant="outline" onClick={handleTestConnection} disabled={testSmtpConnection.isPending} className="w-full sm:w-auto">
+                          {testSmtpConnection.isPending ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : "Testar Conexão"}
+                        </Button>
+                        <Button onClick={handleSmtpSave} disabled={saveSmtpConfig.isPending} className="w-full sm:w-auto">
+                          {saveSmtpConfig.isPending ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                          Salvar Configurações
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <p>Você não tem permissão para acessar estas configurações.</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Notifications Settings */}
+          <TabsContent value="notifications">
             <Card>
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Bell className="h-5 w-5 text-primary" />
-                  <CardTitle>Preferências de Notificação</CardTitle>
-                </div>
-                <CardDescription>Configure como você recebe notificações</CardDescription>
+                <CardTitle>Preferências de Notificação</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="notifications">Notificações por E-mail</Label>
-                    <p className="text-sm text-muted-foreground">Receba atualizações importantes por e-mail</p>
+                    <Label className="text-base">Notificações por Email</Label>
+                    <p className="text-sm text-muted-foreground">Receba alertas sobre sua conta e backups.</p>
                   </div>
                   <Switch
-                    id="notifications"
                     checked={notificationsEnabled}
                     onCheckedChange={setNotificationsEnabled}
-                    data-testid="switch-notifications"
                   />
                 </div>
                 <Separator />
-                <div className="space-y-2">
-                  <Label>Frequência do Resumo por E-mail</Label>
+                <div className="space-y-4">
+                  <Label>Resumo de Atividades</Label>
                   <Select value={emailDigest} onValueChange={setEmailDigest} disabled={!notificationsEnabled}>
-                    <SelectTrigger data-testid="select-email-digest">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="realtime">Em tempo real</SelectItem>
-                      <SelectItem value="daily">Resumo diário</SelectItem>
-                      <SelectItem value="weekly">Resumo semanal</SelectItem>
+                      <SelectItem value="daily">Diário</SelectItem>
+                      <SelectItem value="weekly">Semanal</SelectItem>
                       <SelectItem value="never">Nunca</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Nota: As preferências de e-mail são salvas localmente para este MVP.
-                  </p>
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* SMTP Email Configuration Section */}
-            {
-              selectedAccount && ['owner', 'admin'].includes(selectedAccount.role) && (
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-5 w-5 text-primary" />
-                      <CardTitle>Configuração de E-mail (SMTP)</CardTitle>
-                    </div>
-                    <CardDescription>
-                      Configure seu próprio servidor SMTP para envio de e-mails
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="smtp-enabled">Ativar SMTP Personalizado</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Usar seu próprio servidor SMTP para enviar e-mails
-                        </p>
-                      </div>
-                      <Switch
-                        id="smtp-enabled"
-                        checked={smtpEnabled}
-                        onCheckedChange={setSmtpEnabled}
-                      />
-                    </div>
-
-                    {smtpEnabled && (
-                      <>
-                        <Separator />
-                        <div className="grid gap-4">
-                          <div className="grid gap-2 grid-cols-2">
-                            <div className="space-y-2">
-                              <Label htmlFor="smtp-host">Servidor SMTP *</Label>
-                              <Input
-                                id="smtp-host"
-                                value={smtpHost}
-                                onChange={(e) => setSmtpHost(e.target.value)}
-                                placeholder="smtp.gmail.com"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="smtp-port">Porta *</Label>
-                              <Input
-                                id="smtp-port"
-                                type="number"
-                                value={smtpPort}
-                                onChange={(e) => setSmtpPort(parseInt(e.target.value) || 587)}
-                                placeholder="587"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="smtp-encryption">Criptografia</Label>
-                            <Select value={smtpEncryption} onValueChange={(value: any) => setSmtpEncryption(value)}>
-                              <SelectTrigger id="smtp-encryption">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">Nenhuma</SelectItem>
-                                <SelectItem value="tls">TLS (STARTTLS)</SelectItem>
-                                <SelectItem value="ssl">SSL/TLS</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground">
-                              Porta 587 geralmente usa TLS. Porta 465 usa SSL/TLS.
-                            </p>
-                          </div>
-
-                          <div className="grid gap-2 grid-cols-2">
-                            <div className="space-y-2">
-                              <Label htmlFor="smtp-user">Usuário SMTP *</Label>
-                              <Input
-                                id="smtp-user"
-                                value={smtpUser}
-                                onChange={(e) => setSmtpUser(e.target.value)}
-                                placeholder="seu-email@exemplo.com"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="smtp-pass">Senha SMTP *</Label>
-                              <Input
-                                id="smtp-pass"
-                                type="password"
-                                value={smtpPass}
-                                onChange={(e) => setSmtpPass(e.target.value)}
-                                placeholder="••••••••"
-                              />
-                            </div>
-                          </div>
-
-                          <Separator />
-
-                          <div className="grid gap-2 grid-cols-2">
-                            <div className="space-y-2">
-                              <Label htmlFor="smtp-from-email">E-mail Remetente</Label>
-                              <Input
-                                id="smtp-from-email"
-                                type="email"
-                                value={smtpFromEmail}
-                                onChange={(e) => setSmtpFromEmail(e.target.value)}
-                                placeholder="noreply@suaempresa.com"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="smtp-from-name">Nome do Remetente</Label>
-                              <Input
-                                id="smtp-from-name"
-                                value={smtpFromName}
-                                onChange={(e) => setSmtpFromName(e.target.value)}
-                                placeholder="Sua Empresa"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-                            <p className="text-sm font-medium">⚠️ Informações Importantes:</p>
-                            <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                              <li>Gmail: Use senha de aplicativo, não sua senha normal</li>
-                              <li>Office 365: smtp.office365.com, porta 587, TLS</li>
-                              <li>O envio de e-mails usará estas configurações quando ativado</li>
-                            </ul>
-                          </div>
-
-                          <div className="flex gap-2 flex-wrap">
-                            <Button
-                              onClick={handleSmtpSave}
-                              disabled={saveSmtpConfig.isPending}
-                            >
-                              {saveSmtpConfig.isPending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Salvando...
-                                </>
-                              ) : (
-                                "Salvar Configuração"
-                              )}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={handleTestConnection}
-                              disabled={testSmtpConnection.isPending || !smtpHost}
-                            >
-                              {testSmtpConnection.isPending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Testando...
-                                </>
-                              ) : (
-                                "Testar Conexão"
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            }
-
+          <TabsContent value="security">
             <Card>
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  <CardTitle>Segurança</CardTitle>
-                </div>
-                <CardDescription>A autenticação é gerenciada através do seu provedor</CardDescription>
+                <CardTitle>Segurança</CardTitle>
+                <CardDescription>Gerencie a segurança da sua conta.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between p-4 rounded-md bg-muted/50">
-                  <div>
-                    <p className="font-medium">Autenticação de Dois Fatores</p>
-                    <p className="text-sm text-muted-foreground">Configure nas configurações da sua conta</p>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                      <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Autenticação de Dois Fatores (2FA)</h4>
+                      <p className="text-sm text-muted-foreground">Adicione uma camada extra de segurança.</p>
+                    </div>
                   </div>
-                  <Button variant="outline" data-testid="button-manage-security">
-                    Gerenciar Segurança
-                  </Button>
+                  <Button variant="outline">Configurar</Button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+                      <Key className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Alterar Senha</h4>
+                      <p className="text-sm text-muted-foreground">Última alteração ha 30 dias.</p>
+                    </div>
+                  </div>
+                  <Button variant="outline">Alterar</Button>
                 </div>
               </CardContent>
             </Card>
-          </div >
-        </div >
-      </main >
-    </div >
+          </TabsContent>
+        </Tabs>
+      </div>
+    </DashboardLayout>
   );
 }

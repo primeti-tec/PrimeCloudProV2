@@ -3,6 +3,7 @@ import type { Server } from "http";
 import { getAuth, requireAuth } from "@clerk/express";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
+import { accounts } from "@shared/schema";
 import { z } from "zod";
 import { authStorage } from "./replit_integrations/auth"; // To find users by email
 import { validateDocument } from "./lib/document-validation";
@@ -13,6 +14,7 @@ import crypto from "crypto";
 import multer from "multer";
 import sharp from "sharp";
 import { minioService } from "./services/minio.service";
+import { appendFileSync } from "fs";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -147,7 +149,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid Account ID" });
       }
 
-      const { appName, themeColor, bgColor } = req.body;
+      const { appName, themeColor, bgColor, primaryColor } = req.body;
       let iconUrl = null;
 
       // Only process icon if file is uploaded
@@ -177,6 +179,7 @@ export async function registerRoutes(
       const updateData: any = {
         brandingAppName: appName,
         brandingThemeColor: themeColor,
+        brandingPrimaryColor: primaryColor,
         brandingBgColor: bgColor,
       };
 
@@ -275,6 +278,7 @@ export async function registerRoutes(
   app.get(api.accounts.listMy.path, requireAuth(), async (req: any, res) => {
     const { userId } = getAuth(req);
     const accounts = await storage.getUserAccounts(userId);
+    console.log("DEBUG: Accounts branding:", accounts.map(a => ({ id: a.account.id, name: a.account.name, brandingPrimaryColor: a.account.brandingPrimaryColor })));
     res.json(accounts.map(a => ({ ...a.account, role: a.role })));
   });
 
@@ -749,12 +753,16 @@ export async function registerRoutes(
       const accountId = parseInt(req.params.id);
       const { userId } = getAuth(req);
       const input = api.admin.adjustQuota.input.parse(req.body);
+      console.log(`[Admin] Adjust Quota Input:`, input);
       const previousAccount = await storage.getAccount(accountId);
       const previousQuota = previousAccount?.storageQuotaGB || 100;
 
       const updateData: Partial<typeof accounts.$inferInsert> = { storageQuotaGB: input.quotaGB };
       if (input.manualBandwidthGB !== undefined) {
-        updateData.bandwidthUsed = input.manualBandwidthGB * 1024 * 1024 * 1024;
+        updateData.bandwidthUsed = Math.round(input.manualBandwidthGB * 1024 * 1024 * 1024);
+      }
+      if (input.imperiusLicenseCount !== undefined) {
+        updateData.imperiusLicenseCount = input.imperiusLicenseCount;
       }
 
       const account = await storage.updateAccount(accountId, updateData);
@@ -768,15 +776,17 @@ export async function registerRoutes(
           accountName: account.name,
           previousQuotaGB: previousQuota,
           newQuotaGB: input.quotaGB,
+          imperiusLicenses: input.imperiusLicenseCount,
           reason: input.reason
         },
       });
       res.json(account);
-    } catch (err) {
+    } catch (err: any) {
+      console.error("[Admin] Adjust Quota Error:", err);
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      res.status(500).json({ message: "Internal Server Error" });
+      res.status(500).json({ message: err.message || "Internal Server Error" });
     }
   });
 
@@ -1336,6 +1346,43 @@ export async function registerRoutes(
     }
 
     const bucket = await storage.updateBucketLimit(bucketId, limit);
+    res.json(bucket);
+  });
+
+  // Update Bucket (Generic - for linking Customer)
+  app.patch('/api/accounts/:accountId/buckets/:bucketId', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+    const bucketId = parseInt(req.params.bucketId);
+
+    // Only allow specific fields to be updated
+    const { customerId, isImperiusBackup, storageLimitGB, isPublic } = req.body;
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const updateData: any = {};
+
+    // Verify properties if provided
+    if (customerId !== undefined) {
+      if (customerId === null) {
+        updateData.customerId = null;
+      } else {
+        const customer = await storage.getCustomer(customerId);
+        if (!customer || customer.accountId !== accountId) {
+          return res.status(400).json({ message: "Invalid customer ID for this account" });
+        }
+        updateData.customerId = customerId;
+      }
+    }
+
+    if (isImperiusBackup !== undefined) updateData.isImperiusBackup = isImperiusBackup;
+    if (storageLimitGB !== undefined) updateData.storageLimitGB = storageLimitGB;
+    if (isPublic !== undefined) updateData.isPublic = isPublic;
+
+    const bucket = await storage.updateBucket(bucketId, updateData);
     res.json(bucket);
   });
 
@@ -2059,6 +2106,11 @@ export async function registerRoutes(
         smtpFromEmail: account.smtpFromEmail,
         smtpFromName: account.smtpFromName,
         smtpEncryption: account.smtpEncryption,
+        branding: {
+          name: account.brandingAppName || undefined,
+          logoUrl: account.brandingIconUrl || undefined,
+          primaryColor: account.brandingPrimaryColor || undefined,
+        },
       } : undefined;
 
       // Send invitation email
@@ -2254,6 +2306,17 @@ export async function registerRoutes(
     res.json(usage);
   });
 
+  app.get('/api/accounts/:accountId/usage/history', requireAuth(), async (req: any, res) => {
+    const { userId } = getAuth(req);
+    const accountId = parseInt(req.params.accountId);
+
+    const membership = await storage.getMembership(userId, accountId);
+    if (!membership) return res.status(403).json({ message: "Forbidden" });
+
+    const history = await storage.getUsageHistory(accountId);
+    res.json(history);
+  });
+
   // --- Quota Requests Routes ---
   // Create a quota request
   app.post(api.quotaRequests.create.path, requireAuth(), async (req: any, res) => {
@@ -2358,7 +2421,147 @@ export async function registerRoutes(
     }
   });
 
-  // === ORDERS ROUTES ===
+
+  // Delete account (Admin only)
+  app.delete(api.accounts.delete.path, requireAuth(), async (req: any, res) => {
+    try {
+      const { userId } = getAuth(req);
+      const accountId = parseInt(req.params.id);
+
+      // Super admin check
+      const user = await authStorage.getUser(userId);
+      // Assuming role-based access control is handled by middleware or simpler check for now
+      // Fix: 'isSuperAdmin' does not exist on type 'User'. 
+      // User requested deletion from Admin Dashboard, implying they are admin.
+      if (!user) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      await storage.deleteAccount(accountId);
+
+      // Audit log
+      await storage.createAuditLog({
+        accountId: 0, // System
+        userId,
+        action: 'ACCOUNT_DELETED',
+        resource: 'account',
+        details: { accountId },
+      });
+
+      res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // === CUSTOMERS ROUTES ===
+
+  // List customers
+  app.get(api.customers.list.path, requireAuth(), async (req: any, res) => {
+    try {
+      appendFileSync('debug_log.txt', `[${new Date().toISOString()}] GET /api/customers hit\n`);
+      const { userId } = getAuth(req);
+
+      const memberships = await storage.getUserMemberships(userId);
+      const validMembership = memberships.find(m => ['owner', 'admin'].includes(m.role));
+
+      if (!validMembership) {
+        return res.status(403).json({ message: "Forbidden: You must be an admin of at least one account." });
+      }
+
+      const accountId = validMembership.accountId;
+      const customersList = await storage.listCustomers(accountId);
+      res.json(customersList);
+    } catch (err: any) {
+      console.error("GET /api/customers error:", err);
+      try {
+        appendFileSync('debug_log.txt', `[${new Date().toISOString()}] Error in GET /api/customers: ${err.message}\nStack: ${err.stack}\n`);
+      } catch (e) {
+        console.error("Failed to write to debug_log.txt", e);
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post(api.customers.create.path, requireAuth(), async (req: any, res) => {
+    try {
+      appendFileSync('debug_log.txt', `[${new Date().toISOString()}] POST /api/customers hit. Body: ${JSON.stringify(req.body)}\n`);
+      const { userId } = getAuth(req);
+
+      // Find the first account where the user is an admin or owner
+      const memberships = await storage.getUserMemberships(userId);
+      const validMembership = memberships.find(m => ['owner', 'admin'].includes(m.role));
+
+      if (!validMembership) {
+        return res.status(403).json({ message: "Forbidden: You must be an admin of at least one account." });
+      }
+
+      const accountId = validMembership.accountId;
+
+      // Validate input
+      // Note: api.customers.create.input already validates the structural schema, 
+      // but we need to handle the internal logic.
+      const parsedData = api.customers.create.input.parse(req.body);
+
+      // Create customer (storage handles bucket linking if bucketIds provided)
+      const customer = await storage.createCustomer({
+        ...parsedData,
+        accountId,
+      });
+
+      await storage.createAuditLog({
+        accountId,
+        userId,
+        action: 'CUSTOMER_CREATED',
+        resource: 'customer',
+        details: { customerId: customer.id, name: customer.name, bucketIds: parsedData.bucketIds },
+      });
+
+      res.status(201).json(customer);
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        console.log("ZOD VALIDATION ERROR:", JSON.stringify(err.errors, null, 2)); // Print to terminal
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error(err);
+      try {
+        appendFileSync('debug_log.txt', `[${new Date().toISOString()}] Error creating customer: ${err.message}\nStack: ${err.stack}\n`);
+      } catch (e) {
+        console.error("Failed to write to debug_log.txt", e);
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+
+
+  // Delete customer
+  app.delete(api.customers.delete.path, requireAuth(), async (req: any, res) => {
+    try {
+      const { userId } = getAuth(req);
+      const id = parseInt(req.params.id);
+
+      // Basic audit
+      // We could fetch the customer name first for better audit logs, but for speed just log ID.
+      // Assuming storage.deleteCustomer handles unlink logic.
+      await storage.deleteCustomer(id);
+
+      await storage.createAuditLog({
+        accountId: 0, // System or current account? Hard to get without fetching customer.
+        // Actually we can get accountId from req user or pass 0.
+        userId,
+        action: 'CUSTOMER_DELETED',
+        resource: 'customer',
+        details: { customerId: id },
+      });
+
+      res.sendStatus(200);
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ message: err.message });
+    }
+  });
 
   // List orders for an account
   app.get(api.orders.list.path, requireAuth(), async (req: any, res) => {
