@@ -51,6 +51,11 @@ export async function registerRoutes(
     next();
   });
 
+  // --- Health Check ---
+  app.get("/health", (_req, res) => {
+    res.status(200).send("ok");
+  });
+
   // --- Public Routes ---
   app.get(api.products.list.path, async (req, res) => {
     const products = await storage.getProducts();
