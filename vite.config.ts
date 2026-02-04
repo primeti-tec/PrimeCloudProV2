@@ -45,17 +45,7 @@ export default defineConfig({
     minify: 'esbuild',
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
-          // Keep React, React-DOM, and Clerk together to avoid initialization issues
-          if (id.includes("/react/") || id.includes("/react-dom/") || id.includes("/scheduler/") || id.includes("/@clerk/")) return "react-core";
-          if (id.includes("/@radix-ui/")) return "radix";
-          if (id.includes("/recharts/")) return "recharts";
-          if (id.includes("/framer-motion/")) return "framer-motion";
-          if (id.includes("/date-fns/")) return "date-fns";
-          if (id.includes("/lucide-react/")) return "lucide";
-          return "vendor";
-        },
+        // Let Vite handle chunking automatically to avoid initialization order issues
       },
     },
   },
