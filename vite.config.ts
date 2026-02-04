@@ -47,10 +47,8 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
-          // Keep React and React-DOM in their own chunk
-          if (id.includes("/react/") || id.includes("/react-dom/") || id.includes("/scheduler/")) return "react";
-          // Keep Clerk in vendor to avoid circular dependency issues
-          if (id.includes("/@clerk/")) return "vendor";
+          // Keep React, React-DOM, and Clerk together to avoid initialization issues
+          if (id.includes("/react/") || id.includes("/react-dom/") || id.includes("/scheduler/") || id.includes("/@clerk/")) return "react-core";
           if (id.includes("/@radix-ui/")) return "radix";
           if (id.includes("/recharts/")) return "recharts";
           if (id.includes("/framer-motion/")) return "framer-motion";
