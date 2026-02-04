@@ -1,70 +1,70 @@
-  import { defineConfig } from "vite";                                          
-  import react from "@vitejs/plugin-react";                                     
-  import path from "path";                                                      
-  import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-  import { VitePWA } from "vite-plugin-pwa";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { VitePWA } from "vite-plugin-pwa";
 
-  export default defineConfig({
-    optimizeDeps: {
-      include: ['@clerk/clerk-react', '@clerk/shared', '@clerk/types'],
+export default defineConfig({
+  optimizeDeps: {
+    include: ['@clerk/clerk-react', '@clerk/shared', '@clerk/types'],
+  },
+  plugins: [
+    react(),
+    runtimeErrorOverlay(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true
+      },
+      includeAssets: ['favicon.png', 'robots.txt'],
+      manifest: false, // We serve a dynamic manifest from the backend at /manifest.webmanifest
+    }),
+    ...(process.env.NODE_ENV !== "production" &&
+      process.env.REPL_ID !== undefined
+      ? [
+        await import("@replit/vite-plugin-cartographer").then((m) =>
+          m.cartographer(),
+        ),
+        await import("@replit/vite-plugin-dev-banner").then((m) =>
+          m.devBanner(),
+        ),
+      ]
+      : []),
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(import.meta.dirname, "client", "src"),
+      "@shared": path.resolve(import.meta.dirname, "shared"),
+      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
-    plugins: [
-      react(),
-      runtimeErrorOverlay(),
-      VitePWA({
-        registerType: 'autoUpdate',
-        devOptions: {
-          enabled: true
+  },
+  root: path.resolve(import.meta.dirname, "client"),
+  build: {
+    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    emptyOutDir: true,
+    minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          // Keep React and React-DOM in their own chunk
+          if (id.includes("/react/") || id.includes("/react-dom/") || id.includes("/scheduler/")) return "react";
+          // Keep Clerk in vendor to avoid circular dependency issues
+          if (id.includes("/@clerk/")) return "vendor";
+          if (id.includes("/@radix-ui/")) return "radix";
+          if (id.includes("/recharts/")) return "recharts";
+          if (id.includes("/framer-motion/")) return "framer-motion";
+          if (id.includes("/date-fns/")) return "date-fns";
+          if (id.includes("/lucide-react/")) return "lucide";
+          return "vendor";
         },
-        includeAssets: ['favicon.png', 'robots.txt'],
-        manifest: false, // We serve a dynamic manifest from the backend at
-  /manifest.webmanifest
-      }),
-      ...(process.env.NODE_ENV !== "production" &&
-        process.env.REPL_ID !== undefined
-        ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-        : []),
-    ],
-    resolve: {
-      alias: {
-        "@": path.resolve(import.meta.dirname, "client", "src"),
-        "@shared": path.resolve(import.meta.dirname, "shared"),
-        "@assets": path.resolve(import.meta.dirname, "attached_assets"),
       },
     },
-    root: path.resolve(import.meta.dirname, "client"),
-    build: {
-      outDir: path.resolve(import.meta.dirname, "dist/public"),
-      emptyOutDir: true,
-      rollupOptions: {
-        output: {
-          manualChunks(id) {
-            if (!id.includes("node_modules")) return;
-            // Bundle React and Clerk together to avoid initialization order
-  issues
-            if (id.includes("/react/") || id.includes("/react-dom/") ||
-  id.includes("/@clerk/")) return "react";
-            if (id.includes("/@radix-ui/")) return "radix";
-            if (id.includes("/recharts/")) return "recharts";
-            if (id.includes("/framer-motion/")) return "framer-motion";
-            if (id.includes("/date-fns/")) return "date-fns";
-            if (id.includes("/lucide-react/")) return "lucide";
-            return "vendor";
-          },
-        },
-      },
+  },
+  server: {
+    fs: {
+      strict: true,
+      deny: ["**/.*"],
     },
-    server: {
-      fs: {
-        strict: true,
-        deny: ["**/.*"],
-      },
-    },
-  });
+  },
+});
