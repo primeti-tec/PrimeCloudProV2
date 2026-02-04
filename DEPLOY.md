@@ -55,3 +55,61 @@ Use esta opção se você já tiver bancos de dados PostgreSQL e S3 (MinIO/AWS) 
 
 ### Domínios e SSL
 - O Coolify (via Traefik) gerencia SSL automaticamente (Let's Encrypt). Apenas aponte os registros DNS (A/CNAME) para o IP da sua VPS.
+
+## Configuração do Clerk (Autenticação)
+
+### Variáveis Obrigatórias
+
+O Clerk requer as seguintes variáveis configuradas:
+
+**Build Arguments** (necessárias durante o build):
+```
+VITE_CLERK_PUBLISHABLE_KEY=pk_live_xxxx
+```
+
+**Environment Variables** (necessárias em runtime):
+```
+CLERK_PUBLISHABLE_KEY=pk_live_xxxx
+CLERK_SECRET_KEY=sk_live_xxxx
+```
+
+### Configuração no Coolify
+
+1. No painel do Coolify, vá em **Settings** > **Environment Variables**
+2. Adicione as variáveis `CLERK_PUBLISHABLE_KEY` e `CLERK_SECRET_KEY`
+3. Vá em **Settings** > **Build** e adicione o Build Argument `VITE_CLERK_PUBLISHABLE_KEY`
+4. Faça o deploy
+
+### Problemas Conhecidos
+
+**Erro: "Cannot access 'at' before initialization" ou "Cannot read properties of undefined (reading 'useState')"**
+
+Este erro ocorre quando há conflito de bundling entre React e Clerk. Soluções aplicadas:
+
+1. **Vite versão 5.4.x** - Versões mais novas (7.x) causam conflitos de mangling
+2. **Sem manualChunks** - O `vite.config.ts` não deve ter configuração customizada de `manualChunks` para evitar problemas de ordem de carregamento
+3. **optimizeDeps** - Incluir Clerk no `optimizeDeps.include`:
+   ```typescript
+   optimizeDeps: {
+     include: ['@clerk/clerk-react', '@clerk/shared', '@clerk/types'],
+   },
+   ```
+
+**Erro: "Publishable key not valid" (500)**
+
+Este erro indica que as variáveis do Clerk não estão configuradas corretamente no runtime.
+
+1. Verifique se `CLERK_PUBLISHABLE_KEY` e `CLERK_SECRET_KEY` estão no `.env` do Coolify
+2. O Coolify pode sobrescrever o `.env` a cada deploy - configure as variáveis no painel
+3. Após corrigir o `.env`, recrie o container:
+   ```bash
+   cd /data/coolify/applications/<app-id>
+   docker compose up -d --force-recreate api
+   ```
+
+### Versões Testadas
+
+- Node.js: 20.x
+- Vite: 5.4.14
+- @clerk/clerk-react: 5.59.4
+- @clerk/express: 1.7.63
